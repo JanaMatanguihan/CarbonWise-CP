@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:carbonwise_app/navigation.dart';
 
 void main() {
   runApp(const CarbonWiseApp());
@@ -14,8 +15,8 @@ class CarbonWiseApp extends StatelessWidget {
       title: 'CarbonWise',
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(
-          0xFFF5F7F5,
-        ), // Off-white canvas tone
+          0xFFEFEFEA,
+        ), // Canvas off-white tone matching background images
         primarySwatch: Colors.green,
       ),
       home: const LandingPageScreen(),
@@ -55,7 +56,7 @@ class LandingPageScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green[800],
+                      color: const Color(0xFF265D3B),
                     ),
                   ),
                 ],
@@ -93,7 +94,7 @@ class LandingPageScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B9E66),
+                    backgroundColor: const Color(0xFF3AA76D),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -118,7 +119,7 @@ class LandingPageScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 2. LOG-IN SCREEN (FIXED BOTTOM PINNING)
+// 2. LOG-IN SCREEN
 // ==========================================
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -135,43 +136,40 @@ class LoginScreen extends StatelessWidget {
               child: IntrinsicHeight(
                 child: Column(
                   children: [
-                    const SizedBox(height: 60),
+                    const SizedBox(height: 50),
                     Center(
                       child: Image.asset(
                         'assets/carbonwise-logo.png',
-                        height: 70,
-                        width: 70,
+                        height: 160,
+                        width: 160,
                         fit: BoxFit.contain,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 12),
+                    const Text(
                       'CarbonWise',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green[800],
+                        color: Color(0xFF265D3B),
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 35),
 
-                    // Expanded card fills all remaining bottom viewport room
                     Expanded(
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.only(
                           left: 24.0,
                           right: 24.0,
-                          top: 32.0,
-                          bottom: 24.0,
+                          top: 36.0,
+                          bottom: 32.0,
                         ),
                         decoration: const BoxDecoration(
-                          color: Color(
-                            0xFF1E5631,
-                          ), // Deep dark green mockup tone
+                          color: Color(0xFF2B6B46),
                           borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(32),
-                            topRight: Radius.circular(32),
+                            topLeft: Radius.circular(28),
+                            topRight: Radius.circular(28),
                           ),
                         ),
                         child: Column(
@@ -181,49 +179,55 @@ class LoginScreen extends StatelessWidget {
                               child: Text(
                                 'Welcome to CarbonWise',
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 24,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             const Center(
-                              child: Text(
-                                'Log in with your SR-Code and password to start your sustainability journey.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white70,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text(
+                                  'Log in with your SR-Code and password to start your sustainability journey.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                    height: 1.3,
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 30),
+                            const SizedBox(height: 35),
 
                             const Text(
                               'SR-Code',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 6),
                             TextField(
+                              style: const TextStyle(color: Colors.black87),
                               decoration: InputDecoration(
                                 hintText: '2x-xxxxx',
                                 hintStyle: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 13,
+                                  color: Color(0xFFB0B0B0),
+                                  fontSize: 14,
                                 ),
-                                fillColor: const Color(0xFFECECEC),
+                                fillColor: const Color(0xFFF5F5F5),
                                 filled: true,
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                   borderSide: BorderSide.none,
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
-                                  vertical: 12,
+                                  vertical: 14,
                                 ),
                               ),
                             ),
@@ -233,39 +237,51 @@ class LoginScreen extends StatelessWidget {
                               'Password',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 6),
                             TextField(
                               obscureText: true,
+                              style: const TextStyle(color: Colors.black87),
                               decoration: InputDecoration(
                                 hintText: 'Enter Password',
                                 hintStyle: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 13,
+                                  color: Color(0xFFB0B0B0),
+                                  fontSize: 14,
                                 ),
-                                fillColor: const Color(0xFFECECEC),
+                                fillColor: const Color(0xFFF5F5F5),
                                 filled: true,
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                   borderSide: BorderSide.none,
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
-                                  vertical: 12,
+                                  vertical: 14,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 35),
+                            const SizedBox(height: 30),
 
                             SizedBox(
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CustomMainNavigation(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF3B9E66),
+                                  backgroundColor: const Color(0xFF3AA76D),
+                                  elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -274,18 +290,16 @@ class LoginScreen extends StatelessWidget {
                                   'Log in',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
                             ),
 
-                            // This spacer forces the following items down to the bottom
                             const Spacer(),
-
-                            const Divider(color: Colors.white30),
-                            const SizedBox(height: 15),
+                            const Divider(color: Colors.white38, thickness: 1),
+                            const SizedBox(height: 25),
 
                             Center(
                               child: GestureDetector(
@@ -303,11 +317,11 @@ class LoginScreen extends StatelessWidget {
                                   text: const TextSpan(
                                     style: TextStyle(
                                       color: Colors.white70,
-                                      fontSize: 13,
+                                      fontSize: 14,
                                     ),
                                     children: [
                                       TextSpan(
-                                        text: "Don't have an account yet? ",
+                                        text: "Don’t have an account yet? ",
                                       ),
                                       TextSpan(
                                         text: "Click here to Sign up.",
@@ -321,6 +335,7 @@ class LoginScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 10),
                           ],
                         ),
                       ),
@@ -373,12 +388,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    const Text(
                       'CarbonWise',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green[800],
+                        color: Color(0xFF265D3B),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -391,7 +406,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           vertical: 32.0,
                         ),
                         decoration: const BoxDecoration(
-                          color: Color(0xFF1E5631),
+                          color: Color(0xFF2B6B46),
                           borderRadius: BorderRadius.only(
                             topLeft: Radius.circular(32),
                             topRight: Radius.circular(32),
@@ -540,9 +555,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                  // Clears out screen stacking history and drops them into CustomMainNavigation
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CustomMainNavigation(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF3B9E66),
+                                  backgroundColor: const Color(0xFF3AA76D),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -590,6 +615,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         const SizedBox(height: 6),
         TextField(
           obscureText: isObscured,
+          style: const TextStyle(color: Colors.black87),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
