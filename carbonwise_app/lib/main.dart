@@ -18,7 +18,6 @@ class CarbonWiseApp extends StatelessWidget {
         ), // Off-white canvas tone
         primarySwatch: Colors.green,
       ),
-      // Starts directly on the mock landing page
       home: const LandingPageScreen(),
     );
   }
@@ -40,7 +39,6 @@ class LandingPageScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              // Title Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -63,39 +61,14 @@ class LandingPageScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 40),
-
-              // App Logo Image Frame
-              Container(
-                height: 220,
-                width: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                // ClipRRect ensures your custom logo image stays perfectly circular
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(80),
-                  child: Padding(
-                    padding: const EdgeInsets.all(
-                      20.0,
-                    ), // Adds space around logo inside circle
-                    child: Image.asset(
-                      'assets/carbonwise-logo.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+              Center(
+                child: Image.asset(
+                  'assets/carbonwise-logo.png',
+                  height: 200,
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 50),
-
-              // Description Text
               const Text(
                 'Track your daily footprint and level up your impact on campus sustainability!',
                 textAlign: TextAlign.center,
@@ -107,8 +80,6 @@ class LandingPageScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-
-              // Interactive Navigation Action
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -122,9 +93,7 @@ class LandingPageScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(
-                      0xFF3B9E66,
-                    ), // Match mockup green tint
+                    backgroundColor: const Color(0xFF3B9E66),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -149,7 +118,7 @@ class LandingPageScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 2. LOG-IN SCREEN
+// 2. LOG-IN SCREEN (FIXED BOTTOM PINNING)
 // ==========================================
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -157,180 +126,211 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 60),
-            // Header Custom Image Logo Replacement
-            Center(
-              child: Image.asset(
-                'assets/carbonwise-logo.png',
-                height: 70,
-                width: 70,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'CarbonWise',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.green[800],
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Form container background
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24.0),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E5631), // Deep dark green mockup banner tone
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      'Welcome to CarbonWise',
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 60),
+                    Center(
+                      child: Image.asset(
+                        'assets/carbonwise-logo.png',
+                        height: 70,
+                        width: 70,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'CarbonWise',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Colors.green[800],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Center(
-                    child: Text(
-                      'Log in with your SR-Code and password to start your sustainability journey.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
+                    const SizedBox(height: 30),
 
-                  // SR Code Field
-                  const Text(
-                    'SR-Code',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: '2x-xxxxx',
-                      fillColor: const Color(0xFFECECEC),
-                      filled: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Password Field
-                  const Text(
-                    'Password',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: 'Enter Password',
-                      fillColor: const Color(0xFFECECEC),
-                      filled: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Log-in Trigger Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Place submission or dashboard push routing action here later
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3B9E66),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    // Expanded card fills all remaining bottom viewport room
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.only(
+                          left: 24.0,
+                          right: 24.0,
+                          top: 32.0,
+                          bottom: 24.0,
                         ),
-                      ),
-                      child: const Text(
-                        'Log in',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(color: Colors.white30),
-                  const SizedBox(height: 20),
-
-                  // Alternate Form Registration Redirect Action
-                  Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SignUpScreen(),
+                        decoration: const BoxDecoration(
+                          color: Color(
+                            0xFF1E5631,
+                          ), // Deep dark green mockup tone
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(32),
+                            topRight: Radius.circular(32),
                           ),
-                        );
-                      },
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: const TextSpan(
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextSpan(text: "Don't have an account yet? "),
-                            TextSpan(
-                              text: "Click here to Sign up.",
+                            const Center(
+                              child: Text(
+                                'Welcome to CarbonWise',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Center(
+                              child: Text(
+                                'Log in with your SR-Code and password to start your sustainability journey.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+
+                            const Text(
+                              'SR-Code',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
                                 color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              decoration: InputDecoration(
+                                hintText: '2x-xxxxx',
+                                hintStyle: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                                fillColor: const Color(0xFFECECEC),
+                                filled: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            const Text(
+                              'Password',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              obscureText: true,
+                              decoration: InputDecoration(
+                                hintText: 'Enter Password',
+                                hintStyle: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                                fillColor: const Color(0xFFECECEC),
+                                filled: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 35),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: () {},
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3B9E66),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Log in',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // This spacer forces the following items down to the bottom
+                            const Spacer(),
+
+                            const Divider(color: Colors.white30),
+                            const SizedBox(height: 15),
+
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SignUpScreen(),
+                                    ),
+                                  );
+                                },
+                                child: RichText(
+                                  textAlign: TextAlign.center,
+                                  text: const TextSpan(
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: "Don't have an account yet? ",
+                                      ),
+                                      TextSpan(
+                                        text: "Click here to Sign up.",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -347,7 +347,6 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  // Temporary drop-down selection options tracking references
   String? selectedCampus;
   String? selectedYearLevel;
   String? selectedDepartment;
@@ -355,204 +354,224 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 50),
-            // Sign Up Custom Image Logo Replacement
-            Center(
-              child: Image.asset(
-                'assets/carbonwise-logo.png',
-                height: 60,
-                width: 60,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'CarbonWise',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.green[800],
-              ),
-            ),
-            const SizedBox(height: 20),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 50),
+                    Center(
+                      child: Image.asset(
+                        'assets/carbonwise-logo.png',
+                        height: 60,
+                        width: 60,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'CarbonWise',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24.0),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E5631),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24.0,
+                          vertical: 32.0,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF1E5631),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(32),
+                            topRight: Radius.circular(32),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Center(
+                              child: Text(
+                                'Get Started with CarbonWise',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Center(
+                              child: Text(
+                                'Create your account and start your sustainability journey today!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 25),
+
+                            _buildInputField(
+                              label: 'SR-Code',
+                              hint: '2x-xxxxx',
+                            ),
+                            _buildInputField(
+                              label: 'Name',
+                              hint: 'Enter your name',
+                            ),
+                            _buildInputField(
+                              label: 'G-Suite Email',
+                              hint: '@g.batstate-u.edu.ph',
+                            ),
+                            _buildInputField(
+                              label: 'Password',
+                              hint: 'Enter your password',
+                              isObscured: true,
+                            ),
+                            _buildInputField(
+                              label: 'Password Confirmation',
+                              hint: 'Enter your password',
+                              isObscured: true,
+                            ),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Campus',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildDropdownField(
+                                        hint: 'Click to choose...',
+                                        items: [
+                                          'Lipa Campus',
+                                          'Pablo Borbon Campus',
+                                          'Alangilan Campus',
+                                          'Lima Campus',
+                                          'ARASOF Nasugbu Campus',
+                                          'JPLPC Malvar Campus',
+                                          'Lemery Campus',
+                                          'Rosario Campus',
+                                          'San Juan Campus',
+                                          'Balayan Campus',
+                                          'Lobo Campus',
+                                          'Mabini',
+                                        ],
+                                        value: selectedCampus,
+                                        onChanged: (val) => setState(
+                                          () => selectedCampus = val,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Year Level',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildDropdownField(
+                                        hint: 'Click to choose...',
+                                        items: [
+                                          '1st Year',
+                                          '2nd Year',
+                                          '3rd Year',
+                                          '4th Year',
+                                        ],
+                                        value: selectedYearLevel,
+                                        onChanged: (val) => setState(
+                                          () => selectedYearLevel = val,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            const Text(
+                              'Department',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            _buildDropdownField(
+                              hint: 'Click to choose your department',
+                              items: ['CABE', 'CAS', 'CET', 'CICS', 'CTE'],
+                              value: selectedDepartment,
+                              onChanged: (val) =>
+                                  setState(() => selectedDepartment = val),
+                            ),
+                            const SizedBox(height: 35),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: () {},
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3B9E66),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Sign Up',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      'Get Started with CarbonWise',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Center(
-                    child: Text(
-                      'Create your account and start your sustainability journey today!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-
-                  // Individual Form Entry Rows Block Layouts
-                  _buildInputField(label: 'SR-Code', hint: '2x-xxxxx'),
-                  _buildInputField(label: 'Name', hint: 'Enter your name'),
-                  _buildInputField(
-                    label: 'G-Suite Email',
-                    hint: '@g.batstate-u.edu.ph',
-                  ),
-                  _buildInputField(
-                    label: 'Password',
-                    hint: 'Enter your password',
-                    isObscured: true,
-                  ),
-                  _buildInputField(
-                    label: 'Password Confirmation',
-                    hint: 'Enter your password',
-                    isObscured: true,
-                  ),
-
-                  // Inline Selection Controls Layout Group Split (Campus & Year Level)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Campus',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _buildDropdownField(
-                              hint: 'Click to choose...',
-                              items: [
-                                'Lipa Campus',
-                                'Pablo Borbon Campus',
-                                'Alangilan Campus',
-                                'Lima Campus',
-                                'ARASOF Nasugbu Campus',
-                                'JPLPC Malvar Campus',
-                                'Lemery Campus',
-                                'Rosario Campus',
-                                'San Juan Campus',
-                                'Balayan Campus',
-                                'Lobo Campus',
-                                'Mabini',
-                              ],
-                              value: selectedCampus,
-                              onChanged: (val) =>
-                                  setState(() => selectedCampus = val),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Year Level',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _buildDropdownField(
-                              hint: 'Click to choose...',
-                              items: [
-                                '1st Year',
-                                '2nd Year',
-                                '3rd Year',
-                                '4th Year',
-                              ],
-                              value: selectedYearLevel,
-                              onChanged: (val) =>
-                                  setState(() => selectedYearLevel = val),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Full Width Dropdown (Department)
-                  const Text(
-                    'Department',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildDropdownField(
-                    hint: 'Click to choose your department',
-                    items: ['CABE', 'CAS', 'CET', 'CICS', 'CTE'],
-                    value: selectedDepartment,
-                    onChanged: (val) =>
-                        setState(() => selectedDepartment = val),
-                  ),
-                  const SizedBox(height: 35),
-
-                  // Form Action Execution Trigger Box
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Future configuration placeholder block hook
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3B9E66),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  // Component Helper for Cleaner Code Separation
   Widget _buildInputField({
     required String label,
     required String hint,
