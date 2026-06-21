@@ -123,11 +123,9 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $recommendedStrategies = MitigationAction::where('status', 'completed')
-        ->latest()
-        ->take(5)
+        $recommendedStrategies = MitigationAction::latest()
+        ->take(4)
         ->get();
-
         /*
         |--------------------------------------------------------------------------
         | Forecast Placeholder

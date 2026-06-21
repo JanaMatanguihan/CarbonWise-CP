@@ -110,16 +110,16 @@
     <!-- Left -->
     <div class="flex items-center gap-4">
 
-        <button class="text-3xl text-gray-700">
+        <button class="text-2xl text-gray-700">
             ☰
         </button>
 
         <div>
-            <h2 class="text-2xl font-bold">
+            <h2 class="text-3xl font-bold leading-none">
                 Overview
             </h2>
 
-            <p class="text-gray-500">
+            <p class="text-base text-gray-500 mt-1">
                 Welcome Back, {{ Auth::user()->name }}!
             </p>
         </div>
@@ -127,12 +127,10 @@
     </div>
 
     <!-- Right -->
-    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-8">
 
         <!-- Month Filter -->
-        <select
-            class="border rounded-lg px-4 py-2 bg-white shadow-sm"
-        >
+        <select class="border rounded-lg px-6 py-3 bg-white shadow-sm">
             <option>This Month</option>
             <option>January {{ now()->year }}</option>
             <option>February {{ now()->year }}</option>
@@ -148,22 +146,33 @@
             <option>December {{ now()->year }}</option>
         </select>
 
+        <!-- Vertical Divider -->
+        <div class="h-12 border-l border-gray-300"></div>
+
         <!-- Admin Info -->
-        <div class="text-right">
-            <div class="font-bold text-green-700">
-                {{ Auth::user()->name }}
+        <div class="flex items-center gap-3">
+
+            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                👤
             </div>
 
-            <div class="text-sm text-gray-500">
-                Administrator
+            <div>
+                <div class="font-bold text-green-700">
+                    {{ Auth::user()->name }}
+                </div>
+
+                <div class="text-sm text-gray-500">
+                    Administrator
+                </div>
             </div>
+
         </div>
 
     </div>
 
 </div>
 
-       <div class="p-6">
+      <div class="px-6 pb-6 pt-0">
     @yield('content')
 </div>
     </main>
