@@ -29,8 +29,8 @@
 
         </div>
 
-        <nav class="flex-1 py-4">
-
+        <nav class="flex-1 py-4 overflow-hidden">
+            
     <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="/dashboard">
         <img src="{{ asset('icons/dashboard.png') }}" class="w-5 h-5">
         <span>Overview</span>
@@ -88,23 +88,17 @@
 
 </nav>
 
-        <div class="p-4 border-t border-green-700">
-            <form method="POST" action="{{ route('logout') }}">
-    @csrf
-    <button type="submit"
-        style="
-            width:100%;
-            background:#2F6E49;
-            color:white;
-            border:none;
-            border-radius:10px;
-            padding:12px;
-            font-weight:600;
-        ">
-        Log Out
-    </button>
-</form>
-        </div>
+        <div class="mt-auto p-4 border-t border-green-700">
+    <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button
+            type="submit"
+            class="w-full bg-green-700 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition"
+        >
+            Log Out
+        </button>
+    </form>
+</div>
 
     </aside>
 
@@ -113,35 +107,72 @@
 
         <div class="bg-white shadow px-8 py-4 flex justify-between items-center">
 
-            <div>
-                <h2 class="font-bold text-2xl">
-                    Overview
-                </h2>
+    <!-- Left -->
+    <div class="flex items-center gap-4">
 
-                <p class="text-gray-500">
-                    Welcome back, {{ Auth::user()->name }}!
-                </p>
-            </div>
+        <button class="text-3xl text-gray-700">
+            ☰
+        </button>
 
-            <div class="text-right">
-                <div class="font-semibold">
-                    {{ now()->format('F d, Y') }}
-                </div>
+        <div>
+            <h2 class="text-2xl font-bold">
+                Overview
+            </h2>
 
-                <div class="text-sm text-gray-500">
-                    Administrator
-                </div>
-            </div>
-
+            <p class="text-gray-500">
+                Welcome Back, {{ Auth::user()->name }}!
+            </p>
         </div>
 
-        <div class="py-12">
-            @yield('content')
+    </div>
+
+    <!-- Right -->
+    <div class="flex items-center gap-6">
+
+        <!-- Month Filter -->
+        <select
+            class="border rounded-lg px-4 py-2 bg-white shadow-sm"
+        >
+            <option>This Month</option>
+            <option>January {{ now()->year }}</option>
+            <option>February {{ now()->year }}</option>
+            <option>March {{ now()->year }}</option>
+            <option>April {{ now()->year }}</option>
+            <option>May {{ now()->year }}</option>
+            <option>June {{ now()->year }}</option>
+            <option>July {{ now()->year }}</option>
+            <option>August {{ now()->year }}</option>
+            <option>September {{ now()->year }}</option>
+            <option>October {{ now()->year }}</option>
+            <option>November {{ now()->year }}</option>
+            <option>December {{ now()->year }}</option>
+        </select>
+
+        <!-- Admin Info -->
+        <div class="text-right">
+            <div class="font-bold text-green-700">
+                {{ Auth::user()->name }}
+            </div>
+
+            <div class="text-sm text-gray-500">
+                Administrator
+            </div>
         </div>
 
+    </div>
+
+</div>
+
+       <div class="p-6">
+    @yield('content')
+</div>
     </main>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+@stack('scripts')
 
 </body>
 </html>

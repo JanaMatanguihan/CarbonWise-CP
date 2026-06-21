@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\CarbonRecordController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +12,15 @@ Route::get('/', function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
+
+    Route::get('/carbon-records', [CarbonRecordController::class, 'index'])
+        ->name('carbon.index');
+
+    Route::get('/carbon-records/create', [CarbonRecordController::class, 'create'])
+        ->name('carbon.create');
+
+    Route::post('/carbon-records', [CarbonRecordController::class, 'store'])
+        ->name('carbon.store');
 });
 
 Route::middleware('auth')->group(function () {
