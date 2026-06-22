@@ -11,41 +11,35 @@
 <body class="bg-gray-100 min-h-screen">
 
 <nav class="w-full bg-white shadow-md">
-    <div class="max-w-7xl mx-auto flex items-center justify-between px-8 py-4">
+    <div class="max-w-7xl mx-auto grid grid-cols-3 items-center px-8 py-4">
 
-        <!-- Logo -->
+        <!-- Left: Logo -->
         <div class="flex items-center gap-3">
-            <img src="{{ asset('images/carbonwise-logo.png') }}"
-                 class="w-14 h-14"
-                 alt="CarbonWise Logo">
+            <img
+                src="{{ asset('images/carbonwise-logo.png') }}"
+                class="w-14 h-14"
+                alt="CarbonWise Logo"
+            >
 
             <span class="text-3xl font-bold text-green-700">
                 CarbonWise
             </span>
         </div>
 
-        <!-- Navigation Links -->
-        <div class="flex gap-10 text-lg font-medium text-green-700">
-            <a href="/">Home</a>
-            <a href="#features">Features</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
+        <div class="flex justify-center gap-10 text-lg font-medium text-green-700">
+            <a href="/" class="hover:text-green-900">Home</a>
+            <a href="#features" class="hover:text-green-900">Features</a>
+            <a href="#about" class="hover:text-green-900">About</a>
+            <a href="#contact" class="hover:text-green-900">Contact</a>
         </div>
+        
+        <div></div>
 
     </div>
 </nav>
         <div class="flex justify-center items-center py-16">
     
-<div class="w-full max-w-xl bg-[#B7CBB9] rounded-[40px] shadow-2xl px-10 py-12">
-
-        <div class="flex justify-center mb-6">
-            <img
-                src="{{ asset('images/carbonwise-logo.png') }}"
-                class="w-24 h-24 rounded-full bg-white p-2 shadow-md"
-                alt="CarbonWise Logo"
-            >
-            </div>
-
+<div class="w-full max-w-xl bg-[#B5C9B8] rounded-[40px_0_40px_0] shadow-xl px-10 py-12">
     <h1 class="text-3xl font-bold text-center text-[#1F5A3C]">
     Welcome to CarbonWise
     </h1>
