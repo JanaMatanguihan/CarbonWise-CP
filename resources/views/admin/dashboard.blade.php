@@ -1,5 +1,8 @@
 @extends('layouts.admin')
 
+@section('page-title', 'Overview')
+@section('page-subtitle', 'Welcome Back, ' . Auth::user()->name . '!')
+
 @section('content')
 
 <div class="p-4 space-y-4">
@@ -9,8 +12,8 @@
 
         <!-- Total Users -->
         <div class="bg-white rounded-2xl shadow px-4 py-2 flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img src="{{ asset('icons/user.png') }}" class="w-7 h-7" alt="Users">
+    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+                <img src="{{ asset('icons/group.png') }}" class="w-7 h-7" alt="Users">
             </div>
 
             <div>
@@ -22,8 +25,8 @@
 
         <!-- Total Emissions -->
         <div class="bg-white rounded-2xl shadow px-4 py-2 flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img src="{{ asset('icons/emissions.png') }}" class="w-7 h-7" alt="Emissions">
+    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+                <img src="{{ asset('icons/co2.png') }}" class="w-7 h-7" alt="Emissions">
             </div>
 
             <div>
@@ -37,8 +40,8 @@
 
         <!-- Average -->
         <div class="bg-white rounded-2xl shadow px-4 py-2 flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img src="{{ asset('icons/user.png') }}" class="w-7 h-7" alt="Average">
+    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+                <img src="{{ asset('icons/user2.png') }}" class="w-7 h-7" alt="Average">
             </div>
 
             <div>
@@ -52,8 +55,8 @@
 
         <!-- Mitigation -->
         <div class="bg-white rounded-2xl shadow px-4 py-2 flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img src="{{ asset('icons/mitigation.png') }}" class="w-7 h-7" alt="Mitigation">
+    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+                <img src="{{ asset('icons/leaf.png') }}" class="w-7 h-7" alt="Mitigation">
             </div>
 
             <div>
@@ -64,8 +67,8 @@
 
         <!-- Reports -->
         <div class="bg-white rounded-2xl shadow px-4 py-3 flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img src="{{ asset('icons/audit.png') }}" class="w-7 h-7" alt="Reports">
+    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+                <img src="{{ asset('icons/report.png') }}" class="w-7 h-7" alt="Reports">
             </div>
 
             <div>
@@ -355,8 +358,8 @@
     <div class="flex items-start gap-3 border-r last:border-r-0 pr-3">
 
         <!-- Icon -->
-        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-            <img src="{{ asset('icons/mitigation.png') }}"
+        <div class="w-12 h-12 rounded-full bg-green-200 flex items-center justify-center shrink-0">
+            <img src="{{ asset('icons/leaf.png') }}"
                  class="w-6 h-6"
                  alt="Mitigation">
         </div>

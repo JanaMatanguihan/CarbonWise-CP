@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\CarbonRecordController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,11 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/carbon-records', [CarbonRecordController::class, 'store'])
         ->name('carbon.store');
+
+    // User Management page
+    Route::get('/admin/users', [UserManagementController::class, 'index'])
+    ->name('admin.users');
+    
 });
 
 Route::middleware('auth')->group(function () {

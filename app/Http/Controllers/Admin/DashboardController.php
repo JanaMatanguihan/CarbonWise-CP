@@ -14,6 +14,9 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        $selectedMonth = request('month', now()->format('Y-m'));
+
+        [$year, $month] = explode('-', $selectedMonth);
         /*
         |--------------------------------------------------------------------------
         | Dashboard Summary Cards
@@ -21,10 +24,14 @@ class DashboardController extends Controller
         */
 
         // Total registered users
-        $totalUsers = User::count();
+        $totalUsers = User::whereYear('created_at', $year)
+        ->whereMonth('created_at', $month)
+        ->count();
 
         // Total carbon emissions
-        $totalEmissions = CarbonRecord::sum('total_emission');
+        $totalEmissions = CarbonRecord::whereYear('record_date', $year)
+        ->whereMonth('record_date', $month)
+        ->sum('total_emission');
 
         // Average emission per user
         $averageEmission = $totalUsers > 0
@@ -32,10 +39,14 @@ class DashboardController extends Controller
             : 0;
 
         // Total mitigation actions
-        $mitigationCount = MitigationAction::count();
+        $mitigationCount = MitigationAction::whereYear('created_at', $year)
+        ->whereMonth('created_at', $month)
+        ->count();
 
         // Total SDO reports
-        $reportCount = SdoReport::count();
+        $reportCount = SdoReport::whereYear('created_at', $year)
+        ->whereMonth('created_at', $month)
+        ->count();
 
         /*
         |--------------------------------------------------------------------------
@@ -43,10 +54,21 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $transportationTotal = CarbonRecord::sum('transportation');
-        $electricityTotal    = CarbonRecord::sum('electricity');
-        $foodTotal           = CarbonRecord::sum('food');
-        $wasteTotal          = CarbonRecord::sum('waste');
+        $transportationTotal = CarbonRecord::whereYear('record_date', $year)
+        ->whereMonth('record_date', $month)
+        ->sum('transportation');
+
+        $electricityTotal = CarbonRecord::whereYear('record_date', $year)
+            ->whereMonth('record_date', $month)
+            ->sum('electricity');
+
+        $foodTotal = CarbonRecord::whereYear('record_date', $year)
+            ->whereMonth('record_date', $month)
+            ->sum('food');
+
+        $wasteTotal = CarbonRecord::whereYear('record_date', $year)
+            ->whereMonth('record_date', $month)
+            ->sum('waste');
 
         /*
         |--------------------------------------------------------------------------
@@ -54,36 +76,41 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        // Ensure monthlyEmissions is always defined to avoid undefined variable notices
         $monthlyEmissions = [];
-
-        for ($month = 1; $month <= 12; $month++) {
+        for ($i = 1; $i <= 12; $i++) {
             $monthlyEmissions[] = CarbonRecord::whereYear(
-                    'record_date',
-                    now()->year
-                )
-                ->whereMonth('record_date', $month)
-                ->sum('total_emission');
+                'record_date',
+                $year
+            )
+            ->whereMonth('record_date', $i)
+            ->sum('total_emission');
         }
 
         /*
-    /*
         |--------------------------------------------------------------------------
         | Top Emitting Departments
         |--------------------------------------------------------------------------
         */
 
-        $totalEmissions = CarbonRecord::sum('total_emission');
+        $totalEmissions = CarbonRecord::whereYear('record_date', $year)
+        ->whereMonth('record_date', $month)
+        ->sum('total_emission');
 
         $topDepartments = CarbonRecord::join(
-                'users',
-                'carbon_records.user_id',
-                '=',
-                'users.id'
+        'users',
+        'carbon_records.user_id',
+        '=',
+        'users.id'
             )
             ->select(
                 'users.department',
                 DB::raw('SUM(carbon_records.total_emission) as total_emissions')
             )
+
+            ->whereYear('carbon_records.record_date', $year)
+            ->whereMonth('carbon_records.record_date', $month)
+
             ->whereNotNull('users.department')
             ->groupBy('users.department')
             ->orderByDesc('total_emissions')
@@ -102,7 +129,10 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $activeUsers = CarbonRecord::distinct('user_id')->count('user_id');
+        $activeUsers = CarbonRecord::whereYear('record_date', $year)
+            ->whereMonth('record_date', $month)
+            ->distinct('user_id')
+            ->count('user_id');
 
         $engagementRate = $totalUsers > 0
             ? round(($activeUsers / $totalUsers) * 100)

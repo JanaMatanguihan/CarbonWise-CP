@@ -36,9 +36,12 @@
         <span>Overview</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
-        <img src="{{ asset('icons/user.png') }}" class="w-5 h-5">
-        <span>User Management</span>
+    <a
+    href="{{ route('admin.users') }}"
+    class="flex items-center gap-3 px-6 py-3 hover:bg-green-700"
+>
+    <img src="{{ asset('icons/user.png') }}" class="w-5 h-5">
+    <span>User Management</span>
     </a>
 
     <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
@@ -116,11 +119,11 @@
 
         <div>
             <h2 class="text-3xl font-bold leading-none">
-                Overview
+                @yield('page-title', 'Overview')
             </h2>
 
             <p class="text-base text-gray-500 mt-1">
-                Welcome Back, {{ Auth::user()->name }}!
+                @yield('page-subtitle', 'Welcome Back, ' . Auth::user()->name . '!')
             </p>
         </div>
 
@@ -129,24 +132,39 @@
     <!-- Right -->
     <div class="flex items-center gap-8">
 
-        <!-- Month Filter -->
-        <select class="border rounded-lg px-6 py-3 bg-white shadow-sm">
-            <option>This Month</option>
-            <option>January {{ now()->year }}</option>
-            <option>February {{ now()->year }}</option>
-            <option>March {{ now()->year }}</option>
-            <option>April {{ now()->year }}</option>
-            <option>May {{ now()->year }}</option>
-            <option>June {{ now()->year }}</option>
-            <option>July {{ now()->year }}</option>
-            <option>August {{ now()->year }}</option>
-            <option>September {{ now()->year }}</option>
-            <option>October {{ now()->year }}</option>
-            <option>November {{ now()->year }}</option>
-            <option>December {{ now()->year }}</option>
-        </select>
+       @if (request()->routeIs('dashboard'))
+<div class="flex items-center gap-3 bg-white border border-gray-300 rounded-xl px-4 py-3 shadow-sm">
 
-        <!-- Vertical Divider -->
+    <!-- Calendar Icon -->
+    <svg xmlns="http://www.w3.org/2000/svg"
+         class="w-6 h-6 text-gray-700"
+         fill="none"
+         viewBox="0 0 24 24"
+         stroke="currentColor">
+        <path stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+
+    <!-- Month Picker -->
+        <form method="GET" action="{{ route('dashboard') }}">
+                    <input
+            id="monthPicker"
+            name="month"
+            type="month"
+            value="{{ request('month', now()->format('Y-m')) }}"
+            class="bg-transparent outline-none font-semibold cursor-pointer"
+            onchange="this.form.submit()"
+        />
+        </form>
+
+</div>
+
+    <!-- Vertical Divider -->
+    <div class="h-12 border-l border-gray-300"></div>
+    @endif
+       
         <div class="h-12 border-l border-gray-300"></div>
 
         <!-- Admin Info -->
