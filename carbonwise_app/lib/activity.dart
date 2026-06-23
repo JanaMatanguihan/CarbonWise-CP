@@ -18,6 +18,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   // Controllers
   final TextEditingController _distanceController = TextEditingController();
 
+  // 🟢 Lists to store added emissions dynamically
+  final List<String> _transportEmissions = [];
+  final List<String> _officeEmissions = [];
+  final List<String> _foodEmissions = [];
+
   // Helper method to get conditional food categories based on selected food type
   List<String> _getFoodCategories(String? foodType) {
     switch (foodType) {
@@ -56,34 +61,82 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   List<String> _getOfficeResourceCategories(String? officeResourceType) {
     switch (officeResourceType) {
-      case 'Red Meat':
-        return ['Beef (Beef Herd)', 'Lamb & Mutton', 'Beef (Dairy Herd)'];
-      case 'Dairy & Poultry':
+      case 'Air Conditioner':
         return [
-          'Cheese',
-          'Pork',
-          'Poultry (Chicken/Turkey)',
-          'Eggs',
-          'Fish (Farmed)',
+          'Window Type',
+          'Split-Type (Wall-Mounted)',
+          'Ceiling Cassette / Ceiling Suspended',
+          'Floor Standing (Tower)',
         ];
-      case 'Staples & Plant-based Proteins':
+      case 'Electric Fan':
         return [
-          'Rice (Flooded)',
-          'Tofu (Soy-based)',
-          'Groundnuts/Peanuts',
-          'Pulses (Beans/Pease)',
+          'AC Motor Fan',
+          'DC Motor Fan',
+          'Ceiling Fan',
+          'Stand Fan',
+          'Wall Fan',
+          'Exhaust Fan',
+          'Tower Fan',
+          'Desk Fan',
+          'Bladeless Fan',
+          'Misting Fan',
+          'Industrial Fan',
         ];
-      case 'Grains, Vegetables, and Fruits':
+      case 'Lights':
+        return ['LED (Light Emitting Diode)', 'Fluorescent', 'Incandescent'];
+      case 'Projector':
         return [
-          'Wheat & Rye (Bread)',
-          'Maize (Corn)',
-          'Potatoes',
-          'Apples/Bananas',
-          'Root Vegetables',
-          'Other Fruits & Vegetables',
+          'Standard DLP/LDC Projector',
+          'Eco Mode',
+          'Large Venue Projector (Auditoriums)',
+          'Standby',
         ];
-      case 'Beverages and Discretionary Items':
-        return ['Coffee', 'Dark Chocolate', 'Milk (Bovine)', 'Soy Milk'];
+      case 'Printer (Laser)':
+        return [
+          'Inkjet Printer (Desktop)',
+          'Laser Printer (B&W)',
+          'Color Laser Printer',
+          'Soy Milk',
+        ];
+      case 'Photocopier / Multifunction Printer':
+        return ['Mid-size Office MFP', 'High-volume Photocopier'];
+      case 'Laptop':
+        return [
+          'Ultra-light/Notebook',
+          'Standard Business Laptop',
+          'Performance Laptop',
+          'Gaming/High-End Workstation',
+        ];
+      case 'Desktop Computer (CPU + Monitor)':
+        return [
+          'Standard Office PC',
+          'Mid-range Workstation',
+          'High-end/Gaming PC',
+          'Mini PC (NUC/MAC Mini)',
+          '18.5" to 20" LED Monitor',
+          '22" to 24" LED Monitor',
+          '27" and Larger',
+          'OLD CRTS Monitor (Big Box Style)',
+        ];
+      case 'Viewboard / Smart Screen':
+        return ['55" to 65"', '75"', '86"', '98" and above'];
+      case 'Scanner':
+        return [
+          'Standard Office PC',
+          'Mid-range Workstation',
+          'High-end/Gaming PC',
+          'Mini PC (NUC/MAC Mini)',
+          '18.5" to 20" LED Monitor',
+          '22" to 24" LED Monitor',
+          '27" and Larger',
+          'OLD CRTS Monitor (Big Box Style)',
+        ];
+      case 'Sound Speaker':
+        return [
+          'Desktop/PC Speakers',
+          'Wall-mounted Classroom Speakers',
+          'Large PA System (Events/Gyms)',
+        ];
       default:
         return [];
     }
@@ -142,7 +195,16 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   const SizedBox(width: 10),
                   _buildAddButton(
                     onPressed: () {
-                      // Handle add event
+                      if (_selectedTransportType != null &&
+                          _distanceController.text.isNotEmpty) {
+                        setState(() {
+                          _transportEmissions.add(
+                            '${_selectedTransportType!} (${_distanceController.text} km)',
+                          );
+                          _selectedTransportType = null;
+                          _distanceController.clear();
+                        });
+                      }
                     },
                   ),
                 ],
@@ -177,32 +239,46 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         'Scanner',
                         'Sound Speaker',
                       ],
-                      onChanged: (val) =>
-                          setState(() => _selectedOfficeResourceType = val),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedOfficeResourceType = val;
+                          _selectedOfficeResourceCategory = null;
+                        });
+                      },
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     flex: 5,
                     child: _buildDropdownField(
-                      label: 'Food Category',
-                      hint: _selectedFoodType == null
-                          ? 'Select type first'
-                          : 'Select food category',
+                      label: 'Office Resource Category',
+                      hint: _selectedOfficeResourceType == null
+                          ? 'Select resource type'
+                          : 'Select resource category',
                       value: _selectedOfficeResourceCategory,
                       items: _getOfficeResourceCategories(
                         _selectedOfficeResourceType,
                       ),
-                      onChanged: _selectedFoodType == null
-                          ? (_) {}
-                          : (val) =>
-                                setState(() => _selectedFoodCategory = val),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedOfficeResourceCategory = val;
+                        });
+                      },
                     ),
                   ),
                   const SizedBox(width: 10),
                   _buildAddButton(
                     onPressed: () {
-                      // Handle add event
+                      if (_selectedOfficeResourceType != null &&
+                          _selectedOfficeResourceCategory != null) {
+                        setState(() {
+                          _officeEmissions.add(
+                            '${_selectedOfficeResourceType!} - ${_selectedOfficeResourceCategory!}',
+                          );
+                          _selectedOfficeResourceType = null;
+                          _selectedOfficeResourceCategory = null;
+                        });
+                      }
                     },
                   ),
                 ],
@@ -234,8 +310,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedFoodType = val;
-                          _selectedFoodCategory =
-                              null; // Resets child selection to prevent Flutter drop-down crashes
+                          _selectedFoodCategory = null;
                         });
                       },
                     ),
@@ -246,7 +321,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     child: _buildDropdownField(
                       label: 'Food Category',
                       hint: _selectedFoodType == null
-                          ? 'Select type first'
+                          ? 'Select food type'
                           : 'Select food category',
                       value: _selectedFoodCategory,
                       items: _getFoodCategories(_selectedFoodType),
@@ -259,7 +334,16 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   const SizedBox(width: 10),
                   _buildAddButton(
                     onPressed: () {
-                      // Handle add event
+                      if (_selectedFoodType != null &&
+                          _selectedFoodCategory != null) {
+                        setState(() {
+                          _foodEmissions.add(
+                            '${_selectedFoodType!} (${_selectedFoodCategory!})',
+                          );
+                          _selectedFoodType = null;
+                          _selectedFoodCategory = null;
+                        });
+                      }
                     },
                   ),
                 ],
@@ -280,30 +364,168 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildEmptyListCard('Transportation')),
+              Expanded(
+                child: _buildDynamicListCard(
+                  'Transportation',
+                  _transportEmissions,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildEmptyListCard('Office Resource')),
+              Expanded(
+                child: _buildDynamicListCard(
+                  'Office Resource',
+                  _officeEmissions,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildEmptyListCard('Food Consumption')),
+              Expanded(
+                child: _buildDynamicListCard(
+                  'Food Consumption',
+                  _foodEmissions,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
 
+          // 🟢 POP-UP LOGIC ADDED BELOW
           GestureDetector(
             onTap: () {
-              // computation / submission logic
-              debugPrint("Calculate my Carbon Emissions tapped!");
+              // 1. Guard against empty submissions
+              if (_transportEmissions.isEmpty &&
+                  _officeEmissions.isEmpty &&
+                  _foodEmissions.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please add at least one emission to calculate.',
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              // 2. Launch the details summary modal
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: const Text(
+                      'Your Carbon Emissions Summary',
+                      style: TextStyle(
+                        color: darkGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          if (_transportEmissions.isNotEmpty) ...[
+                            const Text(
+                              '🚗 Transportation',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            ..._transportEmissions.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 8.0,
+                                  bottom: 2.0,
+                                ),
+                                child: Text(
+                                  '• $e',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_officeEmissions.isNotEmpty) ...[
+                            const Text(
+                              '🏢 Office Resources',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            ..._officeEmissions.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 8.0,
+                                  bottom: 2.0,
+                                ),
+                                child: Text(
+                                  '• $e',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_foodEmissions.isNotEmpty) ...[
+                            const Text(
+                              '🍲 Food Consumption',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            ..._foodEmissions.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 8.0,
+                                  bottom: 2.0,
+                                ),
+                                child: Text(
+                                  '• $e',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Close',
+                          style: TextStyle(
+                            color: darkGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
             },
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 16.0,
-              ), // Makes the button taller/bigger
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
               decoration: BoxDecoration(
                 color: primaryGreen,
-                borderRadius: BorderRadius.circular(10), // Clean rounded edges
+                borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.08),
@@ -486,26 +708,72 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     );
   }
 
-  Widget _buildEmptyListCard(String title) {
+  Widget _buildDynamicListCard(String title, List<String> items) {
     return Container(
       height: 160,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFF3AA76D), width: 1),
       ),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF3AA76D),
+      child: Column(
+        children: [
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF3AA76D),
+            ),
           ),
-        ),
+          const Divider(height: 8, color: Color(0xFF3AA76D)),
+          Expanded(
+            child: items.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No entries yet',
+                      style: TextStyle(fontSize: 9, color: Colors.black38),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                items[index],
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  items.removeAt(index);
+                                });
+                              },
+                              child: const Icon(
+                                Icons.cancel_outlined,
+                                color: Colors.redAccent,
+                                size: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

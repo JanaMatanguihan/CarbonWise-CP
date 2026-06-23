@@ -70,7 +70,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
   static const Color primaryGreen = Color(0xFF3AA76D);
   static const Color darkGreen = Color(0xFF1E5631);
-  static const Color lightBgGrey = Color(0xFFEFEFEF); // Re-added light gray
   static const Color badgeGrey = Color(0xFFCCEAD8);
 
   @override
