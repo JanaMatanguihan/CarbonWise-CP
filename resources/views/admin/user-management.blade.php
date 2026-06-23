@@ -41,7 +41,7 @@
         >
     </div>
 
-    <!-- BIG SPACE AFTER SEARCH -->
+    
     <div class="flex items-center gap-4 ml-20">
 
         <!-- Role -->
@@ -68,7 +68,7 @@
             <option value="College of Accountancy, Business, and Economics" {{ request('department') == 'College of Accountancy, Business, and Economics' ? 'selected' : '' }}>CABE</option>
             <option value="College of Arts and Sciences" {{ request('department') == 'College of Arts and Sciences' ? 'selected' : '' }}>CAS</option>
             <option value="College of Informatics and Computing Science" {{ request('department') == 'College of Informatics and Computing Science' ? 'selected' : '' }}>CICS</option>
-            <option value="Admin Offices" {{ request('department') == 'Admin Offices' ? 'selected' : '' }}>Admin Offices</option>
+            <option value="College of Engineering Technology" {{ request('department') == 'College of Engineering Technology' ? 'selected' : '' }}>CET</option>
             <option value="SDO Office" {{ request('department') == 'SDO Office' ? 'selected' : '' }}>SDO Office</option>
         </select>
 
@@ -161,7 +161,7 @@
                 </td>
 
                 <td class="p-4">
-                    {{ $user->created_at->format('F d, Y') }}
+                    {{ $user->created_at ? $user->created_at->format('F d, Y') : 'N/A' }}
                 </td>
 
                 <td class="p-4 text-center">

@@ -14,9 +14,8 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $selectedMonth = request('month', now()->format('Y-m'));
-
-        [$year, $month] = explode('-', $selectedMonth);
+        $year = request('year', now()->year);
+        $month = request('month', now()->format('m'));
         /*
         |--------------------------------------------------------------------------
         | Dashboard Summary Cards
