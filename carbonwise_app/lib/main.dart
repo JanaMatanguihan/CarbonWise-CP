@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:carbonwise_app/dashboard.dart';
 import 'package:carbonwise_app/navigation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://cvlibryzqhoztbutyvbx.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bGlicnl6cWhvenRidXR5dmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMDgxNTcsImV4cCI6MjA5Nzc4NDE1N30.q0vj8nBE4_SPVs8DDDeBOnzu8rpvGdfA5GXQpGp5rWs',
+  );
+
   runApp(const CarbonWiseApp());
 }
 
@@ -119,12 +128,85 @@ class LandingPageScreen extends StatelessWidget {
 // ==========================================
 // 2. LOG-IN SCREEN
 // ==========================================
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnackBar('Please fill in all fields', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      print('------------------ SUPABASE LOGIN ATTEMPT ------------------');
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      print('SUCCESS: User Logged In! UUID: ${response.user?.id}');
+      print('------------------------------------------------------------');
+
+      if (mounted) {
+        _showSnackBar('Welcome back!');
+
+        // Delay slightly to ensure Supabase Auth stream synchronizes the
+        // session data locally across your dashboard.dart widgets before rendering.
+        await Future.delayed(const Duration(milliseconds: 150));
+
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const CustomMainNavigation()),
+          (route) => false,
+        );
+      }
+    } on AuthException catch (error) {
+      print('SUPABASE AUTH ERROR: ${error.message}');
+      _showSnackBar(error.message, isError: true);
+    } catch (error) {
+      print('UNEXPECTED ERROR: $error');
+      _showSnackBar('An unexpected error occurred.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -134,13 +216,19 @@ class LoginScreen extends StatelessWidget {
               child: IntrinsicHeight(
                 child: Column(
                   children: [
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 60),
                     Center(
                       child: Image.asset(
                         'assets/carbonwise-logo.png',
-                        height: 160,
-                        width: 160,
+                        height: 140,
+                        width: 140,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.eco,
+                              size: 100,
+                              color: Color(0xFF265D3B),
+                            ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -153,7 +241,6 @@ class LoginScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 35),
-
                     Expanded(
                       child: Container(
                         width: double.infinity,
@@ -188,7 +275,7 @@ class LoginScreen extends StatelessWidget {
                               child: Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                                 child: Text(
-                                  'Log in with your SR-Code and password to start your sustainability journey.',
+                                  'Log in with your G-Suite email and password to start your sustainability journey.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 13,
@@ -199,9 +286,8 @@ class LoginScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 35),
-
                             const Text(
-                              'SR-Code',
+                              'G-Suite Email',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
@@ -210,9 +296,11 @@ class LoginScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             TextField(
+                              controller: _emailController,
                               style: const TextStyle(color: Colors.black87),
+                              keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                hintText: '2x-xxxxx',
+                                hintText: 'example@g.batstate-u.edu.ph',
                                 hintStyle: const TextStyle(
                                   color: Color(0xFFB0B0B0),
                                   fontSize: 14,
@@ -230,7 +318,6 @@ class LoginScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 20),
-
                             const Text(
                               'Password',
                               style: TextStyle(
@@ -241,6 +328,7 @@ class LoginScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             TextField(
+                              controller: _passwordController,
                               obscureText: true,
                               style: const TextStyle(color: Colors.black87),
                               decoration: InputDecoration(
@@ -262,21 +350,11 @@ class LoginScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 30),
-
                             SizedBox(
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CustomMainNavigation(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                },
+                                onPressed: _isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF3AA76D),
                                   elevation: 0,
@@ -284,21 +362,28 @@ class LoginScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Log in',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Log in',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                               ),
                             ),
-
-                            const Spacer(),
+                            const SizedBox(height: 30),
                             const Divider(color: Colors.white38, thickness: 1),
-                            const SizedBox(height: 25),
-
+                            const SizedBox(height: 20),
                             Center(
                               child: GestureDetector(
                                 onTap: () {
@@ -333,7 +418,6 @@ class LoginScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 10),
                           ],
                         ),
                       ),
@@ -360,13 +444,109 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final _srCodeController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
   String? selectedCampus;
   String? selectedYearLevel;
   String? selectedDepartment;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _srCodeController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _handleSignUp() async {
+    final srCode = _srCodeController.text.trim();
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (srCode.isEmpty ||
+        name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        selectedCampus == null ||
+        selectedYearLevel == null ||
+        selectedDepartment == null) {
+      _showSnackBar(
+        'Please fill out all fields and selections.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showSnackBar('Passwords do not match.', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      print('------------------ SUPABASE SIGNUP ATTEMPT ------------------');
+      print('Registering Email: $email');
+
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'sr_code': srCode,
+          'full_name': name,
+          'campus': selectedCampus,
+          'year_level': selectedYearLevel,
+          'department': selectedDepartment,
+        },
+      );
+
+      print('SUCCESS: User Registered via Authentication module!');
+      print('Assigned User UUID: ${response.user?.id}');
+      print('-------------------------------------------------------------');
+
+      if (mounted) {
+        _showSnackBar('Account Created Successfully!');
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const CustomMainNavigation()),
+          (route) => false,
+        );
+      }
+    } on AuthException catch (error) {
+      print('SUPABASE AUTH ERROR: ${error.message}');
+      _showSnackBar(error.message, isError: true);
+    } catch (error) {
+      print('UNEXPECTED ERROR: $error');
+      _showSnackBar('An unexpected error occurred.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -383,6 +563,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         height: 60,
                         width: 60,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.eco,
+                              size: 40,
+                              color: Color(0xFF265D3B),
+                            ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -395,7 +581,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
                     Expanded(
                       child: Container(
                         width: double.infinity,
@@ -426,7 +611,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             const SizedBox(height: 6),
                             const Center(
                               child: Text(
-                                'Create your account and start your sustainability journey today!',
+                                'Create your account and start your journey today!',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
@@ -435,30 +620,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                             ),
                             const SizedBox(height: 25),
-
                             _buildInputField(
                               label: 'SR-Code',
                               hint: '2x-xxxxx',
+                              controller: _srCodeController,
                             ),
                             _buildInputField(
                               label: 'Name',
                               hint: 'Enter your name',
+                              controller: _nameController,
                             ),
                             _buildInputField(
                               label: 'G-Suite Email',
-                              hint: '@g.batstate-u.edu.ph',
+                              hint: 'user@g.batstate-u.edu.ph',
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
                             ),
                             _buildInputField(
                               label: 'Password',
                               hint: 'Enter your password',
                               isObscured: true,
+                              controller: _passwordController,
                             ),
                             _buildInputField(
                               label: 'Password Confirmation',
-                              hint: 'Enter your password',
+                              hint: 'Confirm your password',
                               isObscured: true,
+                              controller: _confirmPasswordController,
                             ),
-
                             Row(
                               children: [
                                 Expanded(
@@ -531,7 +720,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-
                             const Text(
                               'Department',
                               style: TextStyle(
@@ -548,39 +736,64 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   setState(() => selectedDepartment = val),
                             ),
                             const SizedBox(height: 35),
-
                             SizedBox(
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: () {
-                                  // Clears out screen stacking history and drops them into CustomMainNavigation
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CustomMainNavigation(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                },
+                                onPressed: _isLoading ? null : _handleSignUp,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF3AA76D),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Sign Up',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Sign Up',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Center(
+                              child: GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: RichText(
+                                  textAlign: TextAlign.center,
+                                  text: const TextSpan(
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: "Already have an account? ",
+                                      ),
+                                      TextSpan(
+                                        text: "Log In.",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 12),
                           ],
                         ),
                       ),
@@ -595,10 +808,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // Helper widget stubs so the layout code runs smoothly
   Widget _buildInputField({
     required String label,
     required String hint,
+    required TextEditingController controller,
     bool isObscured = false,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,20 +828,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
           obscureText: isObscured,
+          keyboardType: keyboardType,
           style: const TextStyle(color: Colors.black87),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-            fillColor: const Color(0xFFECECEC),
+            hintStyle: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 14),
+            fillColor: const Color(0xFFF5F5F5),
             filled: true,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               borderSide: BorderSide.none,
             ),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
+              horizontal: 16,
+              vertical: 14,
             ),
           ),
         ),
@@ -641,27 +859,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required ValueChanged<String?> onChanged,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFECECEC),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           hint: Text(
             hint,
-            style: const TextStyle(color: Colors.grey, fontSize: 13),
+            style: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 14),
           ),
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
           items: items.map((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(
-                item,
-                style: const TextStyle(fontSize: 14, color: Colors.black87),
-              ),
+              child: Text(item, style: const TextStyle(color: Colors.black87)),
             );
           }).toList(),
           onChanged: onChanged,
@@ -669,4 +883,83 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
+}
+
+Widget _buildInputField({
+  required String label,
+  required String hint,
+  required TextEditingController controller,
+  bool isObscured = false,
+  TextInputType keyboardType = TextInputType.text,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 6),
+      TextField(
+        controller: controller,
+        obscureText: isObscured,
+        keyboardType: keyboardType,
+        style: const TextStyle(color: Colors.black87),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+          fillColor: const Color(0xFFECECEC),
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+    ],
+  );
+}
+
+Widget _buildDropdownField({
+  required String hint,
+  required List<String> items,
+  required String? value,
+  required ValueChanged<String?> onChanged,
+}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFECECEC),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: value,
+        hint: Text(
+          hint,
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+        isExpanded: true,
+        icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
+        items: items.map((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(
+              item,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
+          );
+        }).toList(),
+        onChanged: onChanged,
+      ),
+    ),
+  );
 }

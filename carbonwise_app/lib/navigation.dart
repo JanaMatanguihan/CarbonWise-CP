@@ -24,7 +24,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   ];
 
   final List<Widget> _pages = [
-    const MainDashboardScreen(),
+    const DashboardScreen(),
     const ReportsScreen(),
     const ActivityInputScreen(),
     const StrategiesScreen(),
@@ -41,20 +41,19 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
     return Scaffold(
       backgroundColor: backgroundGray,
+
       appBar: isProfilePage
           ? null
           : AppBar(
               automaticallyImplyLeading: false,
               backgroundColor: backgroundGray,
               elevation: 0,
-              scrolledUnderElevation:
-                  0, // Keeps the layout color stable when scrolling
+              scrolledUnderElevation: 0,
               toolbarHeight: 155,
               titleSpacing: 14,
               title: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1. Top Identity Greeting Card
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14.0,
@@ -74,7 +73,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                             children: [
                               Text(
                                 _pageTitles[_currentIndex],
-                                softWrap: true,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,
@@ -95,7 +93,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                         ),
                         const SizedBox(width: 8),
                         Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             _buildCircleIcon(Icons.notifications_none),
                             const SizedBox(width: 6),
@@ -107,9 +104,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 2. Continuous Progress Status Bar Layout
                   Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
@@ -141,7 +136,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
 
-      // BOTTOM NAVIGATION DESIGN
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
@@ -190,7 +184,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     );
   }
 
-  // Header Utility circular icon builder
   Widget _buildCircleIcon(IconData icon) {
     return Container(
       padding: const EdgeInsets.all(7),
@@ -209,32 +202,23 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     int index,
   ) {
     final bool isSelected = _currentIndex == index;
-    const Color itemColor = Colors.white;
 
     return Expanded(
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: () => setState(() => _currentIndex = index),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               isSelected ? selectedIcon : unselectedIcon,
-              color: itemColor,
+              color: Colors.white,
               size: isSelected ? 28 : 24,
             ),
             const SizedBox(height: 3),
             Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: itemColor,
+                color: Colors.white,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
