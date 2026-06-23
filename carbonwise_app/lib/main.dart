@@ -14,9 +14,7 @@ class CarbonWiseApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'CarbonWise',
       theme: ThemeData(
-        scaffoldBackgroundColor: const Color(
-          0xFFEFEFEA,
-        ), // Canvas off-white tone matching background images
+        scaffoldBackgroundColor: const Color(0xFFEFEFEA),
         primarySwatch: Colors.green,
       ),
       home: const LandingPageScreen(),
