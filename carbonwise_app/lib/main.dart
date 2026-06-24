@@ -170,23 +170,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       print('------------------ SUPABASE LOGIN ATTEMPT ------------------');
+
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      print('SUCCESS: User Logged In! UUID: ${response.user?.id}');
+      final user = response.user;
+
+      if (user == null) {
+        throw Exception('Login failed.');
+      }
+
+      print('SUCCESS: User Logged In!');
+      print('UUID: ${user.id}');
+      print('Email: ${user.email}');
       print('------------------------------------------------------------');
 
       if (mounted) {
         _showSnackBar('Welcome back!');
 
-        // Delay slightly to ensure Supabase Auth stream synchronizes the
-        // session data locally across your dashboard.dart widgets before rendering.
         await Future.delayed(const Duration(milliseconds: 150));
 
-        // redirects page from sign up to main navigation page after successful registration
         if (!mounted) return;
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const CustomMainNavigation()),
@@ -198,9 +205,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _showSnackBar(error.message, isError: true);
     } catch (error) {
       print('UNEXPECTED ERROR: $error');
-      _showSnackBar('An unexpected error occurred.', isError: true);
+      _showSnackBar(error.toString(), isError: true);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
