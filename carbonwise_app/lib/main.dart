@@ -185,6 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // session data locally across your dashboard.dart widgets before rendering.
         await Future.delayed(const Duration(milliseconds: 150));
 
+        // redirects page from sign up to main navigation page after successful registration
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
@@ -504,8 +505,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('------------------ SUPABASE SIGNUP ATTEMPT ------------------');
-      print('Registering Email: $email');
+      print('Attempting insert into user_info...');
 
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
@@ -519,10 +519,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
         },
       );
 
+      final user = response.user;
+
+      if (user != null) {
+        print('Attempting insert into user_info...');
+
+        await Supabase.instance.client.from('user_info').insert({
+          'role': 'student',
+          'sr_code': srCode,
+          'g_suite': email,
+          'full_name': name,
+          'password': password,
+          'campus': selectedCampus,
+          'year_level': int.parse(
+            selectedYearLevel!.replaceAll(RegExp(r'[^0-9]'), ''),
+          ),
+          'department': selectedDepartment,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        print('SUCCESS: user_info insert completed');
+      }
+      ;
+
       print('SUCCESS: User Registered via Authentication module!');
       print('Assigned User UUID: ${response.user?.id}');
       print('-------------------------------------------------------------');
 
+      // redirects page from sign up to main navigation page after successful registration
       if (mounted) {
         _showSnackBar('Account Created Successfully!');
 
