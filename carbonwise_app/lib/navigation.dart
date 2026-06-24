@@ -4,6 +4,7 @@ import 'package:carbonwise_app/dashboard.dart';
 import 'package:carbonwise_app/reports.dart';
 import 'package:carbonwise_app/activity.dart';
 import 'package:carbonwise_app/profile.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CustomMainNavigation extends StatefulWidget {
   const CustomMainNavigation({super.key});
@@ -15,8 +16,28 @@ class CustomMainNavigation extends StatefulWidget {
 class _CustomMainNavigationState extends State<CustomMainNavigation> {
   int _currentIndex = 0;
 
+  String userName = 'User';
+
+  Future<void> loadUserName() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    setState(() {
+      userName = user.userMetadata?['full_name'] ?? 'User';
+    });
+
+    print('Logged in as: $userName');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserName();
+  }
+
   final List<String> _pageTitles = [
-    'Good morning, Jana Venice!',
+    '',
     'View your Reports',
     'Activity Input',
     'Mitigation Strategies',
@@ -72,7 +93,9 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _pageTitles[_currentIndex],
+                                _currentIndex == 0
+                                    ? 'Good morning, $userName!'
+                                    : _pageTitles[_currentIndex],
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,

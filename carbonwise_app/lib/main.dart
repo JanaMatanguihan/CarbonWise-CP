@@ -177,6 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final user = response.user;
+      print("LOGGED IN EMAIL: ${user?.email}");
 
       if (user == null) {
         throw Exception('Login failed.');
