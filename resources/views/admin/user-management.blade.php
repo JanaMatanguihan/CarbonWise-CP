@@ -5,7 +5,7 @@
 
 @section('content')
 
-<div class="mt-6 bg-white rounded-xl shadow overflow-hidden">
+<div class="mt-6 bg-white rounded-xl shadow overflow-visible">
 
     <form
     method="GET"
@@ -166,7 +166,7 @@
             </tr>
         </thead>
             <tbody>
-            @foreach ($users as $user)
+            @foreach ($users as $index => $user)
             <tr class="border-b">
                 <td class="p-4">
                     <div class="flex items-center gap-3">
@@ -238,10 +238,13 @@
                 </td>
 
                 <td class="p-4">
-                    {{ $user->created_at ? $user->created_at->format('F d, Y') : 'N/A' }}
+                   {{ $user->created_at
+                    ? \Carbon\Carbon::parse($user->created_at)->format('F d, Y')
+                    : 'N/A'
+                }}
                 </td>
 
-                <td class="p-4 text-center relative action-menu">
+                <td class="p-4 text-center relative action-menu overflow-visible">
 
             <button
                 onclick="toggleMenu('{{ md5($user->g_suite) }}')"
@@ -252,9 +255,10 @@
 
             <div
                 id="menu-{{ md5($user->g_suite) }}"
-                class="hidden absolute right-6 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50"
+                class="hidden absolute right-6
+                {{ $index >= $users->count() - 3 ? 'bottom-full mb-2' : 'top-full mt-2' }}
+                w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
             >
-
                 <a
                     href="{{ route('admin.users.show', $user->g_suite) }}"
                     class="block px-4 py-2 hover:bg-gray-100"
@@ -262,22 +266,23 @@
                     View Profile
                 </a>
 
-                <a href="#"
-                    class="block px-4 py-2 hover:bg-gray-100">
-                    Edit User
-                </a>
-
-                <a href="#"
-                    class="block px-4 py-2 hover:bg-gray-100">
-                    Change Status
-                </a>
-
                 <hr>
 
-                <a href="#"
-                    class="block px-4 py-2 text-red-600 hover:bg-red-50">
-                    Delete User
-                </a>
+                <form
+                    action="{{ route('admin.users.destroy', $user->g_suite) }}"
+                    method="POST"
+                    onsubmit="return confirm('Are you sure you want to delete this user?');"
+                >
+                    @csrf
+                    @method('DELETE')
+
+                    <button
+                        type="submit"
+                        class="block w-full px-4 py-2 text-center text-red-600 hover:bg-red-50"
+                    >
+                        Delete User
+                    </button>
+                </form>
 
             </div>
 

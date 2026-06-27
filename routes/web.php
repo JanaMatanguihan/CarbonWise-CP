@@ -36,6 +36,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::put('/admin/users/{g_suite}', [UserManagementController::class, 'update'])
     ->name('admin.users.update');
+
+    Route::delete('/admin/users/{g_suite}', [UserManagementController::class, 'destroy'])
+    ->name('admin.users.destroy');
     
 });
 

@@ -14,6 +14,8 @@ class UserInfo extends Model
 
     protected $keyType = 'string';
 
+    public $timestamps = false;
+
     protected $fillable = [
         'sr_code',
         'full_name',

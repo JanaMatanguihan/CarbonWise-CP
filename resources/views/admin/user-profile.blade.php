@@ -73,13 +73,18 @@
 
                 <div class="flex justify-between">
                     <span class="text-gray-500">Joined</span>
-                    <span>{{ $user->created_at->format('F d, Y') }}</span>
+                    <span>{{ \Carbon\Carbon::parse($user->created_at)->format('F d, Y') }}</span>
                 </div>
 
                 <div class="flex justify-between">
                     <span class="text-gray-500">Status</span>
 
-                    <span class="text-green-600 font-semibold">
+                    <span class="
+                        font-semibold
+                        {{ $user->status == 'Active'
+                            ? 'text-green-600'
+                            : 'text-red-600' }}
+                    ">
                         {{ $user->status }}
                     </span>
                 </div>

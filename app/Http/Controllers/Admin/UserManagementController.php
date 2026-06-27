@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserInfo;
 use App\Models\CarbonRecord;
 use App\Models\MitigationAction;
+use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
 {
@@ -163,4 +164,48 @@ class UserManagementController extends Controller
 
                 return view('admin.edit-user', compact('user'));
             }
+
+            public function update(Request $request, $g_suite)
+{
+    $user = UserInfo::findOrFail($g_suite);
+
+    $request->validate([
+        'full_name' => 'required|string|max:255',
+        'g_suite' => 'required|email',
+        'sr_code' => 'required',
+        'campus' => 'required',
+        'department' => 'required',
+        'year_level' => 'required',
+        'role' => 'required',
+        'status' => 'required',
+    ]);
+
+    $user->update([
+        'full_name' => $request->full_name,
+        'g_suite' => $request->g_suite,
+        'sr_code' => $request->sr_code,
+        'campus' => $request->campus,
+        'department' => $request->department,
+        'year_level' => $request->year_level,
+        'role' => $request->role,
+        'status' => $request->status,
+    ]);
+
+    
+
+    return redirect()
+        ->route('admin.users.show', $request->g_suite)
+        ->with('success', 'User updated successfully.');
+}
+
+    public function destroy($g_suite)
+        {
+            $user = UserInfo::findOrFail($g_suite);
+
+            $user->delete();
+
+            return redirect()
+                ->route('admin.users')
+                ->with('success', 'User deleted successfully.');
+        }
 }
