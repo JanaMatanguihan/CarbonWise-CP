@@ -89,7 +89,10 @@
                     Emissions Trend
                 </h3>
 
-                <select id="trendFilter" class="border rounded-lg px-3 py-1 text-sm">
+            <select
+            id="trendFilter"
+            class="custom-select min-w-[110px] h-10 border border-gray-300 rounded-lg px-4 text-sm bg-white"
+        >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly" selected>Monthly</option>
@@ -212,7 +215,10 @@
                 Forecasted Emissions
             </h3>
 
-            <select id="forecastFilter" class="border rounded-lg px-3 py-1 text-sm">
+            <select
+            id="forecastFilter"
+            class="custom-select min-w-[110px] h-10 border border-gray-300 rounded-lg px-4 text-sm bg-white"
+        >
             <option value="7">7 Days</option>
             <option value="30" selected>30 Days</option>
             <option value="60">60 Days</option>

@@ -13,20 +13,28 @@ import monthSelectPlugin from "flatpickr/dist/plugins/monthSelect/index.js";
 import "flatpickr/dist/flatpickr.min.css";
 import "flatpickr/dist/plugins/monthSelect/style.css";
 
-const picker = document.querySelector("#monthPicker");
+document.addEventListener("DOMContentLoaded", () => {
 
-if (picker) {
+    const picker = document.querySelector("#monthPicker");
+
+    if (!picker) return;
+
     flatpickr(picker, {
         plugins: [
             monthSelectPlugin({
-                shorthand: true,
+                shorthand: false,
                 dateFormat: "Y-m",
                 altFormat: "F Y",
             }),
         ],
+
+        altInput: true,
+        allowInput: false,
         defaultDate: picker.value || "today",
+
         onChange: function () {
             picker.form.submit();
         },
     });
-}
+
+});

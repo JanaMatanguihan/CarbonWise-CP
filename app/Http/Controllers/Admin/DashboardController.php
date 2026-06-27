@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\UserInfo;
 use App\Models\CarbonRecord;
 use App\Models\MitigationAction;
 use App\Models\SdoReport;
@@ -14,18 +14,18 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $year = request('year', now()->year);
-        $month = request('month', now()->format('m'));
+        $selectedMonth = request('month', now()->format('Y-m'));
+
+        $year = date('Y', strtotime($selectedMonth));
+        $month = date('m', strtotime($selectedMonth));
         /*
-        |--------------------------------------------------------------------------
-        | Dashboard Summary Cards
-        |--------------------------------------------------------------------------
+        Dashboard Summary Cards
         */
 
         // Total registered users
-        $totalUsers = User::whereYear('created_at', $year)
-        ->whereMonth('created_at', $month)
-        ->count();
+            $totalUsers = UserInfo::whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->count();
 
         // Total carbon emissions
         $totalEmissions = CarbonRecord::whereYear('record_date', $year)
@@ -48,9 +48,7 @@ class DashboardController extends Controller
         ->count();
 
         /*
-        |--------------------------------------------------------------------------
-        | Emission by Source
-        |--------------------------------------------------------------------------
+        Emission by Source
         */
 
         $transportationTotal = CarbonRecord::whereYear('record_date', $year)
@@ -70,9 +68,7 @@ class DashboardController extends Controller
             ->sum('waste');
 
         /*
-        |--------------------------------------------------------------------------
-        | Monthly Emissions Trend (Current Year)
-        |--------------------------------------------------------------------------
+         Monthly Emissions Trend (Current Year)
         */
 
         // Ensure monthlyEmissions is always defined to avoid undefined variable notices
@@ -87,78 +83,60 @@ class DashboardController extends Controller
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Top Emitting Departments
-        |--------------------------------------------------------------------------
+        Top Emitting Departments
         */
 
-        $totalEmissions = CarbonRecord::whereYear('record_date', $year)
-        ->whereMonth('record_date', $month)
-        ->sum('total_emission');
-
-        $topDepartments = CarbonRecord::join(
-        'users',
-        'carbon_records.user_id',
-        '=',
-        'users.id'
+        $topDepartments = DB::table('carbon_records')
+            ->join(
+                'user_info',
+                'carbon_records.g_suite',
+                '=',
+                'user_info.g_suite'
             )
             ->select(
-                'users.department',
+                'user_info.department',
                 DB::raw('SUM(carbon_records.total_emission) as total_emissions')
             )
-
             ->whereYear('carbon_records.record_date', $year)
             ->whereMonth('carbon_records.record_date', $month)
-
-            ->whereNotNull('users.department')
-            ->groupBy('users.department')
+            ->groupBy('user_info.department')
             ->orderByDesc('total_emissions')
-            ->take(5)
-            ->get()
-            ->map(function ($dept) use ($totalEmissions) {
-                $dept->percentage = $totalEmissions > 0
-                    ? round(($dept->total_emissions / $totalEmissions) * 100, 1)
-                    : 0;
-
-        return $dept;
-    });
+            ->limit(5)
+            ->get();
         /*
-        |--------------------------------------------------------------------------
-        | User Engagement
-        |--------------------------------------------------------------------------
+         User Engagement
         */
 
         $activeUsers = CarbonRecord::whereYear('record_date', $year)
-            ->whereMonth('record_date', $month)
-            ->distinct('user_id')
-            ->count('user_id');
+        ->whereMonth('record_date', $month)
+        ->distinct('g_suite')
+        ->count('g_suite');
 
         $engagementRate = $totalUsers > 0
             ? round(($activeUsers / $totalUsers) * 100)
             : 0;
 
         /*
-        |--------------------------------------------------------------------------
-        | Recent Alerts
-        |--------------------------------------------------------------------------
+        Recent Alerts
         */
 
-        $recentAlerts = Alert::latest()
-            ->take(5)
-            ->get();
-        /*
-        |--------------------------------------------------------------------------
-        | Recommended Mitigation Strategies
-        |--------------------------------------------------------------------------
-        */
-
-        $recommendedStrategies = MitigationAction::latest()
-        ->take(4)
+        $recentAlerts = Alert::whereYear('created_at', $year)
+        ->whereMonth('created_at', $month)
+        ->latest()
+        ->take(5)
         ->get();
         /*
-        |--------------------------------------------------------------------------
-        | Forecast Placeholder
-        |--------------------------------------------------------------------------
+        Recommended Mitigation Strategies
+        */
+
+       $recommendedStrategies = MitigationAction::whereYear('created_at', $year)
+            ->whereMonth('created_at', $month)
+            ->latest()
+            ->take(4)
+            ->get();
+
+        /*
+        Forecast Placeholder
         */
 
         $forecastData = $monthlyEmissions;

@@ -26,6 +26,16 @@ Route::middleware(['auth'])->group(function () {
     // User Management page
     Route::get('/admin/users', [UserManagementController::class, 'index'])
     ->name('admin.users');
+
+    // View User Profile
+    Route::get('/admin/users/{g_suite}', [UserManagementController::class, 'show'])
+    ->name('admin.users.show');
+
+    Route::get('/admin/users/{g_suite}/edit', [UserManagementController::class, 'edit'])
+    ->name('admin.users.edit');
+
+    Route::put('/admin/users/{g_suite}', [UserManagementController::class, 'update'])
+    ->name('admin.users.update');
     
 });
 

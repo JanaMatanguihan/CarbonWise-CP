@@ -149,7 +149,7 @@
 
     <!-- Month Picker -->
         <form method="GET" action="{{ route('dashboard') }}">
-                    <input
+            <input
             id="monthPicker"
             name="month"
             type="month"
@@ -198,6 +198,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 @stack('scripts')
 

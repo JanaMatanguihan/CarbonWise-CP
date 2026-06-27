@@ -47,11 +47,10 @@
         <!-- Role -->
         <select
         name="role"
-        class="ml-16 border rounded-lg px-4 py-2 w-38"
+        class="ml-16 border rounded-lg px-4 py-2 w-40"
         onchange="document.getElementById('filterForm').submit();"
         >
             <option value="">All Roles</option>
-            <option value="admin" {{ request('role') == 'admin' ? 'selected' : '' }}>Administrator</option>
             <option value="faculty" {{ request('role') == 'faculty' ? 'selected' : '' }}>Faculty</option>
             <option value="student" {{ request('role') == 'student' ? 'selected' : '' }}>Student</option>
             <option value="staff" {{ request('role') == 'staff' ? 'selected' : '' }}>Staff</option>
@@ -59,19 +58,77 @@
 
         <!-- Department -->
         <select
-            name="department"
-            class="border rounded-lg px-4 py-2 w-48"
-            onchange="document.getElementById('filterForm').submit();"
-        >
-            <option value="">All Departments</option>
-            <option value="College of Teacher Education" {{ request('department') == 'College of Teacher Education' ? 'selected' : '' }}>CTE</option>
-            <option value="College of Accountancy, Business, and Economics" {{ request('department') == 'College of Accountancy, Business, and Economics' ? 'selected' : '' }}>CABE</option>
-            <option value="College of Arts and Sciences" {{ request('department') == 'College of Arts and Sciences' ? 'selected' : '' }}>CAS</option>
-            <option value="College of Informatics and Computing Science" {{ request('department') == 'College of Informatics and Computing Science' ? 'selected' : '' }}>CICS</option>
-            <option value="College of Engineering Technology" {{ request('department') == 'College of Engineering Technology' ? 'selected' : '' }}>CET</option>
-            <option value="SDO Office" {{ request('department') == 'SDO Office' ? 'selected' : '' }}>SDO Office</option>
-        </select>
+                    name="department"
+                    class="border rounded-lg px-4 py-2 w-48"
+                    onchange="document.getElementById('filterForm').submit();"
+                >
+                    <option value="">All Departments</option>
 
+                    <option value="CICS" {{ request('department') == 'CICS' ? 'selected' : '' }}>
+                        CICS
+                    </option>
+
+                    <option value="CET" {{ request('department') == 'CET' ? 'selected' : '' }}>
+                        CET
+                    </option>
+
+                    <option value="CAS" {{ request('department') == 'CAS' ? 'selected' : '' }}>
+                        CAS
+                    </option>
+
+                    <option value="CABE" {{ request('department') == 'CABE' ? 'selected' : '' }}>
+                        CABE
+                    </option>
+
+                    <option value="CTE" {{ request('department') == 'CTE' ? 'selected' : '' }}>
+                        CTE
+                    </option>
+                </select>
+
+                <!-- Campus -->
+                <select
+                    name="campus"
+                    class="border rounded-lg px-4 py-2 w-52"
+                    onchange="document.getElementById('filterForm').submit();"
+                >
+                    <option value="">All Campuses</option>
+
+                    <option value="Lipa Campus" {{ request('campus') == 'Lipa Campus' ? 'selected' : '' }}>
+                        Lipa Campus
+                    </option>
+
+                    <option value="Alangilan Campus" {{ request('campus') == 'Alangilan Campus' ? 'selected' : '' }}>
+                        Alangilan Campus
+                    </option>
+
+                    <option value="Pablo Borbon Campus" {{ request('campus') == 'Pablo Borbon Campus' ? 'selected' : '' }}>
+                        Pablo Borbon Campus
+                    </option>
+
+                    <option value="ARASOF Nasugbu Campus" {{ request('campus') == 'ARASOF Nasugbu Campus' ? 'selected' : '' }}>
+                        ARASOF Nasugbu Campus
+                    </option>
+
+                    <option value="Rosario Campus" {{ request('campus') == 'Rosario Campus' ? 'selected' : '' }}>
+                        Rosario Campus
+                    </option>
+
+                    <option value="Balayan Campus" {{ request('campus') == 'Balayan Campus' ? 'selected' : '' }}>
+                        Balayan Campus
+                    </option>
+
+                    <option value="Lemery Campus" {{ request('campus') == 'Lemery Campus' ? 'selected' : '' }}>
+                        Lemery Campus
+                    </option>
+
+                    <option value="San Juan Campus" {{ request('campus') == 'San Juan Campus' ? 'selected' : '' }}>
+                        San Juan Campus
+                    </option>
+
+                    <option value="Malvar Campus" {{ request('campus') == 'Malvar Campus' ? 'selected' : '' }}>
+                        Malvar Campus
+                    </option>
+                </select>
         <!-- Status -->
         <select
             name="status"
@@ -102,6 +159,7 @@
                 <th class="text-left p-4">User</th>
                 <th class="text-left p-4">Role</th>
                 <th class="text-left p-4">Department / College</th>
+                <th class="text-left p-4">Campus</th>
                 <th class="text-left p-4">Status</th>
                 <th class="text-left p-4">Joined</th>
                 <th class="text-left p-4">Actions</th>
@@ -111,35 +169,39 @@
             @foreach ($users as $user)
             <tr class="border-b">
                 <td class="p-4">
-    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3">
 
-        @if ($user->profile_photo)
-            <img
-                src="{{ asset('storage/' . $user->profile_photo) }}"
-                alt="{{ $user->name }}"
-                class="w-12 h-12 rounded-full object-cover"
-            >
-        @else
-            <img
-                src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=16a34a&color=ffffff"
-                alt="{{ $user->name }}"
-                class="w-12 h-12 rounded-full"
-            >
-        @endif
+                        @if($user->profile_photo)
+                            <img
+                                src="{{ asset('storage/' . $user->profile_photo) }}"
+                                class="w-12 h-12 rounded-full object-cover"
+                            >
+                        @else
+                            <img
+                                src="https://ui-avatars.com/api/?name={{ urlencode($user->full_name) }}&background=16a34a&color=ffffff"
+                                class="w-12 h-12 rounded-full"
+                            >
+                        @endif
 
-        <div>
-            <div class="font-semibold">
-                {{ $user->name }}
-            </div>
+                        <!-- User Details -->
+                        <div class="flex flex-col">
 
-            <div class="text-sm text-gray-500">
-                {{ $user->email }}
-            </div>
-        </div>
+                            <span class="font-semibold text-gray-900">
+                                {{ $user->full_name }}
+                            </span>
 
-    </div>
-</td>
+                            <span class="text-sm text-gray-500">
+                                {{ $user->g_suite }}
+                            </span>
 
+                            <span class="text-xs text-gray-400">
+                                {{ $user->sr_code }}
+                            </span>
+
+                        </div>
+
+                    </div>
+                </td>
                 <td class="p-4">
                     {{ $user->role }}
                 </td>
@@ -149,28 +211,108 @@
                 </td>
 
                 <td class="p-4">
-                    @if($user->status === 'Active')
-                        <span class="px-3 py-1 rounded bg-green-100 text-green-700">
+                    {{ $user->campus }}
+                </td>
+
+                <td class="p-4">
+                    @if($user->status == 'Active')
+
+                        <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm">
                             Active
                         </span>
+
+                    @elseif($user->status == 'Pending')
+
+                        <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm">
+                            Pending
+                        </span>
+
                     @else
-                        <span class="px-3 py-1 rounded bg-red-100 text-red-700">
+
+                        <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm">
                             Inactive
                         </span>
+
                     @endif
+
                 </td>
 
                 <td class="p-4">
                     {{ $user->created_at ? $user->created_at->format('F d, Y') : 'N/A' }}
                 </td>
 
-                <td class="p-4 text-center">
-                    ⋮
-                </td>
-            </tr>
-            @endforeach
-            </tbody>
-        </table>
-        </div>
-    </div>
+                <td class="p-4 text-center relative action-menu">
+
+            <button
+                onclick="toggleMenu('{{ md5($user->g_suite) }}')"
+                class="text-xl font-bold px-2 hover:text-green-600"
+            >
+                ⋮
+            </button>
+
+            <div
+                id="menu-{{ md5($user->g_suite) }}"
+                class="hidden absolute right-6 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50"
+            >
+
+                <a
+                    href="{{ route('admin.users.show', $user->g_suite) }}"
+                    class="block px-4 py-2 hover:bg-gray-100"
+                >
+                    View Profile
+                </a>
+
+                <a href="#"
+                    class="block px-4 py-2 hover:bg-gray-100">
+                    Edit User
+                </a>
+
+                <a href="#"
+                    class="block px-4 py-2 hover:bg-gray-100">
+                    Change Status
+                </a>
+
+                <hr>
+
+                <a href="#"
+                    class="block px-4 py-2 text-red-600 hover:bg-red-50">
+                    Delete User
+                </a>
+
+            </div>
+
+        </td>
+                    </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <script>
+        function toggleMenu(id){
+
+            document.querySelectorAll("[id^='menu-']").forEach(menu=>{
+                if(menu.id!="menu-"+id){
+                    menu.classList.add("hidden");
+                }
+            });
+
+            document
+                .getElementById("menu-"+id)
+                .classList.toggle("hidden");
+        }
+
+        window.addEventListener("click",function(e){
+
+            if (!e.target.closest(".action-menu")) {
+
+                document.querySelectorAll("[id^='menu-']").forEach(menu=>{
+                    menu.classList.add("hidden");
+                });
+
+            }
+
+        });
+        </script>
 @endsection

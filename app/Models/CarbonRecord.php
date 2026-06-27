@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class CarbonRecord extends Model
 {
     protected $fillable = [
-        'user_id',
+        'g_suite',
         'transportation',
         'electricity',
         'food',
@@ -16,8 +16,8 @@ class CarbonRecord extends Model
         'record_date',
     ];
 
-    public function user()
+    public function student()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(UserInfo::class, 'g_suite', 'g_suite');
     }
 }

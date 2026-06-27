@@ -19,6 +19,7 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@heroicons/vue": "^2.2.0",
         "@popperjs/core": "^2.11.8",
         "bootstrap": "^5.3.8",
         "flatpickr": "^4.6.13",
