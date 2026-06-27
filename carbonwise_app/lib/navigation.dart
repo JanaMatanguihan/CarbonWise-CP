@@ -117,9 +117,9 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                         const SizedBox(width: 8),
                         Row(
                           children: [
-                            _buildCircleIcon(Icons.notifications_none),
+                            _buildNotificationButton(),
                             const SizedBox(width: 6),
-                            _buildCircleIcon(Icons.person_outline),
+                            _buildProfileMenuButton(context),
                           ],
                         ),
                       ],
@@ -251,4 +251,109 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
       ),
     );
   }
+}
+
+Widget _buildNotificationButton() {
+  return PopupMenuButton<String>(
+    offset: const Offset(0, 48),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    color: Colors.white,
+    child: _circleIcon(Icons.notifications_none),
+    itemBuilder: (context) => const <PopupMenuEntry<String>>[
+      PopupMenuItem<String>(
+        enabled: false,
+        child: SizedBox(
+          width: 260,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Notifications',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E5631),
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Reminder: Do not forget to complete your green activity today.',
+                style: TextStyle(color: Colors.black87, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildProfileMenuButton(BuildContext context) {
+  return PopupMenuButton<String>(
+    offset: const Offset(0, 48),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    color: Colors.white,
+    child: _circleIcon(Icons.person_outline),
+    onSelected: (value) {
+      if (value == 'manage_profile') {
+        Navigator.pushNamed(context, '/manage-profile');
+      } else if (value == 'change_password') {
+        Navigator.pushNamed(context, '/change-password');
+      } else if (value == 'logout') {
+        _logout(context);
+      }
+    },
+    itemBuilder: (context) => const <PopupMenuEntry<String>>[
+      PopupMenuItem<String>(
+        value: 'manage_profile',
+        child: Row(
+          children: [
+            Icon(Icons.manage_accounts_outlined, color: Color(0xFF1E5631)),
+            SizedBox(width: 10),
+            Text('Manage Profile'),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'change_password',
+        child: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Color(0xFF1E5631)),
+            SizedBox(width: 10),
+            Text('Change Password'),
+          ],
+        ),
+      ),
+      PopupMenuDivider(),
+      PopupMenuItem<String>(
+        value: 'logout',
+        child: Row(
+          children: [
+            Icon(Icons.logout, color: Colors.red),
+            SizedBox(width: 10),
+            Text('Log Out', style: TextStyle(color: Colors.red)),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _circleIcon(IconData icon) {
+  return Container(
+    width: 40,
+    height: 40,
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+    ),
+    child: Icon(icon, color: Color(0xFF3AA76D), size: 24),
+  );
+}
+
+Future<void> _logout(BuildContext context) async {
+  final navigator = Navigator.of(context);
+
+  await Supabase.instance.client.auth.signOut();
+
+  navigator.pushNamedAndRemoveUntil('/', (route) => false);
 }

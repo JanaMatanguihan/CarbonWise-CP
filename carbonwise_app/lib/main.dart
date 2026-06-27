@@ -764,7 +764,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             const SizedBox(height: 6),
                             _buildDropdownField(
                               hint: 'Click to choose your department',
-                              items: ['CABE', 'CAS', 'CET', 'CICS', 'CTE'],
+                              items: [
+                                'College of Accountancy, Business and Economics',
+                                'College of Arts and Sciences',
+                                'College of Engineering Technology',
+                                'College of Informatics and Computing Sciences',
+                                'College of Teacher Education',
+                              ],
                               value: selectedDepartment,
                               onChanged: (val) =>
                                   setState(() => selectedDepartment = val),

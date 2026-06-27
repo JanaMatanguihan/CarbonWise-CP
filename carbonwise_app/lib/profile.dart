@@ -1,9 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  // Color Palette Constants
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, dynamic>? userInfo;
+  bool isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      setState(() {
+        isLoadingProfile = false;
+      });
+      return;
+    }
+
+    final response = await Supabase.instance.client
+        .from('user_info')
+        .select('sr_code, g_suite, full_name, campus, department')
+        .eq('g_suite', user.email!)
+        .maybeSingle();
+
+    setState(() {
+      userInfo = response;
+      isLoadingProfile = false;
+    });
+  }
+
   static const Color primaryGreen = Color(0xFF3AA76D);
   static const Color darkGreen = Color(0xFF1E5631);
   static const Color lightBgGrey = Color(0xFFEFEFEF);
@@ -46,17 +82,15 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 1. Profile Header - Adjusted top padding to pull elements upward
+  // 1. Profile Header
   Widget _buildProfileHeader() {
+    final String fullName = userInfo?['full_name'] ?? 'Loading...';
+    final String department = userInfo?['department'] ?? '';
+    final String campus = userInfo?['campus'] ?? '';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(
-        top:
-            36, // 🟢 Reduced from 54 to shift the layout upwards and eliminate excess space
-        bottom: 24,
-        left: 36, // Retained rightward indentation to prevent bezel crowding
-        right: 20,
-      ),
+      padding: const EdgeInsets.only(top: 36, bottom: 24, left: 36, right: 20),
       decoration: const BoxDecoration(
         color: primaryGreen,
         borderRadius: BorderRadius.only(
@@ -77,9 +111,9 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Jana Venice Matanguihan',
-                  style: TextStyle(
+                Text(
+                  isLoadingProfile ? 'Loading...' : fullName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
@@ -87,7 +121,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'College of Informatics and Computing Sciences\nBSU Lipa Campus',
+                  isLoadingProfile ? '' : '$department\n$campus',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.9),
                     fontSize: 12,
@@ -132,7 +166,7 @@ class ProfileScreen extends StatelessWidget {
                         'kg CO2 / wk',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11, // Bumped from 10
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: Colors.black.withOpacity(0.7),
                         ),
@@ -144,7 +178,7 @@ class ProfileScreen extends StatelessWidget {
                   '12% less than last week',
                   style: TextStyle(
                     color: primaryGreen,
-                    fontSize: 10.5, // Bumped from 10
+                    fontSize: 10.5,
                     fontStyle: FontStyle.italic,
                     fontWeight: FontWeight.bold,
                   ),
@@ -163,7 +197,7 @@ class ProfileScreen extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     SizedBox(
-                      width: 38, // Slightly expanded
+                      width: 38,
                       height: 38,
                       child: CircularProgressIndicator(
                         value: 0.75,
@@ -1059,10 +1093,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     time,
-                    style: const TextStyle(
-                      fontSize: 8,
-                      color: Colors.black26,
-                    ), // Bumped from 6
+                    style: const TextStyle(fontSize: 8, color: Colors.black26),
                   ),
                 ],
               ),
