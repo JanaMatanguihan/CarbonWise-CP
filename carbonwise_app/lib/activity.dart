@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
@@ -15,6 +16,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   String? _selectedFoodType;
   String? _selectedFoodCategory;
 
+  double _transportationTotalEmission = 0.0;
+  double _officeResourceTotalEmission = 0.0;
+  double _foodTotalEmission = 0.0;
+
   // Controllers
   final TextEditingController _distanceController = TextEditingController();
 
@@ -23,7 +28,112 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final List<String> _officeEmissions = [];
   final List<String> _foodEmissions = [];
 
-  // Helper method to get conditional food categories based on selected food type
+  final Map<String, double> transportationEmissionFactors = {
+    'Traditional Jeepney': 0.18,
+    'Modern Jeepney': 0.09,
+    'Car': 0.21,
+    'Motorcycle': 0.10,
+    'Bicycle/Walking': 0.0,
+  };
+
+  final Map<String, double> officeResourcePowerRatings = {
+    'Window Type': 1500,
+    'Split-Type (Wall-Mounted)': 1800,
+    'Ceiling Cassette / Ceiling Suspended': 3000,
+    'Floor Standing (Tower)': 5300,
+    'AC Motor Fan': 65,
+    'DC Motor Fan': 30,
+    'Ceiling Fan': 80,
+    'Stand Fan': 60,
+    'Wall Fan': 55,
+    'Exhaust Fan': 30,
+    'Tower Fan': 50,
+    'Desk Fan': 40,
+    'Bladeless Fan': 55,
+    'Misting Fan': 130,
+    'Industrial Fan': 200,
+    'LED (Light Emitting Diode)': 15,
+    'Fluorescent': 40,
+    'Incandescent': 60,
+    'Standard DLP/LDC Projector': 300,
+    'Eco Mode': 200,
+    'Large Venue Projector (Auditoriums)': 700,
+    'Standby': 5,
+    'Inkjet Printer (Desktop)': 30,
+    'Laser Printer (B&W)': 400,
+    'Color Laser Printer': 500,
+    'Mid-size Office MFP': 800,
+    'High-volume Photocopier': 1500,
+    'Ultra-light/Notebook': 45,
+    'Standard Business Laptop': 60,
+    'Performance Laptop': 120,
+    'Gaming/High-End Workstation': 200,
+    'Standard Office PC': 200,
+    'Mid-range Workstation': 350,
+    'High-end/Gaming PC': 500,
+    'Mini PC (NUC/MAC Mini)': 50,
+    '18.5" to 20" LED Monitor': 20,
+    '22" to 24" LED Monitor': 30,
+    '27" and Larger': 50,
+    'OLD CRTS Monitor (Big Box Style)': 100,
+    '55" to 65"': 120,
+    '75"': 180,
+    '86"': 250,
+    '98" and above': 400,
+    'Desktop/PC Speakers': 20,
+    'Wall-mounted Classroom Speakers': 60,
+    'Large PA System (Events/Gyms)': 1000,
+  };
+
+  final Map<String, double> foodEmissionFactors = {
+    'Beef (Beef Herd)': 60.0,
+    'Lamb & Mutton': 24.5,
+    'Beef (Dairy Herd)': 21.1,
+    'Cheese': 21.0,
+    'Pork': 7.0,
+    'Poultry (Chicken/Turkey)': 6.0,
+    'Eggs': 4.5,
+    'Fish (Farmed)': 5.0,
+    'Rice (Flooded)': 4.5,
+    'Tofu (Soy-based)': 3.0,
+    'Groundnuts/Peanuts': 2.5,
+    'Pulses (Beans/Pease)': 2.0,
+    'Wheat & Rye (Bread)': 1.4,
+    'Maize (Corn)': 1.0,
+    'Potatoes': 0.5,
+    'Apples/Bananas': 0.4,
+    'Root Vegetables': 0.4,
+    'Other Fruits & Vegetables': 0.2,
+    'Coffee': 28.0,
+    'Dark Chocolate': 19.0,
+    'Milk (Bovine)': 3.2,
+    'Soy Milk': 1.0,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCarbonRecords();
+  }
+
+  @override
+  void dispose() {
+    _distanceController.dispose();
+    super.dispose();
+  }
+
+  double _calculateOfficeResourceEmission(String category) {
+    final watts = officeResourcePowerRatings[category] ?? 0.0;
+    const assumedHoursUsed = 1.0;
+    const emissionFactorPerKwh = 0.7122;
+    final kwh = (watts * assumedHoursUsed) / 1000;
+    return kwh * emissionFactorPerKwh;
+  }
+
+  double _calculateFoodEmission(String foodCategory) {
+    return foodEmissionFactors[foodCategory] ?? 0.0;
+  }
+
   List<String> _getFoodCategories(String? foodType) {
     switch (foodType) {
       case 'Red Meat':
@@ -96,7 +206,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           'Inkjet Printer (Desktop)',
           'Laser Printer (B&W)',
           'Color Laser Printer',
-          'Soy Milk',
         ];
       case 'Photocopier / Multifunction Printer':
         return ['Mid-size Office MFP', 'High-volume Photocopier'];
@@ -108,6 +217,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           'Gaming/High-End Workstation',
         ];
       case 'Desktop Computer (CPU + Monitor)':
+      case 'Scanner':
         return [
           'Standard Office PC',
           'Mid-range Workstation',
@@ -120,17 +230,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         ];
       case 'Viewboard / Smart Screen':
         return ['55" to 65"', '75"', '86"', '98" and above'];
-      case 'Scanner':
-        return [
-          'Standard Office PC',
-          'Mid-range Workstation',
-          'High-end/Gaming PC',
-          'Mini PC (NUC/MAC Mini)',
-          '18.5" to 20" LED Monitor',
-          '22" to 24" LED Monitor',
-          '27" and Larger',
-          'OLD CRTS Monitor (Big Box Style)',
-        ];
       case 'Sound Speaker':
         return [
           'Desktop/PC Speakers',
@@ -142,10 +241,72 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _distanceController.dispose();
-    super.dispose();
+  Future<void> _loadSavedCarbonRecords() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.email == null) return;
+
+    final records = await Supabase.instance.client
+        .from('carbon_records')
+        .select('transportation, electricity, food')
+        .eq('g_suite', user.email!)
+        .order('created_at', ascending: false);
+
+    setState(() {
+      _transportEmissions.clear();
+      _officeEmissions.clear();
+      _foodEmissions.clear();
+
+      for (final record in records) {
+        final transportation = record['transportation'] as String?;
+        final electricity = record['electricity'] as String?;
+        final food = record['food'] as String?;
+
+        if (transportation != null && transportation.isNotEmpty) {
+          _transportEmissions.addAll(transportation.split('\n'));
+        }
+
+        if (electricity != null && electricity.isNotEmpty) {
+          _officeEmissions.addAll(electricity.split('\n'));
+        }
+
+        if (food != null && food.isNotEmpty) {
+          _foodEmissions.addAll(food.split('\n'));
+        }
+      }
+    });
+  }
+
+  Future<void> _saveCarbonRecords() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    final now = DateTime.now();
+
+    final totalEmission =
+        _transportationTotalEmission +
+        _officeResourceTotalEmission +
+        _foodTotalEmission;
+
+    try {
+      await Supabase.instance.client.from('carbon_records').insert({
+        'g_suite': user.email,
+        'transportation': _transportationTotalEmission,
+        'electricity': _officeResourceTotalEmission,
+        'food': _foodTotalEmission,
+        'total_emission': totalEmission,
+        'record_date': now.toIso8601String().split('T').first,
+        'created_at': now.toIso8601String(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Carbon record saved successfully.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Save failed: $e")));
+    }
   }
 
   @override
@@ -172,7 +333,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       label: 'Transport Type',
                       hint: 'Select your transport type',
                       value: _selectedTransportType,
-                      items: [
+                      items: const [
                         'Traditional Jeepney',
                         'Modern Jeepney',
                         'Car',
@@ -188,7 +349,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     flex: 5,
                     child: _buildTextField(
                       label: 'Distance (in Kilometers)',
-                      hint: 'Input distance (ie. 10km)',
+                      hint: 'Input distance',
                       controller: _distanceController,
                     ),
                   ),
@@ -198,9 +359,21 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       if (_selectedTransportType != null &&
                           _distanceController.text.isNotEmpty) {
                         setState(() {
+                          final distance =
+                              double.tryParse(_distanceController.text) ?? 0;
+
+                          final emission =
+                              distance *
+                              (transportationEmissionFactors[_selectedTransportType!] ??
+                                  0);
+
+                          _transportationTotalEmission += emission;
+
                           _transportEmissions.add(
-                            '${_selectedTransportType!} (${_distanceController.text} km)',
+                            '${_selectedTransportType!} - ${distance.toStringAsFixed(1)} km '
+                            '(${emission.toStringAsFixed(2)} kg CO₂e)',
                           );
+
                           _selectedTransportType = null;
                           _distanceController.clear();
                         });
@@ -226,7 +399,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       label: 'Office Resource Type',
                       hint: 'Select resource type',
                       value: _selectedOfficeResourceType,
-                      items: [
+                      items: const [
                         'Air Conditioner',
                         'Desktop Computer (CPU + Monitor)',
                         'Electric Fan',
@@ -259,11 +432,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       items: _getOfficeResourceCategories(
                         _selectedOfficeResourceType,
                       ),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedOfficeResourceCategory = val;
-                        });
-                      },
+                      onChanged: (val) =>
+                          setState(() => _selectedOfficeResourceCategory = val),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -271,10 +441,18 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     onPressed: () {
                       if (_selectedOfficeResourceType != null &&
                           _selectedOfficeResourceCategory != null) {
+                        final emission = _calculateOfficeResourceEmission(
+                          _selectedOfficeResourceCategory!,
+                        );
+
                         setState(() {
                           _officeEmissions.add(
-                            '${_selectedOfficeResourceType!} - ${_selectedOfficeResourceCategory!}',
+                            '${_selectedOfficeResourceType!} - ${_selectedOfficeResourceCategory!} '
+                            '(${emission.toStringAsFixed(2)} kg CO2e)',
                           );
+
+                          _officeResourceTotalEmission += emission;
+
                           _selectedOfficeResourceType = null;
                           _selectedOfficeResourceCategory = null;
                         });
@@ -286,8 +464,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // 3. Food Consumption Form Card
+          // 2. Food Consumption Form Card
           _buildFormCard(
             title: 'Food Consumption',
             children: [
@@ -300,7 +477,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       label: 'Food Type',
                       hint: 'Select food type',
                       value: _selectedFoodType,
-                      items: [
+                      items: const [
                         'Red Meat',
                         'Dairy & Poultry',
                         'Staples & Plant-based Proteins',
@@ -336,10 +513,18 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     onPressed: () {
                       if (_selectedFoodType != null &&
                           _selectedFoodCategory != null) {
+                        final emission = _calculateFoodEmission(
+                          _selectedFoodCategory!,
+                        );
+
                         setState(() {
                           _foodEmissions.add(
-                            '${_selectedFoodType!} (${_selectedFoodCategory!})',
+                            '${_selectedFoodType!} (${_selectedFoodCategory!}) '
+                            '(${emission.toStringAsFixed(2)} kg CO2e)',
                           );
+
+                          _foodTotalEmission += emission;
+
                           _selectedFoodType = null;
                           _selectedFoodCategory = null;
                         });
@@ -394,8 +579,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
           // 🟢 POP-UP LOGIC ADDED BELOW
           GestureDetector(
-            onTap: () {
-              // 1. Guard against empty submissions
+            onTap: () async {
               if (_transportEmissions.isEmpty &&
                   _officeEmissions.isEmpty &&
                   _foodEmissions.isEmpty) {
@@ -409,7 +593,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 return;
               }
 
-              // 2. Launch the details summary modal
+              await _saveCarbonRecords();
+
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
@@ -432,7 +617,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         children: [
                           if (_transportEmissions.isNotEmpty) ...[
                             const Text(
-                              '🚗 Transportation',
+                              'Transportation',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -443,11 +628,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                             ..._transportEmissions.map(
                               (e) => Padding(
                                 padding: const EdgeInsets.only(
-                                  left: 8.0,
-                                  bottom: 2.0,
+                                  left: 8,
+                                  bottom: 2,
                                 ),
                                 child: Text(
-                                  '• $e',
+                                  '- $e',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -456,7 +641,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           ],
                           if (_officeEmissions.isNotEmpty) ...[
                             const Text(
-                              '🏢 Office Resources',
+                              'Office Resource',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -467,11 +652,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                             ..._officeEmissions.map(
                               (e) => Padding(
                                 padding: const EdgeInsets.only(
-                                  left: 8.0,
-                                  bottom: 2.0,
+                                  left: 8,
+                                  bottom: 2,
                                 ),
                                 child: Text(
-                                  '• $e',
+                                  '- $e',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -480,7 +665,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           ],
                           if (_foodEmissions.isNotEmpty) ...[
                             const Text(
-                              '🍲 Food Consumption',
+                              'Food Consumption',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -491,11 +676,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                             ..._foodEmissions.map(
                               (e) => Padding(
                                 padding: const EdgeInsets.only(
-                                  left: 8.0,
-                                  bottom: 2.0,
+                                  left: 8,
+                                  bottom: 2,
                                 ),
                                 child: Text(
-                                  '• $e',
+                                  '- $e',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -522,7 +707,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             },
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 color: primaryGreen,
                 borderRadius: BorderRadius.circular(10),
@@ -560,7 +745,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -741,7 +926,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
+                        padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Row(
                           children: [
                             Expanded(
