@@ -26,7 +26,12 @@ class CarbonWiseApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFEFEFEA),
         primarySwatch: Colors.green,
       ),
-      home: const LandingPageScreen(),
+      initialRoute: '/landing',
+      routes: {
+        '/landing': (context) => const LandingPageScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const CustomMainNavigation(),
+      },
     );
   }
 }
@@ -711,7 +716,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           'San Juan Campus',
                                           'Balayan Campus',
                                           'Lobo Campus',
-                                          'Mabini',
+                                          'Mabini Campus',
                                         ],
                                         value: selectedCampus,
                                         onChanged: (val) => setState(

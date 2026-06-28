@@ -1,9 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:carbonwise_app/strategies.dart';
-import 'package:carbonwise_app/dashboard.dart';
-import 'package:carbonwise_app/reports.dart';
+import 'dart:convert';
+
 import 'package:carbonwise_app/activity.dart';
+import 'package:carbonwise_app/dashboard.dart';
 import 'package:carbonwise_app/profile.dart';
+import 'package:carbonwise_app/reports.dart';
+import 'package:carbonwise_app/strategies.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CustomMainNavigation extends StatefulWidget {
@@ -15,26 +18,7 @@ class CustomMainNavigation extends StatefulWidget {
 
 class _CustomMainNavigationState extends State<CustomMainNavigation> {
   int _currentIndex = 0;
-
   String userName = 'User';
-
-  Future<void> loadUserName() async {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null) return;
-
-    setState(() {
-      userName = user.userMetadata?['full_name'] ?? 'User';
-    });
-
-    print('Logged in as: $userName');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    loadUserName();
-  }
 
   final List<String> _pageTitles = [
     '',
@@ -44,13 +28,29 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     'User Profile Summary',
   ];
 
-  final List<Widget> _pages = [
-    const DashboardScreen(),
-    const ReportsScreen(),
-    const ActivityInputScreen(),
-    const StrategiesScreen(),
-    const ProfileScreen(),
+  final List<Widget> _pages = const [
+    DashboardScreen(),
+    ReportsScreen(),
+    ActivityInputScreen(),
+    StrategiesScreen(),
+    ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserName();
+  }
+
+  Future<void> loadUserName() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    if (!mounted) return;
+    setState(() {
+      userName = user.userMetadata?['full_name'] ?? 'User';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +62,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
     return Scaffold(
       backgroundColor: backgroundGray,
-
       appBar: isProfilePage
           ? null
           : AppBar(
@@ -77,8 +76,8 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14.0,
-                      vertical: 14.0,
+                      horizontal: 14,
+                      vertical: 14,
                     ),
                     decoration: BoxDecoration(
                       color: primaryGreen,
@@ -119,14 +118,13 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                           children: [
                             _buildNotificationButton(),
                             const SizedBox(width: 6),
-                            _buildProfileMenuButton(context),
+                            _buildProfileMenuButton(),
                           ],
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   Column(
                     children: [
                       ClipRRect(
@@ -153,20 +151,18 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                 ],
               ),
             ),
-
       body: SafeArea(
         top: isProfilePage,
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
-
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12.0, 0, 12.0, 12.0),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: Container(
             height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF3AA76D),
+              color: primaryGreen,
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
@@ -207,17 +203,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     );
   }
 
-  Widget _buildCircleIcon(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, color: Colors.white, size: 22),
-    );
-  }
-
   Widget _buildNavItem(
     IconData unselectedIcon,
     IconData selectedIcon,
@@ -251,109 +236,242 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
       ),
     );
   }
-}
 
-Widget _buildNotificationButton() {
-  return PopupMenuButton<String>(
-    offset: const Offset(0, 48),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    color: Colors.white,
-    child: _circleIcon(Icons.notifications_none),
-    itemBuilder: (context) => const <PopupMenuEntry<String>>[
-      PopupMenuItem<String>(
-        enabled: false,
-        child: SizedBox(
-          width: 260,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Notifications',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E5631),
+  Widget _buildNotificationButton() {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      child: _circleIcon(Icons.notifications_none),
+      itemBuilder: (context) => const <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          enabled: false,
+          child: SizedBox(
+            width: 260,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notifications',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E5631),
+                  ),
                 ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Reminder: Do not forget to complete your green activity today.',
-                style: TextStyle(color: Colors.black87, fontSize: 13),
-              ),
+                SizedBox(height: 8),
+                Text(
+                  'Reminder: Do not forget to complete your green activity today.',
+                  style: TextStyle(color: Colors.black87, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileMenuButton() {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      child: _circleIcon(Icons.person_outline),
+      onSelected: (value) {
+        if (value == 'manage_profile') {
+          setState(() => _currentIndex = 4);
+        } else if (value == 'change_password') {
+          _changePassword();
+        } else if (value == 'logout') {
+          _logout();
+        }
+      },
+      itemBuilder: (context) => const <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'manage_profile',
+          child: Row(
+            children: [
+              Icon(Icons.manage_accounts_outlined, color: Color(0xFF1E5631)),
+              SizedBox(width: 10),
+              Text('Manage Profile'),
             ],
           ),
         ),
-      ),
-    ],
-  );
-}
+        PopupMenuItem<String>(
+          value: 'change_password',
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline, color: Color(0xFF1E5631)),
+              SizedBox(width: 10),
+              Text('Change Password'),
+            ],
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 10),
+              Text('Log Out', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-Widget _buildProfileMenuButton(BuildContext context) {
-  return PopupMenuButton<String>(
-    offset: const Offset(0, 48),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    color: Colors.white,
-    child: _circleIcon(Icons.person_outline),
-    onSelected: (value) {
-      if (value == 'manage_profile') {
-        Navigator.pushNamed(context, '/manage-profile');
-      } else if (value == 'change_password') {
-        Navigator.pushNamed(context, '/change-password');
-      } else if (value == 'logout') {
-        _logout(context);
+  Widget _circleIcon(IconData icon) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: Color(0xFF3AA76D), size: 24),
+    );
+  }
+
+  Future<void> _logout() async {
+    await Supabase.instance.client.auth.signOut();
+
+    if (!mounted) return;
+
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushNamedAndRemoveUntil('/landing', (route) => false);
+  }
+
+  Future<void> _changePassword() async {
+    final currentPasswordController = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    try {
+      final newPassword = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Change Password'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Current Password',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'New Password',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Password',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final password = passwordController.text.trim();
+                  final confirmPassword = confirmPasswordController.text.trim();
+
+                  if (password.isEmpty || confirmPassword.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please fill in both fields.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (password.length < 6) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Password must be at least 6 characters.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (password != confirmPassword) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Passwords do not match.')),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(dialogContext).pop(password);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (newPassword == null) return;
+
+      // Password change logic
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      final hashedPassword = sha256
+          .convert(utf8.encode(newPassword))
+          .toString();
+      final userEmail = Supabase.instance.client.auth.currentUser?.email;
+
+      if (userEmail != null) {
+        await Supabase.instance.client
+            .from('user_info')
+            .update({
+              'password_hash': hashedPassword,
+              'password_updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('g_suite', userEmail);
       }
-    },
-    itemBuilder: (context) => const <PopupMenuEntry<String>>[
-      PopupMenuItem<String>(
-        value: 'manage_profile',
-        child: Row(
-          children: [
-            Icon(Icons.manage_accounts_outlined, color: Color(0xFF1E5631)),
-            SizedBox(width: 10),
-            Text('Manage Profile'),
-          ],
-        ),
-      ),
-      PopupMenuItem<String>(
-        value: 'change_password',
-        child: Row(
-          children: [
-            Icon(Icons.lock_outline, color: Color(0xFF1E5631)),
-            SizedBox(width: 10),
-            Text('Change Password'),
-          ],
-        ),
-      ),
-      PopupMenuDivider(),
-      PopupMenuItem<String>(
-        value: 'logout',
-        child: Row(
-          children: [
-            Icon(Icons.logout, color: Colors.red),
-            SizedBox(width: 10),
-            Text('Log Out', style: TextStyle(color: Colors.red)),
-          ],
-        ),
-      ),
-    ],
-  );
-}
 
-Widget _circleIcon(IconData icon) {
-  return Container(
-    width: 40,
-    height: 40,
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-    ),
-    child: Icon(icon, color: Color(0xFF3AA76D), size: 24),
-  );
-}
+      await Supabase.instance.client.auth.signOut();
 
-Future<void> _logout(BuildContext context) async {
-  final navigator = Navigator.of(context);
+      if (!mounted) return;
 
-  await Supabase.instance.client.auth.signOut();
-
-  navigator.pushNamedAndRemoveUntil('/', (route) => false);
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil('/landing', (route) => false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $error')));
+    } finally {
+      // Controllers are safely disposed after the dialog and navigation actions
+      passwordController.dispose();
+      confirmPasswordController.dispose();
+    }
+  }
 }
