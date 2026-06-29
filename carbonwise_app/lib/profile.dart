@@ -12,10 +12,118 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? userInfo;
   bool isLoadingProfile = true;
 
+  List<Map<String, dynamic>> recentActivities = [];
+  bool isLoadingTimeline = true;
+
+  double carbonScore = 0.0;
+  bool isLoadingScore = true;
+
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
+    _loadCarbonScore();
+    _loadRecentActivities();
+  }
+
+  Future<void> _loadRecentActivities() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+
+      if (user == null || user.email == null) return;
+
+      final records = await Supabase.instance.client
+          .from('carbon_records')
+          .select()
+          .eq('g_suite', user.email!)
+          .order('created_at', ascending: false);
+
+      List<Map<String, dynamic>> activities = [];
+
+      for (final record in records) {
+        final date = record['record_date']?.toString() ?? '';
+
+        final transportation =
+            double.tryParse(record['transportation'].toString()) ?? 0.0;
+
+        final electricity =
+            double.tryParse(record['electricity'].toString()) ?? 0.0;
+
+        final food = double.tryParse(record['food'].toString()) ?? 0.0;
+
+        if (transportation > 0) {
+          activities.add({
+            'category': 'Transportation',
+            'title': 'Transportation',
+            'impact': '+${transportation.toStringAsFixed(2)} kg',
+            'time': date,
+            'icon': Icons.directions_bus,
+            'color': Colors.blue,
+          });
+        }
+
+        if (electricity > 0) {
+          activities.add({
+            'category': 'Office Resource',
+            'title': 'Office Resource',
+            'impact': '+${electricity.toStringAsFixed(2)} kg',
+            'time': date,
+            'icon': Icons.wb_incandescent,
+            'color': Colors.amber,
+          });
+        }
+
+        if (food > 0) {
+          activities.add({
+            'category': 'Food Consumption',
+            'title': 'Food Consumption',
+            'impact': '+${food.toStringAsFixed(2)} kg',
+            'time': date,
+            'icon': Icons.flatware,
+            'color': Colors.purple,
+          });
+        }
+      }
+
+      setState(() {
+        recentActivities = activities.take(3).toList();
+        isLoadingTimeline = false;
+      });
+    } catch (e) {
+      print("Timeline Error: $e");
+
+      setState(() {
+        isLoadingTimeline = false;
+      });
+    }
+  }
+
+  Future<void> _loadCarbonScore() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    print("Current user email: ${user?.email}");
+
+    if (user == null || user.email == null) {
+      print("No logged in user.");
+      return;
+    }
+
+    final record = await Supabase.instance.client
+        .from('carbon_records')
+        .select('total_emission')
+        .eq('g_suite', user.email!)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    print("Database record: $record");
+
+    setState(() {
+      carbonScore = (record?['total_emission'] ?? 0).toDouble();
+      isLoadingScore = false;
+    });
+
+    print("Carbon Score: $carbonScore");
   }
 
   Future<void> _loadUserInfo() async {
@@ -152,9 +260,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Text(
-                      '18',
-                      style: TextStyle(
+                    Text(
+                      isLoadingScore ? '--' : carbonScore.toStringAsFixed(1),
+                      style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         color: darkGreen,
@@ -163,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        'kg CO2 / wk',
+                        'kg CO₂ / week',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
@@ -230,10 +338,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Keep it up! You are on track.',
                         overflow: TextOverflow.ellipsis,
                         maxLines: 2,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: textMuted,
-                        ), // Bumped from 8
+                        style: TextStyle(fontSize: 10, color: textMuted),
                       ),
                     ],
                   ),
@@ -274,7 +379,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'This Week',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12, // Bumped from 11
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -282,28 +387,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        const Text(
-                          '18.4',
-                          style: TextStyle(
-                            fontSize: 24, // Bumped from 22
+                        Text(
+                          isLoadingScore
+                              ? '--'
+                              : carbonScore.toStringAsFixed(2),
+                          style: const TextStyle(
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: primaryGreen,
                           ),
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          'kg CO2',
+                          'kg CO₂',
                           style: TextStyle(
-                            fontSize: 11, // Bumped from 9
+                            fontSize: 11,
                             color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
-                    const Text(
-                      '23% of total emissions',
-                      style: TextStyle(
-                        fontSize: 10, // Bumped from 9
+                    Text(
+                      isLoadingScore
+                          ? 'Loading...'
+                          : '${carbonScore.toStringAsFixed(2)} kg CO₂ recorded',
+                      style: const TextStyle(
+                        fontSize: 10,
                         fontStyle: FontStyle.italic,
                         color: textMuted,
                       ),
@@ -313,7 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'Top Contributor',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12, // Bumped from 11
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -339,7 +448,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Text(
                                 'Commuting',
                                 style: TextStyle(
-                                  fontSize: 11, // Bumped from 10
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -349,7 +458,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: textMuted,
-                                ), // Bumped from 7
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -376,12 +485,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'Last 4 Weeks',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12, // Bumped from 11
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 6),
                     SizedBox(
-                      height: 75, // Bumped up slightly
+                      height: 75,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -399,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Text(
                         'View Breakdown Details',
                         style: TextStyle(
-                          fontSize: 10, // Bumped from 9
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: darkGreen.withOpacity(0.8),
                         ),
@@ -422,7 +531,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       trailing: Text(
         'View All',
         style: TextStyle(
-          fontSize: 12, // Bumped from 10
+          fontSize: 12,
           color: darkGreen.withOpacity(0.8),
           fontWeight: FontWeight.bold,
         ),
@@ -472,16 +581,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   'Your Department\nRank',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ), // Bumped from 8
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
                 ),
                 SizedBox(height: 4),
                 Text(
                   '3rd',
                   style: TextStyle(
-                    fontSize: 22, // Bumped from 20
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: darkGreen,
                   ),
@@ -490,10 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   'Out of 5 departments',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: textMuted,
-                  ), // Bumped from 7
+                  style: TextStyle(fontSize: 9, color: textMuted),
                 ),
               ],
             ),
@@ -535,7 +638,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.black87,
-                            ), // Bumped from 7
+                            ),
                             children: [
                               TextSpan(text: 'You contribute '),
                               TextSpan(
@@ -597,41 +700,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Expanded(
           child: _buildSectionCard(
             title: 'Activity Timeline',
-            trailing: Text(
-              'View All',
-              style: TextStyle(
-                fontSize: 10, // Bumped from 8
-                color: darkGreen.withOpacity(0.8),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
             child: Column(
               children: [
-                _buildTimelineItem(
-                  'Transportation',
-                  'Jeepney Ride',
-                  '+2.1 kg',
-                  '8:30am',
-                  Icons.directions_bus,
-                  Colors.blue[400]!,
-                ),
-                _buildTimelineItem(
-                  'Energy Usage',
-                  'ViewBoard screen',
-                  '+1.8 kg',
-                  '10:00am',
-                  Icons.wb_incandescent,
-                  Colors.amber[600]!,
-                ),
-                _buildTimelineItem(
-                  'Food Consumption',
-                  'Lunch Menu',
-                  '+1.8 kg',
-                  '12:40pm',
-                  Icons.flatware,
-                  Colors.purple[300]!,
-                ),
+                if (isLoadingTimeline)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else
+                  ...recentActivities.map(
+                    (activity) => _buildTimelineItem(
+                      activity['category'],
+                      activity['title'],
+                      activity['impact'],
+                      activity['time'],
+                      activity['icon'],
+                      activity['color'],
+                    ),
+                  ),
+
                 const SizedBox(height: 4),
+
                 Align(
                   alignment: Alignment.center,
                   child: Row(
@@ -640,7 +731,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         'Full timeline',
                         style: TextStyle(
-                          fontSize: 10, // Bumped from 8
+                          fontSize: 10,
                           color: darkGreen.withOpacity(0.8),
                           fontWeight: FontWeight.bold,
                         ),
@@ -648,7 +739,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(width: 2),
                       Icon(
                         Icons.arrow_forward,
-                        size: 10, // Bumped from 8
+                        size: 10,
                         color: darkGreen.withOpacity(0.8),
                       ),
                     ],
@@ -681,17 +772,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   'Account Settings',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ), // Bumped from 12
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   'Manage configurations and user info preferences.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textMuted,
-                  ), // Bumped from 9
+                  style: TextStyle(fontSize: 11, color: textMuted),
                 ),
               ],
             ),
@@ -710,7 +795,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text(
               'Edit Profile',
               style: TextStyle(
-                fontSize: 10.5, // Bumped from 9
+                fontSize: 10.5,
                 color: primaryGreen,
                 fontWeight: FontWeight.bold,
               ),
@@ -726,7 +811,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildMetricCard({required String title, required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(10),
-      height: 85, // Bumped from 75 to handle font scaling cleanly
+      height: 85,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(6),
@@ -741,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 11, // Bumped from 10
+              fontSize: 11,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
@@ -776,7 +861,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13, // Bumped from 12
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -799,7 +884,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11, // Bumped from 9
+            fontSize: 11,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             color: isActive ? primaryGreen : Colors.black54,
           ),
@@ -821,15 +906,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w500,
-          ), // Bumped from 7
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 2),
         Container(
           width: 15,
-          height: 45 * fillPercent, // Scaled up height slightly
+          height: 45 * fillPercent,
           decoration: BoxDecoration(
             color: primaryGreen,
             borderRadius: BorderRadius.circular(2),
@@ -839,11 +921,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           dateLabel,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 8,
-            color: textMuted,
-            height: 1.1,
-          ), // Bumped from 6
+          style: const TextStyle(fontSize: 8, color: textMuted, height: 1.1),
         ),
       ],
     );
@@ -890,7 +968,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 10.5, // Bumped from 10
+                fontSize: 10.5,
                 fontWeight: FontWeight.bold,
                 color: isUnlocked ? primaryGreen : Colors.grey,
               ),
@@ -902,10 +980,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 9,
-                  color: textMuted,
-                ), // Bumped from 7
+                style: const TextStyle(fontSize: 9, color: textMuted),
               ),
             ),
           ],
@@ -929,18 +1004,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 12,
             child: Text(
               rank,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ), // Bumped from 8
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ),
           SizedBox(
-            width: 32, // Expanded layout space slightly
+            width: 32,
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 10, // Bumped from 8
+                fontSize: 10,
                 fontWeight: isUserDept ? FontWeight.bold : FontWeight.normal,
                 color: isUserDept ? primaryGreen : Colors.black87,
               ),
@@ -973,12 +1045,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(width: 8),
           SizedBox(
-            width: 55, // Expanded width layout space
+            width: 55,
             child: Text(
               '$score kg',
               textAlign: TextAlign.right,
               style: TextStyle(
-                fontSize: 10, // Bumped from 8
+                fontSize: 10,
                 fontWeight: isUserDept ? FontWeight.bold : FontWeight.normal,
                 color: isUserDept ? primaryGreen : Colors.black54,
               ),
@@ -1010,7 +1082,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 10, // Bumped up from 8
+                fontSize: 10,
                 height: 1.2,
                 fontWeight: FontWeight.w500,
               ),
@@ -1062,7 +1134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       cat,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 10, // Bumped from 8
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1070,7 +1142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     impact,
                     style: TextStyle(
-                      fontSize: 9.5, // Bumped from 7
+                      fontSize: 9.5,
                       color: Colors.grey[600],
                       fontWeight: FontWeight.w500,
                     ),
@@ -1084,10 +1156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Text(
                       title,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: textMuted,
-                      ), // Bumped from 7
+                      style: const TextStyle(fontSize: 9, color: textMuted),
                     ),
                   ),
                   const SizedBox(width: 4),

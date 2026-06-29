@@ -122,6 +122,14 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     super.dispose();
   }
 
+  double _calculateTransportationEmission(
+    String transportType,
+    double distance,
+  ) {
+    final emissionFactor = transportationEmissionFactors[transportType] ?? 0.0;
+    return (distance * 2) * emissionFactor;
+  }
+
   double _calculateOfficeResourceEmission(String category) {
     final watts = officeResourcePowerRatings[category] ?? 0.0;
     const assumedHoursUsed = 1.0;
@@ -257,20 +265,26 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       _foodEmissions.clear();
 
       for (final record in records) {
-        final transportation = record['transportation'] as String?;
-        final electricity = record['electricity'] as String?;
-        final food = record['food'] as String?;
+        final transportation = record['transportation'];
+        final electricity = record['electricity'];
+        final food = record['food'];
 
-        if (transportation != null && transportation.isNotEmpty) {
-          _transportEmissions.addAll(transportation.split('\n'));
+        if (transportation != null &&
+            transportation.toString() != "0" &&
+            transportation.toString() != "0.0") {
+          _transportEmissions.add("${transportation.toString()} kg CO₂");
         }
 
-        if (electricity != null && electricity.isNotEmpty) {
-          _officeEmissions.addAll(electricity.split('\n'));
+        if (electricity != null &&
+            electricity.toString() != "0" &&
+            electricity.toString() != "0.0") {
+          _officeEmissions.add("${electricity.toString()} kg CO₂");
         }
 
-        if (food != null && food.isNotEmpty) {
-          _foodEmissions.addAll(food.split('\n'));
+        if (food != null &&
+            food.toString() != "0" &&
+            food.toString() != "0.0") {
+          _foodEmissions.add("${food.toString()} kg CO₂");
         }
       }
     });
@@ -362,15 +376,16 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           final distance =
                               double.tryParse(_distanceController.text) ?? 0;
 
+                          // Updated Calculation: (Distance * 2) * Emission Factor
                           final emission =
-                              distance *
+                              (distance * 2) *
                               (transportationEmissionFactors[_selectedTransportType!] ??
                                   0);
 
                           _transportationTotalEmission += emission;
 
                           _transportEmissions.add(
-                            '${_selectedTransportType!} - ${distance.toStringAsFixed(1)} km '
+                            '$_selectedTransportType - ${distance.toStringAsFixed(1)} km '
                             '(${emission.toStringAsFixed(2)} kg CO₂e)',
                           );
 
@@ -464,7 +479,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // 2. Food Consumption Form Card
+          // 3. Food Consumption Form Card
           _buildFormCard(
             title: 'Food Consumption',
             children: [
