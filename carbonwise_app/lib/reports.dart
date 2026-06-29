@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -10,12 +11,88 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   String _timeframeOverTime = 'This Week';
   String _timeframeBySource = 'This Week';
+  double totalEmission = 0.0;
+  double weekEmission = 0.0;
+  double monthEmission = 0.0;
+
+  bool isLoading = true;
 
   final List<String> _dropdownOptions = [
     'This Week',
     'This Month',
     'Last Month',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmissionData();
+  }
+
+  Future<void> _loadEmissionData() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+
+      print("Current user: ${user?.email}");
+
+      if (user == null || user.email == null) {
+        print("No logged in user.");
+        return;
+      }
+
+      final records = await Supabase.instance.client
+          .from('carbon_records')
+          .select('total_emission, record_date')
+          .eq('g_suite', user.email!);
+
+      print("Records: $records");
+
+      double total = 0;
+      double week = 0;
+      double month = 0;
+
+      final now = DateTime.now();
+
+      for (final record in records) {
+        final emission =
+            double.tryParse(record['total_emission'].toString()) ?? 0.0;
+
+        final date = DateTime.parse(record['record_date'].toString());
+
+        print("Emission: $emission");
+        print("Date: $date");
+
+        total += emission;
+
+        if (date.year == now.year && date.month == now.month) {
+          month += emission;
+        }
+
+        final difference = now.difference(date).inDays;
+
+        if (difference >= 0 && difference < 7) {
+          week += emission;
+        }
+      }
+
+      print("Total: $total");
+      print("Week: $week");
+      print("Month: $month");
+
+      setState(() {
+        totalEmission = total;
+        weekEmission = week;
+        monthEmission = month;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Reports Error: $e");
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,17 +136,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        '125',
-                        style: TextStyle(
-                          fontSize: 52,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
+                        isLoading ? '--' : totalEmission.toStringAsFixed(2),
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: primaryGreen,
                         ),
                       ),
                       SizedBox(width: 8),
@@ -91,9 +168,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
             // 4. Row of Three Stat Cards
             Row(
               children: [
-                Expanded(child: _buildStatCard('This Week', '18', 'kg CO2')),
+                Expanded(
+                  child: _buildStatCard(
+                    'This Week',
+                    isLoading ? '--' : weekEmission.toStringAsFixed(2),
+                    'kg CO₂',
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _buildStatCard('This Month', '125', 'kg CO2')),
+                Expanded(
+                  child: _buildStatCard(
+                    'This Month',
+                    isLoading ? '--' : monthEmission.toStringAsFixed(2),
+                    'kg CO₂',
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
@@ -154,7 +243,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // FIXED: Removed the redundant Expanded wrappers around the helper calls
                 _buildSuggestionCard(
                   Icons.directions_bus_outlined,
                   'Use public transport 2x this week.',
