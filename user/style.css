@@ -1,0 +1,174 @@
+/* Clean modern reset rules */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+body {
+    background-color: #EDEFEF;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Navigation Navbar Header Styling */
+.navbar {
+    background: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 80px;
+    border-bottom: 1px solid #E0E2E2;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-text {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1E4D3A;
+}
+
+.nav-links {
+    display: flex;
+    gap: 35px;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: #4A5568;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-links a:hover {
+    color: #2D6A4F;
+}
+
+/* Centered Form Wrapper Layout */
+.page-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+}
+
+.auth-card {
+    background-color: #A9BCB3;
+    width: 100%;
+    max-width: 550px;
+    padding: 45px 50px;
+    border-radius: 40px 40px 0px 40px; /* Mimics your custom organic border radius cut */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    text-align: center;
+}
+
+.auth-card h2 {
+    color: #1E4D3A;
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.auth-subtitle {
+    color: #2D6A4F;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+}
+
+/* Dynamic Input Field Configurations */
+.form-group {
+    text-align: left;
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #2A3430;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+}
+
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #EAECEB;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #333;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.form-group input::placeholder {
+    color: #A0AEC0;
+}
+
+.form-group input:focus, .form-group select:focus {
+    background-color: white;
+    border-color: #359F6E;
+}
+
+/* Multi-column Grid Row for Campus and Department Dropdowns */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+/* Action Buttons */
+.submit-btn {
+    width: 100%;
+    background-color: #359F6E;
+    color: white;
+    border: none;
+    padding: 14px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    transition: background-color 0.2s;
+}
+
+.submit-btn:hover {
+    background-color: #2A8458;
+}
+
+/* Redirect text links footer styling */
+.switch-route-text {
+    font-size: 0.85rem;
+    color: #2A3430;
+}
+
+.switch-route-text a {
+    font-weight: 700;
+    color: #1E4D3A;
+    text-decoration: none;
+}
+
+.switch-route-text a:hover {
+    text-decoration: underline;
+}
+
+/* System Alerts block */
+.alert {
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 15px;
+    text-align: left;
+}
+.alert-danger { background-color: #FED7D7; color: #C53030; }
+.alert-success { background-color: #C6F6D5; color: #22543D; }
