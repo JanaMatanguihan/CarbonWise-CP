@@ -517,6 +517,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+
+    _srCodeController.addListener(() {
+      final srCode = _srCodeController.text.trim();
+
+      _emailController.text = srCode.isEmpty
+          ? ''
+          : '$srCode@g.batstate-u.edu.ph';
+    });
+  }
+
+  @override
   void dispose() {
     _srCodeController.dispose();
     _nameController.dispose();
@@ -723,9 +736,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             _buildInputField(
                               label: 'G-Suite Email',
-                              hint: 'user@g.batstate-u.edu.ph',
+                              hint: 'Automatically generated',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              readOnly: true,
                             ),
                             _buildInputField(
                               label: 'Password',
@@ -911,6 +925,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required String hint,
     required TextEditingController controller,
     bool isObscured = false,
+    bool readOnly = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
@@ -928,7 +943,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           controller: controller,
           obscureText: isObscured,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.black87),
+          readOnly: readOnly,
+
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 14),
@@ -980,83 +996,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
-}
-
-Widget _buildInputField({
-  required String label,
-  required String hint,
-  required TextEditingController controller,
-  bool isObscured = false,
-  TextInputType keyboardType = TextInputType.text,
-}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      const SizedBox(height: 6),
-      TextField(
-        controller: controller,
-        obscureText: isObscured,
-        keyboardType: keyboardType,
-        style: const TextStyle(color: Colors.black87),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-          fillColor: const Color(0xFFECECEC),
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-    ],
-  );
-}
-
-Widget _buildDropdownField({
-  required String hint,
-  required List<String> items,
-  required String? value,
-  required ValueChanged<String?> onChanged,
-}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFECECEC),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: value,
-        hint: Text(
-          hint,
-          style: const TextStyle(color: Colors.grey, fontSize: 13),
-        ),
-        isExpanded: true,
-        icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
-        items: items.map((String item) {
-          return DropdownMenuItem<String>(
-            value: item,
-            child: Text(
-              item,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-          );
-        }).toList(),
-        onChanged: onChanged,
-      ),
-    ),
-  );
 }
