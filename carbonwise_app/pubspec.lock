@@ -33,6 +33,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.4"
+  args:
+    dependency: transitive
+    description:
+      name: args
+      sha256: d0481093c50b1da8910eb0bb301626d4d8eb7284aa739614d2b394ee09e3ea04
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.7.0"
   async:
     dependency: transitive
     description:
@@ -41,6 +49,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  awesome_dialog:
+    dependency: "direct main"
+    description:
+      name: awesome_dialog
+      sha256: "4c5821a0a637ceee022084e78c1b8237dd4b8bfca4dd24ac2484662a56707338"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.3.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -208,6 +224,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.22.0"
+  graphs:
+    dependency: transitive
+    description:
+      name: graphs
+      sha256: "741bbf84165310a68ff28fe9e727332eef1407342fca52759cb21ad8177bb8d0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.2"
   gtk:
     dependency: transitive
     description:
@@ -472,6 +496,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.2"
+  rive:
+    dependency: transitive
+    description:
+      name: rive
+      sha256: "84a640f48122679e48397935ed1b971db19ef2e44bfcbae60e42fb5ce29a0a4e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.14.9"
+  rive_native:
+    dependency: transitive
+    description:
+      name: rive_native
+      sha256: "85dc8413398f7540eab9b73c6d704ecd5051ab9c57e539eed85ccd2a69f119aa"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.9"
   rxdart:
     dependency: transitive
     description:

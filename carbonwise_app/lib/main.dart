@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:carbonwise_app/screens/dashboard.dart';
 import 'package:carbonwise_app/screens/navigation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
+import 'package:carbonwise_app/utils/dialog_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -191,22 +192,16 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
-  }
-
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showSnackBar('Please fill in all fields', isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Missing Information",
+        message: "Please fill in all fields before logging in.",
+      );
       return;
     }
 
@@ -233,24 +228,35 @@ class _LoginScreenState extends State<LoginScreen> {
       print('------------------------------------------------------------');
 
       if (mounted) {
-        _showSnackBar('Welcome back!');
-
-        await Future.delayed(const Duration(milliseconds: 150));
-
-        if (!mounted) return;
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const CustomMainNavigation()),
-          (route) => false,
+        DialogHelper.showSuccess(
+          context: context,
+          title: "Welcome!",
+          message: "Login successful. Welcome back to CarbonWise!",
+          onOk: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CustomMainNavigation(),
+              ),
+              (route) => false,
+            );
+          },
         );
       }
     } on AuthException catch (error) {
       print('SUPABASE AUTH ERROR: ${error.message}');
-      _showSnackBar(error.message, isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Login Failed",
+        message: error.message,
+      );
     } catch (error) {
       print('UNEXPECTED ERROR: $error');
-      _showSnackBar(error.toString(), isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Unexpected Error",
+        message: error.toString(),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -520,16 +526,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
-  }
-
   Future<void> _handleSignUp() async {
     final srCode = _srCodeController.text.trim();
     final name = _nameController.text.trim();
@@ -544,15 +540,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
         selectedCampus == null ||
         selectedYearLevel == null ||
         selectedDepartment == null) {
-      _showSnackBar(
-        'Please fill out all fields and selections.',
-        isError: true,
+      DialogHelper.showError(
+        context: context,
+        title: "Missing Information",
+        message: "Please fill out all fields and selections.",
       );
       return;
     }
 
     if (password != confirmPassword) {
-      _showSnackBar('Passwords do not match.', isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Password Mismatch",
+        message: "Passwords do not match.",
+      );
       return;
     }
 
@@ -602,7 +603,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       // redirects page from sign up to main navigation page after successful registration
       if (mounted) {
-        _showSnackBar('Account Created Successfully!');
+        DialogHelper.showSuccess(
+          context: context,
+          title: "Account Created Successfully!",
+          message: "Your account has been created successfully.",
+        );
 
         Navigator.pushAndRemoveUntil(
           context,
@@ -612,10 +617,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } on AuthException catch (error) {
       print('SUPABASE AUTH ERROR: ${error.message}');
-      _showSnackBar(error.message, isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Login Failed",
+        message: error.message,
+      );
     } catch (error) {
       print('UNEXPECTED ERROR: $error');
-      _showSnackBar('An unexpected error occurred.', isError: true);
+      DialogHelper.showError(
+        context: context,
+        title: "Unexpected Error",
+        message: error.toString(),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
