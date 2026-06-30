@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:carbonwise_app/services/api_service.dart';
+import 'package:carbonwise_app/screens/edit_profile.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,6 +11,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final ApiService _apiService = ApiService();
+
   Map<String, dynamic>? userInfo;
   bool isLoadingProfile = true;
 
@@ -32,11 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (user == null || user.email == null) return;
 
-      final records = await Supabase.instance.client
-          .from('carbon_records')
-          .select()
-          .eq('g_suite', user.email!)
-          .order('created_at', ascending: false);
+      final records = await _apiService.getRecentActivities(user.email!);
 
       List<Map<String, dynamic>> activities = [];
 
@@ -108,13 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final record = await Supabase.instance.client
-        .from('carbon_records')
-        .select('total_emission')
-        .eq('g_suite', user.email!)
-        .order('created_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
+    final record = await _apiService.getLatestCarbonScore(user.email!);
 
     print("Database record: $record");
 
@@ -136,11 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final response = await Supabase.instance.client
-        .from('user_info')
-        .select('sr_code, g_suite, full_name, campus, department')
-        .eq('g_suite', user.email!)
-        .maybeSingle();
+    final response = await _apiService.getUserInfo(user.email!);
 
     setState(() {
       userInfo = response;
@@ -783,7 +773,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(width: 6),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: () async {
+              if (userInfo == null) return;
+
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(
+                    fullName: userInfo!['full_name'] ?? '',
+                    studentNumber: userInfo!['sr_code'] ?? '',
+                    email: userInfo!['g_suite'] ?? '',
+                    department: userInfo!['department'] ?? '',
+                    campus: userInfo!['campus'] ?? '',
+                    profilePicture: userInfo!['profile_picture'],
+                  ),
+                ),
+              );
+
+              await _loadUserInfo();
+              await _loadCarbonScore();
+              await _loadRecentActivities();
+            },
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: primaryGreen, width: 0.8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:carbonwise_app/services/api_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -9,6 +10,7 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
+  final ApiService _apiService = ApiService();
   String _timeframeOverTime = 'This Week';
   String _timeframeBySource = 'This Week';
   double totalEmission = 0.0;
@@ -40,10 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         return;
       }
 
-      final records = await Supabase.instance.client
-          .from('carbon_records')
-          .select('total_emission, record_date')
-          .eq('g_suite', user.email!);
+      final records = await _apiService.getEmissionData(user.email!);
 
       print("Records: $records");
 

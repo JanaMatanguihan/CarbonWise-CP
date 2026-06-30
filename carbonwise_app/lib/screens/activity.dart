@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:carbonwise_app/services/api_service.dart';
 
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
@@ -9,6 +10,7 @@ class ActivityInputScreen extends StatefulWidget {
 }
 
 class _ActivityInputScreenState extends State<ActivityInputScreen> {
+  final ApiService _apiService = ApiService();
   // Form State Values
   String? _selectedTransportType;
   String? _selectedOfficeResourceType;
@@ -251,13 +253,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   Future<void> _loadSavedCarbonRecords() async {
     final user = Supabase.instance.client.auth.currentUser;
+
     if (user == null || user.email == null) return;
 
-    final records = await Supabase.instance.client
-        .from('carbon_records')
-        .select('transportation, electricity, food')
-        .eq('g_suite', user.email!)
-        .order('created_at', ascending: false);
+    final records = await _apiService.getCarbonRecords(user.email!);
 
     setState(() {
       _transportEmissions.clear();
@@ -303,23 +302,23 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         _foodTotalEmission;
 
     try {
-      await Supabase.instance.client.from('carbon_records').insert({
-        'g_suite': user.email,
-        'transportation': _transportationTotalEmission,
-        'electricity': _officeResourceTotalEmission,
-        'food': _foodTotalEmission,
-        'total_emission': totalEmission,
-        'record_date': now.toIso8601String().split('T').first,
-        'created_at': now.toIso8601String(),
-      });
+      await _apiService.addCarbonRecord(
+        email: user.email!,
+        transportation: _transportationTotalEmission,
+        electricity: _officeResourceTotalEmission,
+        food: _foodTotalEmission,
+        totalEmission: totalEmission,
+        recordDate: now.toIso8601String().split('T').first,
+        createdAt: now.toIso8601String(),
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Carbon record saved successfully.')),
+        const SnackBar(content: Text("Carbon record saved successfully.")),
       );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Save failed: $e")));
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 

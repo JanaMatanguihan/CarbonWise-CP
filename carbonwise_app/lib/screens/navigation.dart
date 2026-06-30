@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:carbonwise_app/activity.dart';
-import 'package:carbonwise_app/dashboard.dart';
-import 'package:carbonwise_app/profile.dart';
-import 'package:carbonwise_app/reports.dart';
-import 'package:carbonwise_app/strategies.dart';
+import 'package:carbonwise_app/screens/activity.dart';
+import 'package:carbonwise_app/screens/dashboard.dart';
+import 'package:carbonwise_app/screens/profile.dart';
+import 'package:carbonwise_app/screens/reports.dart';
+import 'package:carbonwise_app/screens/strategies.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

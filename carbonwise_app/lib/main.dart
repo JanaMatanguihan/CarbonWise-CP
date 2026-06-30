@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:carbonwise_app/dashboard.dart';
-import 'package:carbonwise_app/navigation.dart';
+import 'package:carbonwise_app/screens/dashboard.dart';
+import 'package:carbonwise_app/screens/navigation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
 
 void main() async {
@@ -23,8 +23,47 @@ class CarbonWiseApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'CarbonWise',
       theme: ThemeData(
+        useMaterial3: true,
+
         scaffoldBackgroundColor: const Color(0xFFEFEFEA),
-        primarySwatch: Colors.green,
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2E7D32),
+          primary: const Color(0xFF2E7D32),
+        ),
+
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF2E7D32),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+            borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
+          ),
+        ),
       ),
       initialRoute: '/landing',
       routes: {
