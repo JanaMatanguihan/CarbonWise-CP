@@ -3,6 +3,7 @@ import 'package:carbonwise_app/screens/dashboard.dart';
 import 'package:carbonwise_app/screens/navigation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
 import 'package:carbonwise_app/utils/dialog_helper.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -216,10 +217,24 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final user = response.user;
-      print("LOGGED IN EMAIL: ${user?.email}");
 
       if (user == null) {
-        throw Exception('Login failed.');
+        throw Exception("Login failed.");
+      }
+
+      if (user.emailConfirmedAt == null) {
+        await Supabase.instance.client.auth.signOut();
+
+        if (!mounted) return;
+
+        DialogHelper.showError(
+          context: context,
+          title: "Email Not Verified",
+          message:
+              "Please verify your BatStateU email before logging into CarbonWise.",
+        );
+
+        return;
       }
 
       print('SUCCESS: User Logged In!');
@@ -521,11 +536,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.initState();
 
     _srCodeController.addListener(() {
-      final srCode = _srCodeController.text.trim();
+      String text = _srCodeController.text;
 
-      _emailController.text = srCode.isEmpty
-          ? ''
-          : '$srCode@g.batstate-u.edu.ph';
+      // Remove existing dash
+      text = text.replaceAll('-', '');
+
+      // Limit to 7 digits
+      if (text.length > 7) {
+        text = text.substring(0, 7);
+      }
+
+      // Insert dash after first 2 digits
+      if (text.length > 2) {
+        text = '${text.substring(0, 2)}-${text.substring(2)}';
+      }
+
+      if (_srCodeController.text != text) {
+        _srCodeController.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      }
+
+      // Automatically generate G-Suite email
+      _emailController.text = text.isEmpty ? '' : '$text@g.batstate-u.edu.ph';
     });
   }
 
@@ -615,19 +649,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
       print('-------------------------------------------------------------');
 
       // redirects page from sign up to main navigation page after successful registration
-      if (mounted) {
-        DialogHelper.showSuccess(
-          context: context,
-          title: "Account Created Successfully!",
-          message: "Your account has been created successfully.",
-        );
+      DialogHelper.showSuccess(
+        context: context,
+        title: "Verify Your Email",
+        message:
+            "A verification email has been sent to your BatStateU G-Suite account.\n\n"
+            "Please verify your email before logging in.",
+        onOk: () async {
+          // Sign out in case a temporary session was created
+          await Supabase.instance.client.auth.signOut();
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const CustomMainNavigation()),
-          (route) => false,
-        );
-      }
+          if (!mounted) return;
+
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
+        },
+      );
     } on AuthException catch (error) {
       print('SUPABASE AUTH ERROR: ${error.message}');
       DialogHelper.showError(
@@ -726,8 +766,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             const SizedBox(height: 25),
                             _buildInputField(
                               label: 'SR-Code',
-                              hint: '2x-xxxxx',
+                              hint: 'xx-xxxxx',
                               controller: _srCodeController,
+                              keyboardType: TextInputType.number,
+                              isSrCode: true,
                             ),
                             _buildInputField(
                               label: 'Name',
@@ -926,6 +968,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required TextEditingController controller,
     bool isObscured = false,
     bool readOnly = false,
+    bool isSrCode = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
@@ -944,6 +987,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
           obscureText: isObscured,
           keyboardType: keyboardType,
           readOnly: readOnly,
+
+          inputFormatters: isSrCode
+              ? [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(7),
+                ]
+              : null,
 
           decoration: InputDecoration(
             hintText: hint,

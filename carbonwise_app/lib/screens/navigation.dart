@@ -8,6 +8,8 @@ import 'package:carbonwise_app/screens/strategies.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/dialog_helper.dart';
+import 'package:carbonwise_app/main.dart';
 
 class CustomMainNavigation extends StatefulWidget {
   const CustomMainNavigation({super.key});
@@ -283,7 +285,14 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
         } else if (value == 'change_password') {
           _changePassword();
         } else if (value == 'logout') {
-          _logout();
+          DialogHelper.showConfirm(
+            context: context,
+            title: "Log Out",
+            message: "Are you sure you want to log out of CarbonWise?",
+            onConfirm: () async {
+              await _logout();
+            },
+          );
         }
       },
       itemBuilder: (context) => const <PopupMenuEntry<String>>[
@@ -335,14 +344,32 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   }
 
   Future<void> _logout() async {
-    await Supabase.instance.client.auth.signOut();
+    try {
+      await Supabase.instance.client.auth.signOut();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    Navigator.of(
-      context,
-      rootNavigator: true,
-    ).pushNamedAndRemoveUntil('/landing', (route) => false);
+      DialogHelper.showSuccess(
+        context: context,
+        title: "Logged Out",
+        message: "You have been logged out successfully.",
+        onOk: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      DialogHelper.showError(
+        context: context,
+        title: "Logout Failed",
+        message: "Unable to log out. Please try again.",
+      );
+    }
   }
 
   Future<void> _changePassword() async {

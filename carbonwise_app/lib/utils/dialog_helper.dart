@@ -100,4 +100,32 @@ class DialogHelper {
       btnOkOnPress: onConfirm,
     ).show();
   }
+
+  static void showInfo({
+    required BuildContext context,
+    required String title,
+    required String message,
+    VoidCallback? onOk,
+  }) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.info,
+      animType: AnimType.scale,
+      dialogBackgroundColor: background,
+
+      title: title,
+      desc: message,
+
+      titleTextStyle: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
+        color: primaryGreen,
+      ),
+
+      btnOkColor: primaryGreen,
+      btnOkText: "OK",
+
+      btnOkOnPress: onOk ?? () {},
+    ).show();
+  }
 }
