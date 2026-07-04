@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
+import 'package:fl_chart/fl_chart.dart';
+
+enum ReportTimeframe { thisWeek, thisMonth, lastMonth }
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -9,15 +12,46 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
+class _Legend extends StatelessWidget {
+  final Color color;
+  final String text;
+
+  const _Legend({required this.color, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+}
+
 class _ReportsScreenState extends State<ReportsScreen> {
   final ApiService _apiService = ApiService();
-  String _timeframeOverTime = 'This Week';
-  String _timeframeBySource = 'This Week';
-  double totalEmission = 0.0;
-  double weekEmission = 0.0;
-  double monthEmission = 0.0;
+  ReportTimeframe _timeframeOverTime = ReportTimeframe.thisWeek;
+  ReportTimeframe _timeframeBySource = ReportTimeframe.thisWeek;
+  List<FlSpot> emissionOverTime = [];
+
+  double transportTotal = 0;
+  double officeTotal = 0;
+  double foodTotal = 0;
+
+  List<FlSpot> emissionSpots = [];
+
+  List<String> labels = [];
 
   bool isLoading = true;
+  double totalEmission = 0;
+  double weekEmission = 0;
+  double monthEmission = 0;
 
   final List<String> _dropdownOptions = [
     'This Week',
@@ -29,6 +63,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void initState() {
     super.initState();
     _loadEmissionData();
+    _loadChartData(_timeframeOverTime);
   }
 
   Future<void> _loadEmissionData() async {
@@ -93,254 +128,467 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  Future<void> _loadChartData(ReportTimeframe timeframe) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    DateTime now = DateTime.now();
+
+    DateTime start;
+    DateTime end;
+
+    switch (timeframe) {
+      case ReportTimeframe.thisWeek:
+        start = now.subtract(Duration(days: now.weekday - 1));
+        end = now;
+        break;
+
+      case ReportTimeframe.thisMonth:
+        start = DateTime(now.year, now.month, 1);
+        end = now;
+        break;
+
+      case ReportTimeframe.lastMonth:
+        start = DateTime(now.year, now.month - 1, 1);
+        end = DateTime(now.year, now.month, 0);
+        break;
+    }
+
+    final records = await Supabase.instance.client
+        .from('carbon_records')
+        .select()
+        .eq('g_suite', user.email!)
+        .gte('record_date', start.toIso8601String().split('T')[0])
+        .lte('record_date', end.toIso8601String().split('T')[0])
+        .order('record_date');
+
+    emissionOverTime.clear();
+
+    transportTotal = 0;
+    officeTotal = 0;
+    foodTotal = 0;
+
+    int x = 0;
+
+    for (final row in records) {
+      emissionOverTime.add(
+        FlSpot(x.toDouble(), (row['total_emission'] as num).toDouble()),
+      );
+
+      transportTotal += (row['transportation'] as num?)?.toDouble() ?? 0;
+
+      officeTotal += (row['electricity'] as num?)?.toDouble() ?? 0;
+
+      foodTotal += (row['food'] as num?)?.toDouble() ?? 0;
+
+      x++;
+    }
+
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF3AA76D);
     const darkGreen = Color(0xFF1E5631);
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 3. Total CO2 Emissions Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: _cardDecoration(),
-              child: Column(
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadEmissionData();
+        await _loadChartData(_timeframeOverTime);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 3. Total CO2 Emissions Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16.0),
+                decoration: _cardDecoration(),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total CO2 Emissions',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          '+5% since last month',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red[400],
+                            fontWeight: FontWeight.w600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          isLoading ? '--' : totalEmission.toStringAsFixed(2),
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: primaryGreen,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'kg CO2',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 4. Row of Three Stat Cards
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total CO2 Emissions',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        '+5% since last month',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.red[400],
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
+                  Expanded(
+                    child: _buildStatCard(
+                      'This Week',
+                      isLoading ? '--' : weekEmission.toStringAsFixed(2),
+                      'kg CO₂',
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        isLoading ? '--' : totalEmission.toStringAsFixed(2),
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: primaryGreen,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'kg CO2',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      'This Month',
+                      isLoading ? '--' : monthEmission.toStringAsFixed(2),
+                      'kg CO₂',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Your emissions\nlast month',
+                      '-12% ↓',
+                      'emissions',
+                      valueColor: primaryGreen,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // 4. Row of Three Stat Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'This Week',
-                    isLoading ? '--' : weekEmission.toStringAsFixed(2),
-                    'kg CO₂',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'This Month',
-                    isLoading ? '--' : monthEmission.toStringAsFixed(2),
-                    'kg CO₂',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'Your emissions\nlast month',
-                    '-12% ↓',
-                    'emissions',
-                    valueColor: primaryGreen,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 5. Charts Placeholder Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildChartPlaceholder(
-                    'Emissions over time',
-                    Icons.show_chart,
-                    primaryGreen,
-                    currentValue: _timeframeOverTime,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _timeframeOverTime = newValue;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildChartPlaceholder(
-                    'Emissions by source',
-                    Icons.pie_chart_outline,
-                    primaryGreen,
-                    currentValue: _timeframeBySource,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _timeframeBySource = newValue;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // 6. Smart Suggestions Section
-            const Text(
-              'Smart Suggestions',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSuggestionCard(
-                  Icons.directions_bus_outlined,
-                  'Use public transport 2x this week.',
-                  'You can save up to 4.2 kg CO2.',
-                ),
-                const SizedBox(width: 8),
-                _buildSuggestionCard(
-                  Icons.lightbulb_outline,
-                  'Turn off lights and electric fans when not in use.',
-                  'You can save up to ~0.5 kg CO2/day.',
-                ),
-                const SizedBox(width: 8),
-                _buildSuggestionCard(
-                  Icons.restaurant_outlined,
-                  'Choose more plant-based meals this week.',
-                  '',
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // 7. Carbon Reduction Journey
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: _cardDecoration(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Carbon Reduction Journey',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      // Circular percentage indicator
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: primaryGreen, width: 4),
+              // 5. Charts
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _cardDecoration(),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Emissions Over Time",
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        child: const Center(
-                          child: Text(
-                            '65%',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: primaryGreen,
+
+                        DropdownButton<ReportTimeframe>(
+                          value: _timeframeOverTime,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(
+                              value: ReportTimeframe.thisWeek,
+                              child: Text("This Week"),
                             ),
-                          ),
+
+                            DropdownMenuItem(
+                              value: ReportTimeframe.thisMonth,
+                              child: Text("This Month"),
+                            ),
+
+                            DropdownMenuItem(
+                              value: ReportTimeframe.lastMonth,
+                              child: Text("Last Month"),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+
+                            setState(() {
+                              _timeframeOverTime = value;
+                            });
+
+                            _loadChartData(value);
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      height: 200,
+                      child: LineChart(
+                        LineChartData(
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: emissionOverTime,
+                              isCurved: true,
+                              barWidth: 4,
+                              dotData: const FlDotData(show: true),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Great job! You’re on track to reduce emissions.',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Emissions by Source Pie Chart
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _cardDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Emissions by Source",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        DropdownButton<ReportTimeframe>(
+                          value: _timeframeOverTime,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(
+                              value: ReportTimeframe.thisWeek,
+                              child: Text("This Week"),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Your Goal: Reduce 200 kg CO2 this month.',
-                              style: TextStyle(
-                                color: Colors.grey[600],
+                            DropdownMenuItem(
+                              value: ReportTimeframe.thisMonth,
+                              child: Text("This Month"),
+                            ),
+                            DropdownMenuItem(
+                              value: ReportTimeframe.lastMonth,
+                              child: Text("Last Month"),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+
+                            setState(() {
+                              _timeframeOverTime = value;
+                            });
+
+                            _loadChartData(value);
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      height: 220,
+                      child: PieChart(
+                        PieChartData(
+                          centerSpaceRadius: 45,
+                          sectionsSpace: 3,
+                          borderData: FlBorderData(show: false),
+
+                          sections: [
+                            PieChartSectionData(
+                              value: transportTotal,
+                              color: Colors.green,
+                              title: "${transportTotal.toStringAsFixed(1)} kg",
+                              radius: 65,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                                 fontSize: 11,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: const LinearProgressIndicator(
-                                value: 0.65,
-                                backgroundColor: Color(0xFFE0E0E0),
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  darkGreen,
-                                ),
-                                minHeight: 8,
+
+                            PieChartSectionData(
+                              value: officeTotal,
+                              color: Colors.orange,
+                              title: "${officeTotal.toStringAsFixed(1)} kg",
+                              radius: 65,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+
+                            PieChartSectionData(
+                              value: foodTotal,
+                              color: Colors.blue,
+                              title: "${foodTotal.toStringAsFixed(1)} kg",
+                              radius: 65,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: const [
+                        _Legend(color: Colors.green, text: "Transportation"),
+                        _Legend(color: Colors.orange, text: "Office"),
+                        _Legend(color: Colors.blue, text: "Food"),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 6. Smart Suggestions Section
+              const Text(
+                'Smart Suggestions',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSuggestionCard(
+                    Icons.directions_bus_outlined,
+                    'Use public transport 2x this week.',
+                    'You can save up to 4.2 kg CO2.',
+                  ),
+                  const SizedBox(width: 8),
+                  _buildSuggestionCard(
+                    Icons.lightbulb_outline,
+                    'Turn off lights and electric fans when not in use.',
+                    'You can save up to ~0.5 kg CO2/day.',
+                  ),
+                  const SizedBox(width: 8),
+                  _buildSuggestionCard(
+                    Icons.restaurant_outlined,
+                    'Choose more plant-based meals this week.',
+                    '',
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+
+              // 7. Carbon Reduction Journey
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: _cardDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Carbon Reduction Journey',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        // Circular percentage indicator
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: primaryGreen, width: 4),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '65%',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: primaryGreen,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Great job! You’re on track to reduce emissions.',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Your Goal: Reduce 200 kg CO2 this month.',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: const LinearProgressIndicator(
+                                  value: 0.65,
+                                  backgroundColor: Color(0xFFE0E0E0),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    darkGreen,
+                                  ),
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -398,92 +646,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               fontSize: 11,
               color: Colors.black87,
               fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChartPlaceholder(
-    String title,
-    IconData icon,
-    Color color, {
-    required String currentValue,
-    required ValueChanged<String> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      height: 140,
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              PopupMenuButton<String>(
-                onSelected: onChanged,
-                itemBuilder: (BuildContext context) {
-                  return _dropdownOptions.map((String choice) {
-                    return PopupMenuItem<String>(
-                      value: choice,
-                      height: 36,
-                      child: Text(
-                        choice,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    );
-                  }).toList();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        currentValue,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.arrow_drop_down,
-                        size: 12,
-                        color: Colors.black87,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Expanded(
-            child: Center(
-              child: Icon(icon, size: 50, color: color.withOpacity(0.4)),
             ),
           ),
         ],
