@@ -77,9 +77,7 @@ class CarbonWiseApp extends StatelessWidget {
   }
 }
 
-// ==========================================
 // 1. LANDING PAGE SCREEN
-// ==========================================
 class LandingPageScreen extends StatelessWidget {
   const LandingPageScreen({super.key});
 
@@ -171,9 +169,7 @@ class LandingPageScreen extends StatelessWidget {
   }
 }
 
-// ==========================================
 // 2. LOG-IN SCREEN
-// ==========================================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -526,10 +522,108 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  String? selectedRole;
+
   String? selectedCampus;
   String? selectedYearLevel;
   String? selectedDepartment;
+  String? selectedFacultyType;
+  String? selectedOffice;
   bool _isLoading = false;
+
+  final roles = ["Student", "Faculty", "Non-Teaching Staff"];
+
+  final facultyTypes = ["Teaching Faculty", "Administrative Faculty"];
+
+  final campuses = [
+    'Lipa Campus',
+    'Pablo Borbon Campus',
+    'Alangilan Campus',
+    'Lima Campus',
+    'ARASOF Nasugbu Campus',
+    'JPLPC Malvar Campus',
+    'Lemery Campus',
+    'Rosario Campus',
+    'San Juan Campus',
+    'Balayan Campus',
+    'Lobo Campus',
+    'Mabini Campus',
+  ];
+
+  final colleges = [
+    'College of Arts and Sciences',
+    'College of Accountancy, Business and Economics',
+    'College of Informatics and Computing Sciences',
+    'College of Engineering Technology',
+    'College of Teacher Education',
+    'College of Engineering',
+  ];
+
+  final administrativeOffices = [
+    'Office of the Chancellor',
+    'Internal Audit',
+    'Quality Assurance Management',
+    'Sustainable Development',
+    'Planning and Development',
+    'External Affairs',
+    'Resource Generation',
+    'ICT Services',
+    'Testing and Admission',
+    'Registration Services',
+    'Scholarship and Financial Assistance',
+    'Guidance and Counseling',
+    'Library Services',
+    'Student Organization and Activities',
+    'Student Discipline',
+    'Sports and Development',
+    'OJT',
+    'National Service Training Program',
+    'Human Resource Management',
+    'Records Management',
+    'Procurement',
+    'Budget',
+    'Cashiering/Disbursing',
+    'Accounting',
+    'Project Facilities and Management',
+    'Environment Management Unit',
+    'Property and Supply Management',
+    'General Services',
+    'Extension',
+    'Research',
+  ];
+
+  final staffOffices = [
+    'Office of the Chancellor',
+    'Internal Audit',
+    'Quality Assurance Management',
+    'Sustainable Development',
+    'Planning and Development',
+    'External Affairs',
+    'Resource Generation',
+    'ICT Services',
+    'Testing and Admission',
+    'Registration Services',
+    'Scholarship and Financial Assistance',
+    'Guidance and Counseling',
+    'Library Services',
+    'Student Organization and Activities',
+    'Student Discipline',
+    'Sports and Development',
+    'OJT',
+    'National Service Training Program',
+    'Human Resource Management',
+    'Records Management',
+    'Procurement',
+    'Budget',
+    'Cashiering/Disbursing',
+    'Accounting',
+    'Project Facilities and Management',
+    'Environment Management Unit',
+    'Property and Supply Management',
+    'General Services',
+    'Extension',
+    'Research',
+  ];
 
   @override
   void initState() {
@@ -627,16 +721,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
         print('Attempting insert into user_info...');
 
         await Supabase.instance.client.from('user_info').insert({
-          'role': 'student',
-          'sr_code': srCode,
+          'role': selectedRole,
+          'sr_code': selectedRole == "Student" ? srCode : null,
           'g_suite': email,
           'full_name': name,
           'password': password,
           'campus': selectedCampus,
-          'year_level': int.parse(
-            selectedYearLevel!.replaceAll(RegExp(r'[^0-9]'), ''),
-          ),
+          'year_level': selectedRole == "Student"
+              ? int.parse(selectedYearLevel!.replaceAll(RegExp(r'[^0-9]'), ''))
+              : null,
           'department': selectedDepartment,
+          'faculty_type': selectedRole == "Faculty"
+              ? selectedFacultyType
+              : null,
+          'office': selectedRole != "Non-Teaching Staff"
+              ? selectedOffice
+              : null,
           'created_at': DateTime.now().toIso8601String(),
         });
 
@@ -763,132 +863,233 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 25),
-                            _buildInputField(
-                              label: 'SR-Code',
-                              hint: 'xx-xxxxx',
-                              controller: _srCodeController,
-                              keyboardType: TextInputType.number,
-                              isSrCode: true,
-                            ),
-                            _buildInputField(
-                              label: 'Name',
-                              hint: 'Enter your name',
-                              controller: _nameController,
-                            ),
-                            _buildInputField(
-                              label: 'G-Suite Email',
-                              hint: 'Automatically generated',
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              readOnly: true,
-                            ),
-                            _buildInputField(
-                              label: 'Password',
-                              hint: 'Enter your password',
-                              isObscured: true,
-                              controller: _passwordController,
-                            ),
-                            _buildInputField(
-                              label: 'Password Confirmation',
-                              hint: 'Confirm your password',
-                              isObscured: true,
-                              controller: _confirmPasswordController,
-                            ),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Campus',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      _buildDropdownField(
-                                        hint: 'Click to choose...',
-                                        items: [
-                                          'Lipa Campus',
-                                          'Pablo Borbon Campus',
-                                          'Alangilan Campus',
-                                          'Lima Campus',
-                                          'ARASOF Nasugbu Campus',
-                                          'JPLPC Malvar Campus',
-                                          'Lemery Campus',
-                                          'Rosario Campus',
-                                          'San Juan Campus',
-                                          'Balayan Campus',
-                                          'Lobo Campus',
-                                          'Mabini Campus',
-                                        ],
-                                        value: selectedCampus,
-                                        onChanged: (val) => setState(
-                                          () => selectedCampus = val,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Year Level',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      _buildDropdownField(
-                                        hint: 'Click to choose...',
-                                        items: [
-                                          '1st Year',
-                                          '2nd Year',
-                                          '3rd Year',
-                                          '4th Year',
-                                        ],
-                                        value: selectedYearLevel,
-                                        onChanged: (val) => setState(
-                                          () => selectedYearLevel = val,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
                             const Text(
-                              'Department',
+                              "Role",
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+
                             const SizedBox(height: 6),
+
                             _buildDropdownField(
-                              hint: 'Click to choose your department',
-                              items: [
-                                'College of Accountancy, Business and Economics',
-                                'College of Arts and Sciences',
-                                'College of Engineering Technology',
-                                'College of Informatics and Computing Sciences',
-                                'College of Teacher Education',
-                              ],
-                              value: selectedDepartment,
-                              onChanged: (val) =>
-                                  setState(() => selectedDepartment = val),
+                              label: "Role",
+                              hint: "Select your role",
+                              items: roles,
+                              value: selectedRole,
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedRole = value;
+
+                                  selectedFacultyType = null;
+                                  selectedCampus = null;
+                                  selectedDepartment = null;
+                                  selectedYearLevel = null;
+
+                                  _srCodeController.clear();
+                                  _nameController.clear();
+                                  _emailController.clear();
+                                  _passwordController.clear();
+                                  _confirmPasswordController.clear();
+                                });
+                              },
                             ),
-                            const SizedBox(height: 35),
+
+                            const SizedBox(height: 20),
+                            const SizedBox(height: 25),
+                            if (selectedRole == "Student") ...[
+                              _buildInputField(
+                                label: "SR-Code",
+                                hint: "xx-xxxxx",
+                                controller: _srCodeController,
+                                keyboardType: TextInputType.number,
+                                isSrCode: true,
+                              ),
+
+                              _buildInputField(
+                                label: "Name",
+                                hint: "Enter your name",
+                                controller: _nameController,
+                              ),
+
+                              _buildInputField(
+                                label: "G-Suite Email",
+                                hint: "Automatically generated",
+                                controller: _emailController,
+                                readOnly: true,
+                              ),
+
+                              _buildInputField(
+                                label: "Password",
+                                hint: "Enter password",
+                                controller: _passwordController,
+                                isObscured: true,
+                              ),
+
+                              _buildInputField(
+                                label: "Confirm Password",
+                                hint: "Confirm password",
+                                controller: _confirmPasswordController,
+                                isObscured: true,
+                              ),
+
+                              _buildDropdownField(
+                                label: "Campus",
+                                hint: "Choose Campus",
+                                items: campuses,
+                                value: selectedCampus,
+                                onChanged: (v) {
+                                  setState(() => selectedCampus = v);
+                                },
+                              ),
+
+                              _buildDropdownField(
+                                label: "Year Level",
+                                hint: "Choose Year Level",
+                                items: [
+                                  "1st Year",
+                                  "2nd Year",
+                                  "3rd Year",
+                                  "4th Year",
+                                ],
+                                value: selectedYearLevel,
+                                onChanged: (v) {
+                                  setState(() => selectedYearLevel = v);
+                                },
+                              ),
+
+                              _buildDropdownField(
+                                label: "Department",
+                                hint: "Choose Department",
+                                items: colleges,
+                                value: selectedDepartment,
+                                onChanged: (v) {
+                                  setState(() => selectedDepartment = v);
+                                },
+                              ),
+                            ],
+                            if (selectedRole == "Faculty") ...[
+                              _buildInputField(
+                                label: "Name",
+                                hint: "Enter your full name",
+                                controller: _nameController,
+                              ),
+
+                              _buildInputField(
+                                label: "G-Suite Email",
+                                hint: "example@g.batstate-u.edu.ph",
+                                controller: _emailController,
+                              ),
+
+                              _buildInputField(
+                                label: "Password",
+                                hint: "Password",
+                                controller: _passwordController,
+                                isObscured: true,
+                              ),
+
+                              _buildInputField(
+                                label: "Confirm Password",
+                                hint: "Confirm Password",
+                                controller: _confirmPasswordController,
+                                isObscured: true,
+                              ),
+
+                              _buildDropdownField(
+                                label: "Campus",
+                                hint: "Choose Campus",
+                                items: campuses,
+                                value: selectedCampus,
+                                onChanged: (v) {
+                                  setState(() => selectedCampus = v);
+                                },
+                              ),
+
+                              _buildDropdownField(
+                                label: "Faculty Type",
+                                hint: "Faculty Type",
+                                items: facultyTypes,
+                                value: selectedFacultyType,
+                                onChanged: (v) {
+                                  setState(() {
+                                    selectedFacultyType = v;
+                                    selectedDepartment = null;
+                                  });
+                                },
+                              ),
+
+                              if (selectedFacultyType == "Teaching Faculty")
+                                _buildDropdownField(
+                                  label: "College",
+                                  hint: "Choose College",
+                                  items: colleges,
+                                  value: selectedDepartment,
+                                  onChanged: (v) {
+                                    setState(() => selectedDepartment = v);
+                                  },
+                                ),
+
+                              if (selectedFacultyType ==
+                                  "Administrative Faculty")
+                                _buildDropdownField(
+                                  label: "Office",
+                                  hint: "Choose Office",
+                                  items: administrativeOffices,
+                                  value: selectedDepartment,
+                                  onChanged: (v) {
+                                    setState(() => selectedDepartment = v);
+                                  },
+                                ),
+                            ],
+                            if (selectedRole == "Non-Teaching Staff") ...[
+                              _buildInputField(
+                                label: "Name",
+                                hint: "Enter your full name",
+                                controller: _nameController,
+                              ),
+
+                              _buildInputField(
+                                label: "Email",
+                                hint: "Enter your email",
+                                controller: _emailController,
+                              ),
+
+                              _buildInputField(
+                                label: "Password",
+                                hint: "Password",
+                                controller: _passwordController,
+                                isObscured: true,
+                              ),
+
+                              _buildInputField(
+                                label: "Confirm Password",
+                                hint: "Confirm Password",
+                                controller: _confirmPasswordController,
+                                isObscured: true,
+                              ),
+
+                              _buildDropdownField(
+                                label: "Campus",
+                                hint: "Choose Campus",
+                                items: campuses,
+                                value: selectedCampus,
+                                onChanged: (v) {
+                                  setState(() => selectedCampus = v);
+                                },
+                              ),
+
+                              _buildDropdownField(
+                                label: "Office",
+                                hint: "Choose Office",
+                                items: staffOffices,
+                                value: selectedDepartment,
+                                onChanged: (v) {
+                                  setState(() => selectedDepartment = v);
+                                },
+                              ),
+                            ],
+                            const SizedBox(height: 12),
                             SizedBox(
                               width: double.infinity,
                               height: 48,
@@ -1016,34 +1217,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Widget _buildDropdownField({
+    required String label,
     required String hint,
     required List<String> items,
     required String? value,
     required ValueChanged<String?> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(
-            hint,
-            style: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
           ),
-          isExpanded: true,
-          items: items.map((String item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item, style: const TextStyle(color: Colors.black87)),
-            );
-          }).toList(),
-          onChanged: onChanged,
         ),
-      ),
+        const SizedBox(height: 6),
+
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              hint: Text(hint),
+              isExpanded: true,
+              items: items.map((item) {
+                return DropdownMenuItem(value: item, child: Text(item));
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

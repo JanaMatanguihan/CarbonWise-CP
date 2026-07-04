@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_constants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
@@ -9,16 +10,15 @@ class ApiService {
   // GET: Carbon Records
 
   Future<List<dynamic>> getCarbonRecords(String email) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl/carbon_records?g_suite=eq.$email&select=*"),
-      headers: {"apikey": apiKey, "Authorization": "Bearer $apiKey"},
-    );
+    final today = DateTime.now().toIso8601String().split('T')[0];
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
+    final response = await Supabase.instance.client
+        .from('carbon_records')
+        .select()
+        .eq('g_suite', email)
+        .eq('record_date', today);
 
-    throw Exception("Failed to load records");
+    return response;
   }
 
   // POST: Carbon Record

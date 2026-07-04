@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
+import 'package:carbonwise_app/utils/dialog_helper.dart';
 
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
@@ -312,13 +313,28 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         createdAt: now.toIso8601String(),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Carbon record saved successfully.")),
+      DialogHelper.showSuccess(
+        context: context,
+        title: "Calculation Complete",
+        message: "Your carbon emission record has been saved successfully.",
+        onOk: () {
+          DialogHelper.showCalculationSummary(
+            context: context,
+            transportEmissions: _transportEmissions,
+            officeEmissions: _officeEmissions,
+            foodEmissions: _foodEmissions,
+          );
+        },
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      print("SAVE ERROR: $e");
+
+      DialogHelper.showError(
+        context: context,
+        title: "Unable to Save",
+        message:
+            "Something went wrong while saving your carbon emission record. Please try again.",
+      );
     }
   }
 
@@ -608,116 +624,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               }
 
               await _saveCarbonRecords();
-
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    title: const Text(
-                      'Your Carbon Emissions Summary',
-                      style: TextStyle(
-                        color: darkGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: [
-                          if (_transportEmissions.isNotEmpty) ...[
-                            const Text(
-                              'Transportation',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            ..._transportEmissions.map(
-                              (e) => Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 8,
-                                  bottom: 2,
-                                ),
-                                child: Text(
-                                  '- $e',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          if (_officeEmissions.isNotEmpty) ...[
-                            const Text(
-                              'Office Resource',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            ..._officeEmissions.map(
-                              (e) => Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 8,
-                                  bottom: 2,
-                                ),
-                                child: Text(
-                                  '- $e',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          if (_foodEmissions.isNotEmpty) ...[
-                            const Text(
-                              'Food Consumption',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            ..._foodEmissions.map(
-                              (e) => Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 8,
-                                  bottom: 2,
-                                ),
-                                child: Text(
-                                  '- $e',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(
-                            color: darkGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
             },
             child: Container(
               width: double.infinity,

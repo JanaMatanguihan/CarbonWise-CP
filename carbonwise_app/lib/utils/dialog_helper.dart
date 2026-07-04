@@ -101,6 +101,8 @@ class DialogHelper {
     ).show();
   }
 
+  // Info Dialog
+
   static void showInfo({
     required BuildContext context,
     required String title,
@@ -126,6 +128,122 @@ class DialogHelper {
       btnOkText: "OK",
 
       btnOkOnPress: onOk ?? () {},
+    ).show();
+  }
+
+  // Calculation Summary Dialog
+
+  static void showCalculationSummary({
+    required BuildContext context,
+    required List<String> transportEmissions,
+    required List<String> officeEmissions,
+    required List<String> foodEmissions,
+  }) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.info,
+      animType: AnimType.scale,
+      dialogBackgroundColor: background,
+
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Icon(Icons.eco, color: primaryGreen, size: 50),
+              ),
+
+              const SizedBox(height: 15),
+
+              const Center(
+                child: Text(
+                  "Carbon Emissions Summary",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: primaryGreen,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Center(
+                child: Text(
+                  "Here is your carbon emission summary for today!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              if (transportEmissions.isNotEmpty) ...[
+                const Text(
+                  "🚗 Transportation",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: primaryGreen,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                ...transportEmissions.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(left: 10, bottom: 3),
+                    child: Text("• $e"),
+                  ),
+                ),
+                const SizedBox(height: 15),
+              ],
+
+              if (officeEmissions.isNotEmpty) ...[
+                const Text(
+                  "💻 Office Resources",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: primaryGreen,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                ...officeEmissions.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(left: 10, bottom: 3),
+                    child: Text("• $e"),
+                  ),
+                ),
+                const SizedBox(height: 15),
+              ],
+
+              if (foodEmissions.isNotEmpty) ...[
+                const Text(
+                  "🍽 Food Consumption",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: primaryGreen,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                ...foodEmissions.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(left: 10, bottom: 3),
+                    child: Text("• $e"),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+
+      btnOkColor: primaryGreen,
+      btnOkText: "Done",
+      btnOkOnPress: () {},
     ).show();
   }
 }
