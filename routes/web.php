@@ -4,7 +4,11 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\CarbonRecordController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Admin\EmissionOverviewController;
+use App\Http\Controllers\Admin\EmissionExportController;
+use App\Http\Controllers\Admin\MitigationStrategyController;
 use Illuminate\Support\Facades\Route;
+
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -26,6 +30,22 @@ Route::middleware(['auth'])->group(function () {
     // User Management page
     Route::get('/admin/users', [UserManagementController::class, 'index'])
     ->name('admin.users');
+
+    Route::get(
+    '/admin/emissions',
+    [EmissionOverviewController::class,'index']
+    )->name('admin.emissions');
+
+    Route::get(
+    '/admin/emissions/export',
+    [EmissionOverviewController::class, 'export']
+    )->name('admin.emissions.export');
+
+    // Mitigation Strategies
+    Route::get(
+        '/admin/mitigation-strategies',
+        [MitigationStrategyController::class, 'index']
+    )->name('admin.mitigation');
 
     // View User Profile
     Route::get('/admin/users/{g_suite}', [UserManagementController::class, 'show'])

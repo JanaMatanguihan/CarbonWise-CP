@@ -4,8 +4,11 @@ import Alpine from "alpinejs";
 window.Alpine = Alpine;
 Alpine.start();
 
-import { createIcons } from "lucide";
-createIcons();
+import { createIcons, icons } from "lucide";
+
+createIcons({
+    icons,
+});
 
 import flatpickr from "flatpickr";
 import monthSelectPlugin from "flatpickr/dist/plugins/monthSelect/index.js";

@@ -44,7 +44,7 @@
     <span>User Management</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
+    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.emissions') }}">
         <img src="{{ asset('icons/emissions.png') }}" class="w-5 h-5">
         <span>Emissions Overview</span>
     </a>
@@ -59,7 +59,7 @@
         <span>Forecasting</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
+    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.mitigation') }}">
         <img src="{{ asset('icons/mitigation.png') }}" class="w-5 h-5">
         <span>Mitigation Strategies</span>
     </a>
@@ -148,16 +148,27 @@
     </svg>
 
     <!-- Month Picker -->
-        <form method="GET" action="{{ route('dashboard') }}">
-            <input
+       <div class="flex items-center gap-2">
+
+    <form method="GET" action="{{ route('dashboard') }}">
+        <input
             id="monthPicker"
             name="month"
             type="month"
-            value="{{ request('month', now()->format('Y-m')) }}"
+            value="{{ request('month') }}"
             class="bg-transparent outline-none font-semibold cursor-pointer"
             onchange="this.form.submit()"
         />
-        </form>
+    </form>
+
+    @if(request('month'))
+        <a href="{{ route('dashboard') }}"
+           class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium">
+            All Time
+        </a>
+    @endif
+
+</div>
 
 </div>
 
@@ -190,7 +201,7 @@
 
 </div>
 
-      <div class="px-6 pb-6 pt-0">
+      <div class="px-4 pb-4 pt-0">
     @yield('content')
 </div>
     </main>

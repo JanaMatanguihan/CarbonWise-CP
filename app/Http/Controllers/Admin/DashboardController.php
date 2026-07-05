@@ -14,23 +14,40 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $selectedMonth = request('month', now()->format('Y-m'));
+        $selectedMonth = request('month');
 
-        $year = date('Y', strtotime($selectedMonth));
-        $month = date('m', strtotime($selectedMonth));
+        $year = null;
+        $month = null;
+
+        if ($selectedMonth) {
+            [$year, $month] = explode('-', $selectedMonth);
+        }
+
         /*
         Dashboard Summary Cards
         */
 
+       
+
         // Total registered users
-            $totalUsers = UserInfo::whereYear('created_at', $year)
-                ->whereMonth('created_at', $month)
-                ->count();
+        $userQuery = UserInfo::query();
+
+        if ($year && $month) {
+            $userQuery->whereYear('created_at', $year)
+                    ->whereMonth('created_at', $month);
+        }
+
+        $totalUsers = $userQuery->count();
 
         // Total carbon emissions
-        $totalEmissions = CarbonRecord::whereYear('record_date', $year)
-        ->whereMonth('record_date', $month)
-        ->sum('total_emission');
+        $emissionQuery = CarbonRecord::query();
+
+        if ($year && $month) {
+            $emissionQuery->whereYear('record_date', $year)
+                        ->whereMonth('record_date', $month);
+        }
+
+        $totalEmissions = $emissionQuery->sum('total_emission');
 
         // Average emission per user
         $averageEmission = $totalUsers > 0
@@ -38,34 +55,63 @@ class DashboardController extends Controller
             : 0;
 
         // Total mitigation actions
-        $mitigationCount = MitigationAction::whereYear('created_at', $year)
-        ->whereMonth('created_at', $month)
-        ->count();
+        $mitigationQuery = MitigationAction::query();
+
+        if ($year && $month) {
+            $mitigationQuery->whereYear('created_at', $year)
+                            ->whereMonth('created_at', $month);
+        }
+
+        $mitigationCount = $mitigationQuery->count();
 
         // Total SDO reports
-        $reportCount = SdoReport::whereYear('created_at', $year)
-        ->whereMonth('created_at', $month)
-        ->count();
+       $reportQuery = SdoReport::query();
+
+        if ($year && $month) {
+            $reportQuery->whereYear('created_at', $year)
+                        ->whereMonth('created_at', $month);
+        }
+
+        $reportCount = $reportQuery->count();
 
         /*
         Emission by Source
         */
+        $transportationQuery = CarbonRecord::query();
 
-        $transportationTotal = CarbonRecord::whereYear('record_date', $year)
-        ->whereMonth('record_date', $month)
-        ->sum('transportation');
+        if ($year && $month) {
+            $transportationQuery->whereYear('record_date', $year)
+                                ->whereMonth('record_date', $month);
+        }
 
-        $electricityTotal = CarbonRecord::whereYear('record_date', $year)
-            ->whereMonth('record_date', $month)
-            ->sum('electricity');
+        $transportationTotal = $transportationQuery->sum('transportation');
 
-        $foodTotal = CarbonRecord::whereYear('record_date', $year)
-            ->whereMonth('record_date', $month)
-            ->sum('food');
+        $electricityQuery = CarbonRecord::query();
 
-        $wasteTotal = CarbonRecord::whereYear('record_date', $year)
-            ->whereMonth('record_date', $month)
-            ->sum('waste');
+        if ($year && $month) {
+            $electricityQuery->whereYear('record_date', $year)
+                            ->whereMonth('record_date', $month);
+        }
+
+        $electricityTotal = $electricityQuery->sum('electricity');
+
+        $foodQuery = CarbonRecord::query();
+
+        if ($year && $month) {
+            $foodQuery->whereYear('record_date', $year)
+                    ->whereMonth('record_date', $month);
+        }
+
+        $foodTotal = $foodQuery->sum('food');
+
+        $wasteQuery = CarbonRecord::query();
+
+        if ($year && $month) {
+            $wasteQuery->whereYear('record_date', $year)
+                    ->whereMonth('record_date', $month);
+        }
+
+        $wasteTotal = $wasteQuery->sum('waste');
 
         /*
          Monthly Emissions Trend (Current Year)
@@ -73,13 +119,14 @@ class DashboardController extends Controller
 
         // Ensure monthlyEmissions is always defined to avoid undefined variable notices
         $monthlyEmissions = [];
+        $trendYear = $year ?? now()->year;
+
+        $monthlyEmissions = [];
+
         for ($i = 1; $i <= 12; $i++) {
-            $monthlyEmissions[] = CarbonRecord::whereYear(
-                'record_date',
-                $year
-            )
-            ->whereMonth('record_date', $i)
-            ->sum('total_emission');
+            $monthlyEmissions[] = CarbonRecord::whereYear('record_date', $trendYear)
+                ->whereMonth('record_date', $i)
+                ->sum('total_emission');
         }
 
         /*
@@ -103,6 +150,14 @@ class DashboardController extends Controller
             ->orderByDesc('total_emissions')
             ->limit(5)
             ->get();
+
+            foreach ($topDepartments as $department) {
+
+            $department->percentage = $totalEmissions > 0
+                ? round(($department->total_emissions / $totalEmissions) * 100, 1)
+                : 0;
+
+}
         /*
          User Engagement
         */
