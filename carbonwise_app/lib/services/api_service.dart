@@ -166,4 +166,12 @@ class ApiService {
       throw Exception(response.body);
     }
   }
+
+  Future<String?> getUserCampus(String email) async {
+    final data = await getUserInfo(email);
+
+    if (data.isEmpty) return null;
+
+    return data["campus"];
+  }
 }

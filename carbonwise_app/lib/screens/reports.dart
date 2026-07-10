@@ -37,7 +37,7 @@ class _Legend extends StatelessWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   final ApiService _apiService = ApiService();
   ReportTimeframe _timeframeOverTime = ReportTimeframe.thisWeek;
-  ReportTimeframe _timeframeBySource = ReportTimeframe.thisWeek;
+  final ReportTimeframe _timeframeBySource = ReportTimeframe.thisWeek;
   List<FlSpot> emissionOverTime = [];
 
   double transportTotal = 0;

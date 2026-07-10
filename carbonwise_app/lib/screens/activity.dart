@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
+import 'package:carbonwise_app/services/location_service.dart';
 
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
@@ -18,6 +19,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   String? _selectedOfficeResourceCategory;
   String? _selectedFoodType;
   String? _selectedFoodCategory;
+  String _userCampus = "";
 
   double _transportationTotalEmission = 0.0;
   double _officeResourceTotalEmission = 0.0;
@@ -30,6 +32,25 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final List<String> _transportEmissions = [];
   final List<String> _officeEmissions = [];
   final List<String> _foodEmissions = [];
+  final LocationService _locationService = LocationService();
+  final TextEditingController _homeAddressController = TextEditingController();
+  double? _distanceKm;
+  final TextEditingController _officeUsageController = TextEditingController();
+
+  final Map<String, String> campusAddresses = {
+    "Lipa Campus": "Batangas State University Lipa Campus",
+    "Pablo Borbon Campus": "Batangas State University Pablo Borbon Campus",
+    "Alangilan Campus": "Batangas State University Alangilan Campus",
+    "Lima Campus": "Batangas State University Lima Campus",
+    "ARASOF Nasugbu Campus": "Batangas State University ARASOF Nasugbu Campus",
+    "JPLPC Malvar Campus": "Batangas State University JPLPC Malvar Campus",
+    "Lemery Campus": "Batangas State University Lemery Campus",
+    "Rosario Campus": "Batangas State University Rosario Campus",
+    "San Juan Campus": "Batangas State University San Juan Campus",
+    "Balayan Campus": "Batangas State University Balayan Campus",
+    "Lobo Campus": "Batangas State University Lobo Campus",
+    "Mabini Campus": "Batangas State University Mabini Campus",
+  };
 
   final Map<String, double> transportationEmissionFactors = {
     'Traditional Jeepney': 0.18,
@@ -117,11 +138,13 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   void initState() {
     super.initState();
     _loadSavedCarbonRecords();
+    _loadUserCampus();
   }
 
   @override
   void dispose() {
-    _distanceController.dispose();
+    _homeAddressController.dispose();
+    _officeUsageController.dispose();
     super.dispose();
   }
 
@@ -133,12 +156,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     return (distance * 2) * emissionFactor;
   }
 
-  double _calculateOfficeResourceEmission(String category) {
-    final watts = officeResourcePowerRatings[category] ?? 0.0;
-    const assumedHoursUsed = 1.0;
-    const emissionFactorPerKwh = 0.7122;
-    final kwh = (watts * assumedHoursUsed) / 1000;
-    return kwh * emissionFactorPerKwh;
+  double _calculateOfficeResourceEmission(String category, double hours) {
+    final powerRating = officeResourcePowerRatings[category] ?? 0.0;
+    return (powerRating * hours) /
+        1000 *
+        0.527; // Convert to kWh and multiply by emission factor
   }
 
   double _calculateFoodEmission(String foodCategory) {
@@ -338,6 +360,61 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     }
   }
 
+  Future<void> _calculateDistance() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    final campus = await _apiService.getUserCampus(user.email!);
+
+    if (campus == null) {
+      DialogHelper.showError(
+        context: context,
+        title: "Campus not found",
+        message: "Unable to retrieve your campus.",
+      );
+      return;
+    }
+
+    setState(() {
+      _userCampus = campus;
+    });
+
+    final campusAddress = campusAddresses[campus];
+
+    if (campusAddress == null) {
+      DialogHelper.showError(
+        context: context,
+        title: "Unknown campus",
+        message: "Campus address is not available.",
+      );
+      return;
+    }
+
+    final distance = await _locationService.calculateDistance(
+      homeAddress: _homeAddressController.text,
+      campusAddress: campusAddress,
+    );
+
+    setState(() {
+      _distanceKm = distance;
+    });
+  }
+
+  Future<void> _loadUserCampus() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    final campus = await _apiService.getUserCampus(user.email!);
+
+    if (campus != null) {
+      setState(() {
+        _userCampus = campus;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF3AA76D);
@@ -354,66 +431,182 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             title: 'Transport',
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  /// LEFT SIDE
                   Expanded(
-                    flex: 5,
-                    child: _buildDropdownField(
-                      label: 'Transport Type',
-                      hint: 'Select your transport type',
-                      value: _selectedTransportType,
-                      items: const [
-                        'Traditional Jeepney',
-                        'Modern Jeepney',
-                        'Car',
-                        'Motorcycle',
-                        'Bicycle/Walking',
+                    flex: 4,
+                    child: Column(
+                      children: [
+                        _buildDropdownField(
+                          label: 'Transport Type',
+                          hint: 'Select your transport type',
+                          value: _selectedTransportType,
+                          items: const [
+                            'Traditional Jeepney',
+                            'Modern Jeepney',
+                            'Car',
+                            'Motorcycle',
+                            'Bicycle/Walking',
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedTransportType = value;
+                            });
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildTextField(
+                          label: "Starting Point",
+                          hint: "Input Address Here",
+                          controller: _homeAddressController,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Ending Point",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3AA76D),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              height: 38,
+                              width: double.infinity,
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.black38),
+                                borderRadius: BorderRadius.circular(6),
+                                color: Colors.grey.shade100,
+                              ),
+                              child: Text(
+                                _userCampus.isEmpty
+                                    ? "Loading campus..."
+                                    : _userCampus,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
-                      onChanged: (val) =>
-                          setState(() => _selectedTransportType = val),
                     ),
                   ),
-                  const SizedBox(width: 10),
+
+                  const SizedBox(width: 14),
+
+                  /// RIGHT SIDE
                   Expanded(
-                    flex: 5,
-                    child: _buildTextField(
-                      label: 'Distance (in Kilometers)',
-                      hint: 'Input distance',
-                      controller: _distanceController,
+                    flex: 6,
+                    child: Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.map,
+                              size: 45,
+                              color: Color(0xFF3AA76D),
+                            ),
+
+                            const SizedBox(height: 9),
+
+                            Text(
+                              _distanceKm == null
+                                  ? "Map Preview"
+                                  : "${_distanceKm!.toStringAsFixed(2)} km",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Color(0xFF3AA76D),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3AA76D),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () async {
+                                await _calculateDistance();
+                              },
+                              child: const Text("Calculate"),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  _buildAddButton(
-                    onPressed: () {
-                      if (_selectedTransportType != null &&
-                          _distanceController.text.isNotEmpty) {
-                        setState(() {
-                          final distance =
-                              double.tryParse(_distanceController.text) ?? 0;
-
-                          // Updated Calculation: (Distance * 2) * Emission Factor
-                          final emission =
-                              (distance * 2) *
-                              (transportationEmissionFactors[_selectedTransportType!] ??
-                                  0);
-
-                          _transportationTotalEmission += emission;
-
-                          _transportEmissions.add(
-                            '$_selectedTransportType - ${distance.toStringAsFixed(1)} km '
-                            '(${emission.toStringAsFixed(2)} kg CO₂e)',
-                          );
-
-                          _selectedTransportType = null;
-                          _distanceController.clear();
-                        });
-                      }
-                    },
                   ),
                 ],
               ),
+
+              const SizedBox(height: 15),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFC7D8CE),
+                    foregroundColor: const Color(0xFF265D3B),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                  ),
+                  onPressed: () {
+                    if (_selectedTransportType == null || _distanceKm == null) {
+                      DialogHelper.showInfo(
+                        context: context,
+                        title: "Incomplete Information",
+                        message:
+                            "Please select a transport type and calculate the distance first.",
+                      );
+                      return;
+                    }
+
+                    final emission = _calculateTransportationEmission(
+                      _selectedTransportType!,
+                      _distanceKm!,
+                    );
+
+                    setState(() {
+                      _transportationTotalEmission += emission;
+
+                      _transportEmissions.add(
+                        "$_selectedTransportType\n"
+                        "${_distanceKm!.toStringAsFixed(2)} km\n"
+                        "${emission.toStringAsFixed(2)} kg CO₂e",
+                      );
+
+                      _selectedTransportType = null;
+                      _homeAddressController.clear();
+                      _distanceKm = null;
+                    });
+                  },
+                  child: const Text(
+                    "+ Add Emission",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             ],
           ),
+
           const SizedBox(height: 16),
 
           // 2. Office Resource Form Card
@@ -424,7 +617,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    flex: 5,
+                    flex: 4,
                     child: _buildDropdownField(
                       label: 'Office Resource Type',
                       hint: 'Select resource type',
@@ -450,9 +643,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       },
                     ),
                   ),
+
                   const SizedBox(width: 10),
+
                   Expanded(
-                    flex: 5,
+                    flex: 4,
                     child: _buildDropdownField(
                       label: 'Office Resource Category',
                       hint: _selectedOfficeResourceType == null
@@ -466,34 +661,65 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           setState(() => _selectedOfficeResourceCategory = val),
                     ),
                   ),
+
                   const SizedBox(width: 10),
+
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _officeUsageController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: "Usage",
+                        hintText: "Hours",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
                   _buildAddButton(
                     onPressed: () {
-                      if (_selectedOfficeResourceType != null &&
-                          _selectedOfficeResourceCategory != null) {
-                        final emission = _calculateOfficeResourceEmission(
-                          _selectedOfficeResourceCategory!,
+                      if (_selectedOfficeResourceType == null ||
+                          _selectedOfficeResourceCategory == null ||
+                          _officeUsageController.text.isEmpty) {
+                        return;
+                      }
+
+                      final hours =
+                          double.tryParse(_officeUsageController.text) ?? 0;
+
+                      final emission = _calculateOfficeResourceEmission(
+                        _selectedOfficeResourceCategory!,
+                        hours,
+                      );
+
+                      setState(() {
+                        _officeEmissions.add(
+                          '${_selectedOfficeResourceType!} - '
+                          '${_selectedOfficeResourceCategory!}\n'
+                          '${hours.toStringAsFixed(1)} hrs\n'
+                          '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
 
-                        setState(() {
-                          _officeEmissions.add(
-                            '${_selectedOfficeResourceType!} - ${_selectedOfficeResourceCategory!} '
-                            '(${emission.toStringAsFixed(2)} kg CO2e)',
-                          );
+                        _officeResourceTotalEmission += emission;
 
-                          _officeResourceTotalEmission += emission;
-
-                          _selectedOfficeResourceType = null;
-                          _selectedOfficeResourceCategory = null;
-                        });
-                      }
+                        _selectedOfficeResourceType = null;
+                        _selectedOfficeResourceCategory = null;
+                        _officeUsageController.clear();
+                      });
                     },
                   ),
                 ],
               ),
             ],
           ),
+
           const SizedBox(height: 16),
+
           // 3. Food Consumption Form Card
           _buildFormCard(
             title: 'Food Consumption',
@@ -565,6 +791,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 24),
 
           // 4. Your Carbon Emissions List Section
@@ -633,7 +860,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -671,7 +898,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -751,6 +978,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required String label,
     required String hint,
     required TextEditingController controller,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,10 +997,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           height: 38,
           child: TextField(
             controller: controller,
-            style: const TextStyle(fontSize: 11),
+            enabled: enabled,
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(fontSize: 10, color: Colors.black38),
+              hintStyle: const TextStyle(fontSize: 8, color: Colors.black38),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 8,
                 vertical: 8,
