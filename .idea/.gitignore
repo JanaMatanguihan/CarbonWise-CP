@@ -1,3 +1,4 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+carbonwise_app/lib/utils/secrets.dart

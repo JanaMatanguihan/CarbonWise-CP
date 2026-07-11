@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dialog_helper.dart';
 import 'package:carbonwise_app/main.dart';
+import 'package:carbonwise_app/widgets/chatbot_button.dart';
 
 class CustomMainNavigation extends StatefulWidget {
   const CustomMainNavigation({super.key});
@@ -202,6 +203,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
           ),
         ),
       ),
+      floatingActionButton: const ChatbotButton(),
     );
   }
 

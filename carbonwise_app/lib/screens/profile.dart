@@ -221,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   isLoadingProfile ? '' : '$department\n$campus',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                     height: 1.3,
@@ -266,7 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.black.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -500,7 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: darkGreen.withOpacity(0.8),
+                          color: darkGreen.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -522,7 +522,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'View All',
         style: TextStyle(
           fontSize: 12,
-          color: darkGreen.withOpacity(0.8),
+          color: darkGreen.withValues(alpha: 0.8),
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -562,7 +562,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 105,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
             decoration: BoxDecoration(
-              color: badgeGrey.withOpacity(0.6),
+              color: badgeGrey.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Column(
@@ -614,7 +614,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     horizontal: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: badgeGrey.withOpacity(0.4),
+                    color: badgeGrey.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -722,7 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Full timeline',
                         style: TextStyle(
                           fontSize: 10,
-                          color: darkGreen.withOpacity(0.8),
+                          color: darkGreen.withValues(alpha: 0.8),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -730,7 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Icon(
                         Icons.arrow_forward,
                         size: 10,
-                        color: darkGreen.withOpacity(0.8),
+                        color: darkGreen.withValues(alpha: 0.8),
                       ),
                     ],
                   ),
@@ -877,7 +877,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
             ],
           ),
           const SizedBox(height: 8),
@@ -1119,7 +1119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
+                color: iconColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 12, color: iconColor),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:carbonwise_app/screens/dashboard.dart';
 import 'package:carbonwise_app/screens/navigation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
 import 'package:carbonwise_app/utils/dialog_helper.dart';
@@ -742,7 +741,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         print('SUCCESS: user_info insert completed');
       }
-      ;
 
       print('SUCCESS: User Registered via Authentication module!');
       print('Assigned User UUID: ${response.user?.id}');

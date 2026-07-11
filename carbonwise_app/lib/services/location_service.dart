@@ -2,75 +2,64 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_constants.dart';
 
-class RouteResult {
-  final double distanceKm;
-  final List<List<double>> coordinates;
-
-  RouteResult({required this.distanceKm, required this.coordinates});
-}
-
 class LocationService {
-  Future<RouteResult> calculateRoute({
+  Future<double> calculateDistance({
     required String homeAddress,
     required String campusAddress,
   }) async {
-    // 1. Convert home address into coordinates
     final home = await _geocode(homeAddress);
-
-    // 2. Convert campus into coordinates
     final campus = await _geocode(campusAddress);
 
-    // 3. Request route from OpenRouteService
-    final response = await http.get(
-      Uri.parse(
-        'https://api.openrouteservice.org/v2/directions/driving-car'
-        '?start=${home[0]},${home[1]}'
-        '&end=${campus[0]},${campus[1]}',
-      ),
-      headers: {'Authorization': ApiConstants.orsApiKey},
+    final url = Uri.parse(
+      "https://api.openrouteservice.org/v2/directions/driving-car",
+    );
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Authorization": ApiConstants.orsApiKey,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "coordinates": [
+          [home[0], home[1]],
+          [campus[0], campus[1]],
+        ],
+      }),
     );
 
     if (response.statusCode != 200) {
-      throw Exception("Unable to calculate route.");
+      throw Exception(response.body);
     }
 
     final data = jsonDecode(response.body);
 
-    final feature = data["features"][0];
+    final distanceMeters =
+        data["features"][0]["properties"]["segments"][0]["distance"];
 
-    final distance =
-        (feature["properties"]["summary"]["distance"] as num) / 1000;
-
-    final coordinates = (feature["geometry"]["coordinates"] as List)
-        .map<List<double>>(
-          (e) => [(e[0] as num).toDouble(), (e[1] as num).toDouble()],
-        )
-        .toList();
-
-    return RouteResult(distanceKm: distance, coordinates: coordinates);
+    return distanceMeters / 1000;
   }
 
   Future<List<double>> _geocode(String address) async {
-    final response = await http.get(
-      Uri.parse(
-        "https://api.openrouteservice.org/geocode/search"
-        "?api_key=${ApiConstants.orsApiKey}"
-        "&text=${Uri.encodeComponent(address)}",
-      ),
+    final url = Uri.parse(
+      "https://api.openrouteservice.org/geocode/search"
+      "?api_key=${ApiConstants.orsApiKey}"
+      "&text=${Uri.encodeComponent(address)}",
     );
 
+    final response = await http.get(url);
+
     if (response.statusCode != 200) {
-      throw Exception("Geocoding failed.");
+      throw Exception(response.body);
     }
 
     final data = jsonDecode(response.body);
 
-    if (data["features"].isEmpty) {
-      throw Exception("Address not found.");
-    }
-
     final coords = data["features"][0]["geometry"]["coordinates"];
 
-    return [(coords[0] as num).toDouble(), (coords[1] as num).toDouble()];
+    return [
+      (coords[0] as num).toDouble(), // longitude
+      (coords[1] as num).toDouble(), // latitude
+    ];
   }
 }

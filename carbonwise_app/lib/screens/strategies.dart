@@ -272,7 +272,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                                                 shape: BoxShape.circle,
                                                 border: Border.all(
                                                   color: primaryGreen
-                                                      .withOpacity(0.3),
+                                                      .withValues(alpha: 0.3),
                                                   width: 1,
                                                 ),
                                               ),
