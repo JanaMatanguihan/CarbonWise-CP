@@ -25,9 +25,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   double _officeResourceTotalEmission = 0.0;
   double _foodTotalEmission = 0.0;
 
-  // Controllers
-  final TextEditingController _distanceController = TextEditingController();
-
   // 🟢 Lists to store added emissions dynamically
   final List<String> _transportEmissions = [];
   final List<String> _officeEmissions = [];

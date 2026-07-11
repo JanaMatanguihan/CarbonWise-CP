@@ -3,6 +3,7 @@ import '../services/gemini_service.dart';
 import 'chat_bubble.dart';
 import 'message_model.dart';
 import 'typing_indicator.dart';
+import '../services/chat_history_service.dart';
 
 class ChatbotOverlay extends StatefulWidget {
   const ChatbotOverlay({super.key});
@@ -21,9 +22,23 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
 
   final List<ChatMessage> _messages = [];
 
-  String _conversationHistory = "";
+  final ChatHistoryService _history = ChatHistoryService();
 
   bool _isLoading = false;
+
+  String _buildConversationHistory() {
+    String history = "";
+
+    for (final message in _messages) {
+      if (message.isUser) {
+        history += "\nUser: ${message.text}";
+      } else {
+        history += "\nCarbonWise AI: ${message.text}";
+      }
+    }
+
+    return history;
+  }
 
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -44,13 +59,7 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
 
     _animationController.forward();
 
-    _messages.add(
-      ChatMessage(
-        text:
-            "Hello! 👋\n\nI'm CarbonWise AI.\n\nAsk me anything about sustainability, transportation, electricity, food, or carbon emissions.",
-        isUser: false,
-      ),
-    );
+    _loadMessages();
   }
 
   @override
@@ -80,37 +89,33 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
 
     _controller.clear();
 
-    setState(() {
-      // Add user's message
-      _messages.add(ChatMessage(text: question, isUser: true));
+    final userMessage = ChatMessage(text: question, isUser: true);
 
-      // Show typing indicator
+    setState(() {
+      _messages.add(userMessage);
       _isLoading = true;
     });
 
+    // Save user message
+    await _history.saveMessage(userMessage);
+
     _scrollDown();
 
-    // Save user's message to conversation history
-    _conversationHistory += "\nUser: $question";
-
     try {
-      // Send the whole conversation to Gemini
-      final reply = await _gemini.askGemini(_conversationHistory);
+      final history = _buildConversationHistory();
 
-      // Save Gemini's reply to conversation history
-      _conversationHistory += "\nCarbonWise AI: $reply";
+      final reply = await _gemini.askGemini("$history\nUser: $question");
+
+      final botMessage = ChatMessage(text: reply, isUser: false);
+
+      // Save bot message
+      await _history.saveMessage(botMessage);
 
       setState(() {
-        // Hide typing indicator
         _isLoading = false;
-
-        // Display Gemini's reply
-        _messages.add(ChatMessage(text: reply, isUser: false));
+        _messages.add(botMessage);
       });
-
-      _scrollDown();
     } catch (e) {
-      print("Gemini Error:");
       print(e);
 
       setState(() {
@@ -120,9 +125,37 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
           ChatMessage(text: "Sorry, something went wrong.", isUser: false),
         );
       });
-
-      _scrollDown();
     }
+
+    _scrollDown();
+  }
+
+  Future<void> _loadMessages() async {
+    print("Loading chat history...");
+
+    final messages = await _history.loadMessages();
+
+    print("Number of messages: ${messages.length}");
+
+    setState(() {
+      if (messages.isEmpty) {
+        print("No previous messages.");
+
+        _messages.add(
+          ChatMessage(
+            text:
+                "Hello! 👋\n\nI'm CarbonWise AI.\n\nAsk me anything about sustainability.",
+            isUser: false,
+          ),
+        );
+      } else {
+        print("Loaded previous messages.");
+
+        _messages.addAll(messages);
+      }
+    });
+
+    _scrollDown();
   }
 
   @override

@@ -37,7 +37,6 @@ class _Legend extends StatelessWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   final ApiService _apiService = ApiService();
   ReportTimeframe _timeframeOverTime = ReportTimeframe.thisWeek;
-  final ReportTimeframe _timeframeBySource = ReportTimeframe.thisWeek;
   List<FlSpot> emissionOverTime = [];
 
   double transportTotal = 0;
@@ -52,12 +51,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
   double totalEmission = 0;
   double weekEmission = 0;
   double monthEmission = 0;
-
-  final List<String> _dropdownOptions = [
-    'This Week',
-    'This Month',
-    'Last Month',
-  ];
 
   @override
   void initState() {
