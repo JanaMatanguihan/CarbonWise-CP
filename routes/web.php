@@ -5,7 +5,7 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\CarbonRecordController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\EmissionOverviewController;
-use App\Http\Controllers\Admin\EmissionExportController;
+use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\MitigationStrategyController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,11 +41,40 @@ Route::middleware(['auth'])->group(function () {
     [EmissionOverviewController::class, 'export']
     )->name('admin.emissions.export');
 
-    // Mitigation Strategies
+
+    // Analytics & Reports
     Route::get(
-        '/admin/mitigation-strategies',
+        '/admin/analytics-reports',
+        [AnalyticsReportController::class, 'index']
+    )->name('admin.analytics');
+
+    Route::get(
+    '/admin/analytics-reports/export/pdf',
+    [AnalyticsReportController::class, 'exportPDF']
+    )->name('admin.analytics.export.pdf');
+
+
+    Route::get(
+        '/admin/analytics-reports/export/excel',
+        [AnalyticsReportController::class, 'exportExcel']
+    )->name('admin.analytics.export.excel');
+        // Mitigation Strategies
+        Route::get(
+
+            '/admin/mitigation-strategies',
+
         [MitigationStrategyController::class, 'index']
+
     )->name('admin.mitigation');
+
+
+    Route::post(
+
+        '/admin/mitigation-strategies',
+
+        [MitigationStrategyController::class, 'store']
+
+    )->name('admin.mitigation.store');
 
     // View User Profile
     Route::get('/admin/users/{g_suite}', [UserManagementController::class, 'show'])

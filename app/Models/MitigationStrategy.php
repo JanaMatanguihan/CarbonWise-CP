@@ -16,7 +16,15 @@ class MitigationStrategy extends Model
 
         'description',
 
+        'category',
+
+        'target_areas',
+
+        'participants',
+
         'carbon_reduced',
+
+        'progress',
 
         'status',
 
@@ -25,5 +33,4 @@ class MitigationStrategy extends Model
         'g_suite',
 
     ];
-
 }

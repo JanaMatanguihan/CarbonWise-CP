@@ -2,58 +2,50 @@
 
 namespace App\Http\Controllers\Admin;
 
-
 use App\Http\Controllers\Controller;
 use App\Models\MitigationStrategy;
+use Illuminate\Http\Request;
 
 
 class MitigationStrategyController extends Controller
 {
 
-    public function index()
+    public function index(Request $request)
     {
 
 
         /*
         |--------------------------------------------------------------------------
-        | Get Strategies
+        | Strategy Filter Tabs
         |--------------------------------------------------------------------------
         */
 
 
-        $strategies = MitigationStrategy::latest()
+        $strategies = MitigationStrategy::query();
+
+
+        if ($request->status) {
+
+
+            $strategies->where(
+
+                'status',
+
+                $request->status
+
+            );
+
+
+        }
+
+
+
+        $strategies = $strategies
+
+            ->latest()
+
             ->get();
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Status Counts
-        |--------------------------------------------------------------------------
-        */
-
-
-        $active = MitigationStrategy::where(
-            'status',
-            'in_progress'
-        )
-        ->count();
-
-
-
-        $completed = MitigationStrategy::where(
-            'status',
-            'completed'
-        )
-        ->count();
-
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Send Data
-        |--------------------------------------------------------------------------
-        */
 
 
         return view(
@@ -62,15 +54,62 @@ class MitigationStrategyController extends Controller
 
             compact(
 
-                'strategies',
-
-                'active',
-
-                'completed'
+                'strategies'
 
             )
 
         );
+
+
+    }
+
+
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store New Strategy
+    |--------------------------------------------------------------------------
+    */
+
+
+    public function store(Request $request)
+    {
+
+
+        MitigationStrategy::create([
+
+
+            'title' => $request->title,
+
+
+            'description' => $request->description,
+
+
+            'category' => $request->category,
+
+
+            'target_areas' => $request->target_areas,
+
+
+            'participants' => $request->participants,
+
+
+            'progress' => $request->progress,
+
+
+            'carbon_reduced' => $request->carbon_reduced,
+
+
+            'status' => $request->status,
+
+
+        ]);
+
+
+
+        return back();
 
 
     }

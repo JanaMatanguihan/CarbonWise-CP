@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\UserInfo;
 use App\Models\CarbonRecord;
-use App\Models\MitigationAction;
+use App\Models\MitigationStrategy;
 use App\Models\SdoReport;
 use App\Models\Alert;
 use Illuminate\Support\Facades\DB;
@@ -53,9 +53,8 @@ class DashboardController extends Controller
         $averageEmission = $totalUsers > 0
             ? $totalEmissions / $totalUsers
             : 0;
-
-        // Total mitigation actions
-        $mitigationQuery = MitigationAction::query();
+        // Total mitigation strategies
+        $mitigationQuery = MitigationStrategy::query();
 
         if ($year && $month) {
             $mitigationQuery->whereYear('created_at', $year)
@@ -184,11 +183,11 @@ class DashboardController extends Controller
         Recommended Mitigation Strategies
         */
 
-       $recommendedStrategies = MitigationAction::whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->latest()
-            ->take(4)
-            ->get();
+       $recommendedStrategies = MitigationStrategy::whereYear('created_at', $year)
+        ->whereMonth('created_at', $month)
+        ->latest()
+        ->take(4)
+        ->get();
 
         /*
         Forecast Placeholder

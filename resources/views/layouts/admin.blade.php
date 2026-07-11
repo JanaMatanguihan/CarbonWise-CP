@@ -49,7 +49,7 @@
         <span>Emissions Overview</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
+    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700"  href="{{ route('admin.analytics') }}">
         <img src="{{ asset('icons/analytics.png') }}" class="w-5 h-5">
         <span>Analytics & Reports</span>
     </a>
@@ -132,51 +132,175 @@
     <!-- Right -->
     <div class="flex items-center gap-8">
 
-       @if (request()->routeIs('dashboard'))
-<div class="flex items-center gap-3 bg-white border border-gray-300 rounded-xl px-4 py-3 shadow-sm">
+      @if (request()->routeIs('dashboard') || request()->routeIs('admin.analytics'))
 
-    <!-- Calendar Icon -->
+<div class="flex items-center gap-5">
+
+
+    <!-- Date Picker -->
+<form 
+    method="GET"
+    class="
+    bg-white
+    border
+    border-gray-300
+    rounded-lg
+    shadow-sm
+    h-[42px]
+    px-5
+    flex
+    items-center
+    gap-3
+    "
+>
+
+
     <svg xmlns="http://www.w3.org/2000/svg"
-         class="w-6 h-6 text-gray-700"
-         fill="none"
-         viewBox="0 0 24 24"
-         stroke="currentColor">
+        class="w-4 h-4 text-gray-700"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor">
+
+
         <path stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+
+
     </svg>
 
-    <!-- Month Picker -->
-       <div class="flex items-center gap-2">
 
-    <form method="GET" action="{{ route('dashboard') }}">
-        <input
-            id="monthPicker"
-            name="month"
-            type="month"
-            value="{{ request('month') }}"
-            class="bg-transparent outline-none font-semibold cursor-pointer"
-            onchange="this.form.submit()"
-        />
-    </form>
+    <input
+        type="month"
+        name="month"
+        value="{{ request('month') }}"
+        onchange="this.form.submit()"
+        class="
+        w-[130px]
+        bg-transparent
+        text-sm
+        outline-none
+        cursor-pointer
+        "
+    >
 
-    @if(request('month'))
-        <a href="{{ route('dashboard') }}"
-           class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium">
-            All Time
+
+</form>
+
+    <!-- Export Dropdown -->
+        @if(request()->routeIs('admin.analytics'))
+
+        <div class="relative group">
+
+
+            <button
+                class="
+                bg-white
+                border
+                border-green-700
+                text-green-700
+                px-5
+                py-2
+                rounded-lg
+                shadow-sm
+                text-sm
+                flex
+                items-center
+                gap-2
+                "
+            >
+
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+
+
+                    <path stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+
+
+                </svg>
+
+
+                Export Report
+
+
+            </button>
+
+
+
+            <!-- Dropdown -->
+            <div
+                class="
+                hidden
+                group-hover:block
+                absolute
+                right-0
+                mt-2
+                w-44
+                bg-white
+                border
+                rounded-lg
+                shadow-lg
+                z-50
+                "
+            >
+
+
+        <a
+            href="{{ route('admin.analytics.export.pdf') }}"
+            class="
+            block
+            px-5
+            py-3
+            text-sm
+            hover:bg-gray-100
+            "
+        >
+
+            PDF Report
+
         </a>
-    @endif
+
+
+        <a
+            href="{{ route('admin.analytics.export.excel') }}"
+            class="
+            block
+            px-5
+            py-3
+            text-sm
+            hover:bg-gray-100
+            "
+        >
+
+            Excel Report
+
+        </a>
+
+
+    </div>
+
 
 </div>
 
+@endif
+
+
 </div>
+
+@endif
+
 
     <!-- Vertical Divider -->
     <div class="h-12 border-l border-gray-300"></div>
-    @endif
        
-        <div class="h-12 border-l border-gray-300"></div>
 
         <!-- Admin Info -->
         <div class="flex items-center gap-3">
