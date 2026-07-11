@@ -7,6 +7,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\EmissionOverviewController;
 use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\MitigationStrategyController;
+use App\Http\Controllers\Admin\AlertController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -58,10 +59,26 @@ Route::middleware(['auth'])->group(function () {
         '/admin/analytics-reports/export/excel',
         [AnalyticsReportController::class, 'exportExcel']
     )->name('admin.analytics.export.excel');
-        // Mitigation Strategies
-        Route::get(
 
-            '/admin/mitigation-strategies',
+    // Alerts & Notifications
+    Route::get(
+        '/admin/alerts-notifications',
+        [AlertController::class, 'index']
+    )->name('admin.alerts');
+    Route::patch(
+    '/admin/alerts/{alert}/read',
+    [AlertController::class, 'markAsRead']
+    )->name('admin.alerts.read');
+    
+    Route::delete(
+    '/admin/alerts/{alert}',
+    [AlertController::class, 'destroy']
+    )->name('admin.alerts.destroy');
+    
+    // Mitigation Strategies
+    Route::get(
+
+        '/admin/mitigation-strategies',
 
         [MitigationStrategyController::class, 'index']
 

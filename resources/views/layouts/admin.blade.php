@@ -64,7 +64,7 @@
         <span>Mitigation Strategies</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
+    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.alerts') }}">
         <img src="{{ asset('icons/alerts.png') }}" class="w-5 h-5">
         <span>Alerts & Notifications</span>
     </a>
@@ -335,6 +335,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 @stack('scripts')
 

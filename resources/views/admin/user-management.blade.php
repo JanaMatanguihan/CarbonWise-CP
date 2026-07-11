@@ -140,13 +140,6 @@
             <option value="Inactive" {{ request('status') == 'Inactive' ? 'selected' : '' }}>Inactive</option>
         </select>
 
-        <!-- Add User -->
-        <a
-            href="{{ route('register') }}"
-            class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold"
-        >
-            + Add User
-        </a>
 
     </div>
 

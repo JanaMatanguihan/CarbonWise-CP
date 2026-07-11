@@ -174,20 +174,39 @@ class DashboardController extends Controller
         Recent Alerts
         */
 
-        $recentAlerts = Alert::whereYear('created_at', $year)
-        ->whereMonth('created_at', $month)
-        ->latest()
-        ->take(5)
-        ->get();
+        $recentAlertsQuery = Alert::query();
+
+        if ($year && $month) {
+
+            $recentAlertsQuery
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month);
+
+        }
+
+        $recentAlerts = $recentAlertsQuery
+            ->latest()
+            ->take(5)
+            ->get();
+
         /*
-        Recommended Mitigation Strategies
+        Recommended Mitigation StrategiesRecent Alerts
         */
 
-       $recommendedStrategies = MitigationStrategy::whereYear('created_at', $year)
-        ->whereMonth('created_at', $month)
-        ->latest()
-        ->take(4)
-        ->get();
+       $recommendedStrategiesQuery = MitigationStrategy::query();
+
+        if ($year && $month) {
+
+            $recommendedStrategiesQuery
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month);
+
+        }
+
+        $recommendedStrategies = $recommendedStrategiesQuery
+            ->latest()
+            ->take(4)
+            ->get();
 
         /*
         Forecast Placeholder

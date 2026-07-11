@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\UserInfo;
 use App\Models\CarbonRecord;
-use App\Models\MitigationAction;
+use App\Models\MitigationStrategy;
+use App\Services\AlertService;
 use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
@@ -92,9 +93,9 @@ class UserManagementController extends Controller
                     ? round($totalEmissions / $daysTracked, 2)
                     : 0;
 
-                $mitigationActions = MitigationAction::where('g_suite', $g_suite)
-                ->where('status', 'completed')
-                ->count();
+                $mitigationActions = MitigationStrategy::where('g_suite', $g_suite)
+                    ->where('status', 'completed')
+                    ->count();
 
                 // Line Chart (Emission History)
                     $history = CarbonRecord::where('g_suite', $g_suite)
@@ -191,6 +192,11 @@ class UserManagementController extends Controller
         'status' => $request->status,
     ]);
 
+        AlertService::create(
+        'User Updated',
+        $user->full_name . ' profile has been updated.',
+        'info'
+    );
     
 
     return redirect()
