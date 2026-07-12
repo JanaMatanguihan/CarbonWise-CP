@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StrategiesScreen extends StatefulWidget {
   const StrategiesScreen({super.key});
@@ -12,6 +13,9 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'All Categories';
   String _selectedFrequency = 'All Frequencies';
+
+  String _aiRecommendation =
+      "Loading your personalized sustainability recommendation...";
 
   final List<Map<String, String>> _allStrategies = [
     {
@@ -71,6 +75,12 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   static const Color primaryGreen = Color(0xFF3AA76D);
   static const Color darkGreen = Color(0xFF1E5631);
   static const Color badgeGrey = Color(0xFFCCEAD8);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecommendation();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +403,34 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _loadRecommendation() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      final user = supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final latest = await supabase
+          .from('carbon_records')
+          .select()
+          .eq('g_suite', user.email!)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .single();
+
+      final transportation = latest['transportation'];
+      final electricity = latest['electricity'];
+      final food = latest['food'];
+
+      print(transportation);
+      print(electricity);
+      print(food);
+    } catch (e) {
+      print(e);
+    }
   }
 
   // --- UI Helpers ---

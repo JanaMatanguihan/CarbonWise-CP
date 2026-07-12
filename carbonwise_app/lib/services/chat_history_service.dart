@@ -40,18 +40,26 @@ class ChatHistoryService {
           .from('chatbot_messages')
           .select()
           .eq('g_suite', user.email!)
-          .order('created_at');
+          .order('id', ascending: true);
 
       print("Messages loaded:");
       print(response);
 
       return response.map<ChatMessage>((item) {
-        return ChatMessage(text: item['message'], isUser: item['is_user']);
+        // Convert the UTC time from Supabase into Philippine time
+        final time = DateTime.parse(
+          item['created_at'],
+        ).toUtc().add(const Duration(hours: 8));
+
+        return ChatMessage(
+          text: item['message'],
+          isUser: item['is_user'],
+          time: time,
+        );
       }).toList();
     } catch (e) {
       print("LOAD ERROR:");
       print(e);
-
       return [];
     }
   }

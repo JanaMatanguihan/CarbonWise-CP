@@ -4,6 +4,7 @@ import 'chat_bubble.dart';
 import 'message_model.dart';
 import 'typing_indicator.dart';
 import '../services/chat_history_service.dart';
+import 'date_separator.dart';
 
 class ChatbotOverlay extends StatefulWidget {
   const ChatbotOverlay({super.key});
@@ -25,6 +26,46 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
   final ChatHistoryService _history = ChatHistoryService();
 
   bool _isLoading = false;
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+
+    final today = DateTime(now.year, now.month, now.day);
+
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    final messageDay = DateTime(date.year, date.month, date.day);
+
+    if (messageDay == today) {
+      return "Today";
+    }
+
+    if (messageDay == yesterday) {
+      return "Yesterday";
+    }
+
+    const months = [
+      "",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    return "${months[date.month]} ${date.day}, ${date.year}";
+  }
 
   String _buildConversationHistory() {
     String history = "";
@@ -102,9 +143,11 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
     _scrollDown();
 
     try {
+      // Build the conversation history from all previous messages
       final history = _buildConversationHistory();
 
-      final reply = await _gemini.askGemini("$history\nUser: $question");
+      // Send the conversation to Gemini
+      final reply = await _gemini.askGemini(history);
 
       final botMessage = ChatMessage(text: reply, isUser: false);
 
@@ -138,6 +181,8 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
     print("Number of messages: ${messages.length}");
 
     setState(() {
+      _messages.clear();
+
       if (messages.isEmpty) {
         print("No previous messages.");
 
@@ -245,24 +290,38 @@ class _ChatbotOverlayState extends State<ChatbotOverlay>
                     ),
                   ),
                   Expanded(
-                    child: ListView(
+                    child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(vertical: 10),
-                      children: [
-                        ..._messages.map(
-                          (message) => ChatBubble(message: message),
-                        ),
-
-                        if (_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.only(
-                              left: 12,
-                              bottom: 10,
-                              top: 4,
-                            ),
+                      itemCount: _messages.length + (_isLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (_isLoading && index == _messages.length) {
+                          return const Padding(
+                            padding: EdgeInsets.only(left: 12, bottom: 10),
                             child: TypingIndicator(),
-                          ),
-                      ],
+                          );
+                        }
+
+                        final message = _messages[index];
+
+                        Widget bubble = ChatBubble(message: message);
+
+                        // Show a date separator if this is the first message or the day changed.
+                        if (index == 0 ||
+                            !_isSameDay(
+                              message.time,
+                              _messages[index - 1].time,
+                            )) {
+                          return Column(
+                            children: [
+                              DateSeparator(text: _formatDate(message.time)),
+                              bubble,
+                            ],
+                          );
+                        }
+
+                        return bubble;
+                      },
                     ),
                   ),
                   SafeArea(
