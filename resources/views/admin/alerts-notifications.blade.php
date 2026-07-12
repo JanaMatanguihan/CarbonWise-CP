@@ -10,35 +10,140 @@
     {{-- Summary Cards --}}
     <div class="grid grid-cols-4 gap-6">
 
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <p class="text-sm text-gray-500">Total Alerts</p>
-            <h2 class="text-4xl font-bold mt-3">
-                {{ number_format($totalAlerts) }}
-            </h2>
-        </div>
+       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex items-center gap-4">
 
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <p class="text-sm text-gray-500">Unread Alerts</p>
-            <h2 class="text-4xl font-bold text-blue-600 mt-3">
-                {{ number_format($unreadAlerts) }}
-            </h2>
-        </div>
+                <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
 
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <p class="text-sm text-gray-500">Critical Alerts</p>
-            <h2 class="text-4xl font-bold text-red-600 mt-3">
-                {{ number_format($criticalAlerts) }}
-            </h2>
-        </div>
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="w-7 h-7 text-green-700"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
 
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <p class="text-sm text-gray-500">Resolved</p>
-            <h2 class="text-4xl font-bold text-green-600 mt-3">
-                {{ number_format($resolvedAlerts) }}
-            </h2>
-        </div>
+                        <path stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118
+                                14.158V11a6.002 6.002 0 00-4-5.659V4a2
+                                2 0 10-4 0v1.341C7.67 6.165 6
+                                8.388 6 11v3.159c0 .538-.214
+                                1.055-.595 1.436L4 17h5m6
+                                0a3 3 0 11-6 0h6z"/>
+                    </svg>
 
-    </div>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Total Alerts</p>
+
+                    <h2 class="text-4xl font-bold">
+                        {{ number_format($totalAlerts) }}
+                    </h2>
+                </div>
+
+            </div>
+
+              <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex items-center gap-4">
+
+                    <div class="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
+
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-7 h-7 text-blue-700"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor">
+
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M3 8l9 6 9-6M5 19h14a2 2 0
+                                002-2V7a2 2 0 00-2-2H5a2 2 0
+                                00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+
+                    </div>
+
+                    <div>
+
+                        <p class="text-sm text-gray-500">Unread Alerts</p>
+
+                        <h2 class="text-4xl font-bold text-blue-600">
+
+                            {{ number_format($unreadAlerts) }}
+
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                   <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex items-center gap-4">
+
+                <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="w-7 h-7 text-red-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
+
+                        <path stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+
+                    </svg>
+
+                </div>
+
+                <div>
+
+                    <p class="text-sm text-gray-500">
+                        Critical Alerts
+                    </p>
+
+                    <h2 class="text-4xl font-bold text-red-600">
+                        {{ number_format($criticalAlerts) }}
+                    </h2>
+
+                </div>
+
+            </div>
+
+                   <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex items-center gap-4">
+
+                        <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-7 h-7 text-green-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor">
+
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+
+                            </svg>
+
+                        </div>
+
+                        <div>
+
+                            <p class="text-sm text-gray-500">
+                                Resolved
+                            </p>
+
+                            <h2 class="text-4xl font-bold text-green-600">
+                                {{ number_format($resolvedAlerts) }}
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
 
     {{-- Search --}}
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -54,9 +159,9 @@
                     placeholder="Search alerts..."
                     class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-700 focus:outline-none"
                 >
-
                 <select
                     name="severity"
+                    onchange="this.form.submit()"
                     class="border border-gray-300 rounded-lg px-4 py-2"
                 >
 
@@ -79,8 +184,9 @@
 
                 </select>
 
-                <select
+               <select
                     name="status"
+                    onchange="this.form.submit()"
                     class="border border-gray-300 rounded-lg px-4 py-2"
                 >
 
@@ -97,40 +203,33 @@
                     </option>
 
                 </select>
+                        <div>
 
-                <div class="flex gap-3">
+                            <a
+                                href="{{ route('admin.alerts') }}"
+                                class="w-full flex items-center justify-center px-5 py-2 border rounded-lg hover:bg-gray-100"
+                            >
+                                Clear Filters
+                            </a>
 
-                    <button
-                        class="flex-1 bg-green-700 hover:bg-green-800 text-white rounded-lg"
-                    >
-                        Search
-                    </button>
+                        </div>
 
-                    <a
-                        href="{{ route('admin.alerts') }}"
-                        class="px-5 py-2 border rounded-lg hover:bg-gray-100"
-                    >
-                        Reset
-                    </a>
+                                    </div>
 
-                </div>
+                                </form>
 
-            </div>
+                            </div>
 
-        </form>
+            {{-- Alerts Table --}}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
-    </div>
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
 
-    {{-- Alerts Table --}}
-<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div>
 
-    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
-
-        <div>
-
-            <h3 class="text-xl font-semibold text-gray-800">
-                Recent Alerts
-            </h3>
+                    <h3 class="text-xl font-semibold text-gray-800">
+                        Recent Alerts
+                    </h3>
 
             <p class="text-sm text-gray-500 mt-1">
                 Latest notifications generated by the CarbonWise system.
