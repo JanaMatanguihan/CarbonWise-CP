@@ -661,21 +661,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                   const SizedBox(width: 10),
 
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: _officeUsageController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: "Usage",
-                        hintText: "Hours",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-
                   const SizedBox(width: 10),
 
                   _buildAddButton(

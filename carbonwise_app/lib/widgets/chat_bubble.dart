@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'message_model.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
@@ -41,13 +42,23 @@ class ChatBubble extends StatelessWidget {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 15,
-                color: isUser ? Colors.white : Colors.black87,
-              ),
-            ),
+            isUser
+                ? Text(
+                    message.text,
+                    style: const TextStyle(fontSize: 15, color: Colors.white),
+                  )
+                : MarkdownBody(
+                    data: message.text,
+                    selectable: true,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(fontSize: 15, color: Colors.black87),
+                      strong: const TextStyle(fontWeight: FontWeight.bold),
+                      listBullet: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
 
             const SizedBox(height: 6),
 
