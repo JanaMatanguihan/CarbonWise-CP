@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmissionOverviewController;
 use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\MitigationStrategyController;
 use App\Http\Controllers\Admin\AlertController;
+use App\Http\Controllers\Admin\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -74,7 +75,7 @@ Route::middleware(['auth'])->group(function () {
     '/admin/alerts/{alert}',
     [AlertController::class, 'destroy']
     )->name('admin.alerts.destroy');
-    
+
     // Mitigation Strategies
     Route::get(
 
@@ -105,8 +106,17 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/admin/users/{g_suite}', [UserManagementController::class, 'destroy'])
     ->name('admin.users.destroy');
-    
-});
+
+     Route::get(
+    '/admin/settings',
+    [\App\Http\Controllers\Admin\SettingsController::class, 'index']
+    )->name('admin.settings');
+
+    Route::put(
+        '/admin/settings',
+        [\App\Http\Controllers\Admin\SettingsController::class, 'update']
+    )->name('admin.settings.update');
+    });
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

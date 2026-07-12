@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+
+@php
+    $setting = \App\Models\Setting::first();
+@endphp
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,6 +11,12 @@
     <title>CarbonWise</title>
 
     @vite(['resources/css/app.css','resources/js/app.js'])
+
+    <style>
+    :root{
+        --accent-color: {{ $setting->accent_color ?? '#15803d' }};
+    }
+</style>
 </head>
 
 <body class="bg-gray-100">
@@ -13,7 +24,10 @@
 <div class="flex h-screen">
 
     <!-- Sidebar -->
-    <aside class="w-72 h-screen bg-green-800 text-white flex flex-col">
+   <aside
+    class="w-72 h-screen text-white flex flex-col"
+    style="background-color: var(--accent-color);">
+
         <div class="p-5 border-b border-green-700 flex items-center gap-3">
 
             <img
@@ -74,7 +88,7 @@
         <span>SDO Monitoring</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
+    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.settings') }}">
         <img src="{{ asset('icons/settings.png') }}" class="w-5 h-5">
         <span>Settings</span>
     </a>
@@ -108,7 +122,7 @@
     <!-- Main -->
     <main class="flex-1 overflow-y-auto">
 
-        <div class="bg-white shadow px-8 py-4 flex justify-between items-center">
+       <div class="bg-white shadow px-8 py-4 flex justify-between items-center">
 
     <!-- Left -->
     <div class="flex items-center gap-4">
