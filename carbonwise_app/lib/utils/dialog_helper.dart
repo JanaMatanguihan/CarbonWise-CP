@@ -131,6 +131,38 @@ class DialogHelper {
     ).show();
   }
 
+  // Warning Dialog
+
+  static void showWarning({
+    required BuildContext context,
+    required String title,
+    required String message,
+    VoidCallback? onOk,
+  }) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.warning,
+      animType: AnimType.scale,
+      dialogBackgroundColor: background,
+
+      title: title,
+      desc: message,
+
+      titleTextStyle: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
+        color: primaryGreen,
+      ),
+
+      descTextStyle: const TextStyle(fontSize: 16),
+
+      btnOkColor: const Color(0xFFE6A23C),
+      btnOkText: "OK",
+
+      btnOkOnPress: onOk ?? () {},
+    ).show();
+  }
+
   // Calculation Summary Dialog
 
   static void showCalculationSummary({

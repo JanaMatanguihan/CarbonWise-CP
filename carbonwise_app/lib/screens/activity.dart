@@ -32,6 +32,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final LocationService _locationService = LocationService();
   final TextEditingController _homeAddressController = TextEditingController();
   double? _distanceKm;
+  bool _isCalculatingDistance = false;
+
   final TextEditingController _officeUsageController = TextEditingController();
 
   final Map<String, String> campusAddresses = {
@@ -106,6 +108,64 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     'Large PA System (Events/Gyms)': 1000,
   };
 
+  final Map<String, double> officeResourceEmissionFactors = {
+    'Window Type': 0.80,
+    'Split-Type (Wall-Mounted)': 0.95,
+    'Ceiling Cassette / Ceiling Suspended': 1.50,
+    'Floor Standing (Tower)': 2.50,
+
+    'AC Motor Fan': 0.03,
+    'DC Motor Fan': 0.02,
+    'Ceiling Fan': 0.04,
+    'Stand Fan': 0.03,
+    'Wall Fan': 0.03,
+    'Exhaust Fan': 0.02,
+    'Tower Fan': 0.03,
+    'Desk Fan': 0.02,
+    'Bladeless Fan': 0.03,
+    'Misting Fan': 0.06,
+    'Industrial Fan': 0.10,
+
+    'LED (Light Emitting Diode)': 0.01,
+    'Fluorescent': 0.02,
+    'Incandescent': 0.03,
+
+    'Standard DLP/LDC Projector': 0.15,
+    'Eco Mode': 0.10,
+    'Large Venue Projector (Auditoriums)': 0.35,
+    'Standby': 0.001,
+
+    'Inkjet Printer (Desktop)': 0.02,
+    'Laser Printer (B&W)': 0.15,
+    'Color Laser Printer': 0.18,
+    'Mid-size Office MFP': 0.25,
+    'High-volume Photocopier': 0.50,
+
+    'Ultra-light/Notebook': 0.02,
+    'Standard Business Laptop': 0.03,
+    'Performance Laptop': 0.06,
+    'Gaming/High-End Workstation': 0.10,
+
+    'Standard Office PC': 0.10,
+    'Mid-range Workstation': 0.18,
+    'High-end/Gaming PC': 0.25,
+    'Mini PC (NUC/MAC Mini)': 0.02,
+
+    '18.5" to 20" LED Monitor': 0.01,
+    '22" to 24" LED Monitor': 0.02,
+    '27" and Larger': 0.03,
+    'OLD CRTS Monitor (Big Box Style)': 0.05,
+
+    '55" to 65"': 0.06,
+    '75"': 0.09,
+    '86"': 0.12,
+    '98" and above': 0.18,
+
+    'Desktop/PC Speakers': 0.01,
+    'Wall-mounted Classroom Speakers': 0.03,
+    'Large PA System (Events/Gyms)': 0.50,
+  };
+
   final Map<String, double> foodEmissionFactors = {
     'Beef (Beef Herd)': 60.0,
     'Lamb & Mutton': 24.5,
@@ -153,11 +213,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     return (distance * 2) * emissionFactor;
   }
 
-  double _calculateOfficeResourceEmission(String category, double hours) {
-    final powerRating = officeResourcePowerRatings[category] ?? 0.0;
-    return (powerRating * hours) /
-        1000 *
-        0.527; // Convert to kWh and multiply by emission factor
+  double _calculateOfficeResourceEmission(String category) {
+    return officeResourceEmissionFactors[category] ?? 0.0;
   }
 
   double _calculateFoodEmission(String foodCategory) {
@@ -346,8 +403,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         },
       );
     } catch (e) {
-      print("SAVE ERROR: $e");
-
       DialogHelper.showError(
         context: context,
         title: "Unable to Save",
@@ -358,6 +413,24 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Future<void> _calculateDistance() async {
+    if (_homeAddressController.text.trim().isEmpty) {
+      DialogHelper.showWarning(
+        context: context,
+        title: "Missing Address",
+        message: "Please enter your starting address first.",
+      );
+      return;
+    }
+
+    // If we've already calculated the distance, don't call the API again.
+    if (_distanceKm != null) {
+      return;
+    }
+
+    setState(() {
+      _isCalculatingDistance = true;
+    });
+
     final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) return;
@@ -388,13 +461,34 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       return;
     }
 
-    final distance = await _locationService.calculateDistance(
-      homeAddress: _homeAddressController.text,
-      campusAddress: campusAddress,
-    );
+    try {
+      final distanceKm = await _locationService.calculateDistance(
+        homeAddress: _homeAddressController.text,
+        campusAddress: campusAddress,
+      );
+
+      setState(() {
+        _distanceKm = distanceKm;
+        _isCalculatingDistance = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isCalculatingDistance = false;
+      });
+
+      DialogHelper.showWarning(
+        context: context,
+        title: "Invalid Address",
+        message:
+            "Please enter a valid starting address. We couldn't locate the address you entered.",
+      );
+
+      return;
+    }
 
     setState(() {
-      _distanceKm = distance;
+      _distanceKm = _distanceKm;
+      _isCalculatingDistance = false;
     });
   }
 
@@ -459,6 +553,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           label: "Starting Point",
                           hint: "Input Address Here",
                           controller: _homeAddressController,
+                          onChanged: (_) {
+                            _distanceKm = null;
+                          },
                         ),
 
                         const SizedBox(height: 12),
@@ -544,7 +641,23 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                               onPressed: () async {
                                 await _calculateDistance();
                               },
-                              child: const Text("Calculate"),
+                              child: _isCalculatingDistance
+                                  ? const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(width: 10),
+                                        Text("Calculating..."),
+                                      ],
+                                    )
+                                  : const Text("Calculate Distance"),
                             ),
                           ],
                         ),
@@ -567,11 +680,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   ),
                   onPressed: () {
                     if (_selectedTransportType == null || _distanceKm == null) {
-                      DialogHelper.showInfo(
+                      DialogHelper.showWarning(
                         context: context,
                         title: "Incomplete Information",
                         message:
-                            "Please select a transport type and calculate the distance first.",
+                            "Please select a transport type and input your address to calculate the distance before adding an emission.",
                       );
                       return;
                     }
@@ -591,8 +704,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       );
 
                       _selectedTransportType = null;
-                      _homeAddressController.clear();
-                      _distanceKm = null;
                     });
                   },
                   child: const Text(
@@ -666,24 +777,24 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   _buildAddButton(
                     onPressed: () {
                       if (_selectedOfficeResourceType == null ||
-                          _selectedOfficeResourceCategory == null ||
-                          _officeUsageController.text.isEmpty) {
+                          _selectedOfficeResourceCategory == null) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please select an office resource type and category before adding an emission.",
+                        );
                         return;
                       }
 
-                      final hours =
-                          double.tryParse(_officeUsageController.text) ?? 0;
-
                       final emission = _calculateOfficeResourceEmission(
                         _selectedOfficeResourceCategory!,
-                        hours,
                       );
 
                       setState(() {
                         _officeEmissions.add(
                           '${_selectedOfficeResourceType!} - '
                           '${_selectedOfficeResourceCategory!}\n'
-                          '${hours.toStringAsFixed(1)} hrs\n'
                           '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
 
@@ -691,7 +802,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                         _selectedOfficeResourceType = null;
                         _selectedOfficeResourceCategory = null;
-                        _officeUsageController.clear();
                       });
                     },
                   ),
@@ -749,24 +859,32 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   const SizedBox(width: 10),
                   _buildAddButton(
                     onPressed: () {
-                      if (_selectedFoodType != null &&
-                          _selectedFoodCategory != null) {
-                        final emission = _calculateFoodEmission(
-                          _selectedFoodCategory!,
+                      if (_selectedFoodCategory == null ||
+                          _selectedFoodType == null) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please select a food category and food item before adding an emission.",
+                        );
+                        return;
+                      }
+
+                      final emission = _calculateFoodEmission(
+                        _selectedFoodCategory!,
+                      );
+
+                      setState(() {
+                        _foodEmissions.add(
+                          '${_selectedFoodType!} (${_selectedFoodCategory!}) '
+                          '(${emission.toStringAsFixed(2)} kg CO2e)',
                         );
 
-                        setState(() {
-                          _foodEmissions.add(
-                            '${_selectedFoodType!} (${_selectedFoodCategory!}) '
-                            '(${emission.toStringAsFixed(2)} kg CO2e)',
-                          );
+                        _foodTotalEmission += emission;
 
-                          _foodTotalEmission += emission;
-
-                          _selectedFoodType = null;
-                          _selectedFoodCategory = null;
-                        });
-                      }
+                        _selectedFoodType = null;
+                        _selectedFoodCategory = null;
+                      });
                     },
                   ),
                 ],
@@ -822,12 +940,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               if (_transportEmissions.isEmpty &&
                   _officeEmissions.isEmpty &&
                   _foodEmissions.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Please add at least one emission to calculate.',
-                    ),
-                  ),
+                DialogHelper.showWarning(
+                  context: context,
+                  title: "Incomplete Information",
+                  message: "Please add at least one emission to calculate.",
                 );
                 return;
               }
@@ -961,6 +1077,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required String hint,
     required TextEditingController controller,
     bool enabled = true,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -980,6 +1097,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           child: TextField(
             controller: controller,
             enabled: enabled,
+            onChanged: onChanged,
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(fontSize: 8, color: Colors.black38),

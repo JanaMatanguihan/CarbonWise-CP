@@ -22,6 +22,7 @@ class CustomMainNavigation extends StatefulWidget {
 class _CustomMainNavigationState extends State<CustomMainNavigation> {
   int _currentIndex = 0;
   String userName = 'User';
+  double _carbonScore = 100;
 
   final List<String> _pageTitles = [
     '',
@@ -43,6 +44,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   void initState() {
     super.initState();
     loadUserName();
+    _loadCarbonScore();
   }
 
   Future<void> loadUserName() async {
@@ -53,6 +55,57 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     setState(() {
       userName = user.userMetadata?['full_name'] ?? 'User';
     });
+  }
+
+  Future<void> _loadCarbonScore() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final today = DateTime.now();
+
+      final todayString =
+          "${today.year.toString().padLeft(4, '0')}-"
+          "${today.month.toString().padLeft(2, '0')}-"
+          "${today.day.toString().padLeft(2, '0')}";
+
+      final records = await supabase
+          .from('carbon_records')
+          .select()
+          .eq('g_suite', user.email!)
+          .eq('record_date', todayString);
+
+      double transportation = 0;
+      double electricity = 0;
+      double food = 0;
+
+      for (final record in records) {
+        transportation += (record['transportation'] as num?)?.toDouble() ?? 0;
+
+        electricity += (record['electricity'] as num?)?.toDouble() ?? 0;
+
+        food += (record['food'] as num?)?.toDouble() ?? 0;
+      }
+
+      final total = transportation + electricity + food;
+
+      double score = 100 - total;
+
+      if (score < 0) score = 0;
+      if (score > 100) score = 100;
+
+      setState(() {
+        _carbonScore = score;
+      });
+
+      print("Today's Total Emission: $total");
+      print("Today's CarbonWise Score: $score");
+    } catch (e) {
+      print("Carbon Score Error:");
+      print(e);
+    }
   }
 
   @override
@@ -132,17 +185,20 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: const LinearProgressIndicator(
-                          value: 0.45,
-                          backgroundColor: Color(0xFFCCEAD8),
-                          valueColor: AlwaysStoppedAnimation<Color>(darkGreen),
+                        child: LinearProgressIndicator(
+                          value: _carbonScore / 100,
+                          backgroundColor: const Color(0xFFCCEAD8),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            darkGreen,
+                          ),
                           minHeight: 12,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Green Points',
-                        style: TextStyle(
+
+                      Text(
+                        "CarbonWise Score: ${_carbonScore.toStringAsFixed(0)}/100",
+                        style: const TextStyle(
                           color: darkGreen,
                           fontWeight: FontWeight.bold,
                           fontStyle: FontStyle.italic,

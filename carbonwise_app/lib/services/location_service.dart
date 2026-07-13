@@ -34,8 +34,8 @@ class LocationService {
 
     final data = jsonDecode(response.body);
 
-    final distanceMeters =
-        data["features"][0]["properties"]["segments"][0]["distance"];
+    final distanceMeters = (data["routes"][0]["summary"]["distance"] as num)
+        .toDouble();
 
     return distanceMeters / 1000;
   }
