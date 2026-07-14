@@ -5,7 +5,7 @@
 
 @section('content')
 <!-- The negative margins counteract parent container padding to make the layout perfectly flush to all edges -->
-<div class="bg-[#f1f1ee] min-h-screen p-6 space-y-6 -mx-6 -mt-6 pb-12 w-[calc(100%+3rem)]">
+<div class="bg-[#f1f1ee] min-h-screen p-6 space-y-6 -mx-6 -mt-6 pb-12 w-[calc(100%_+_3rem)]">
 
    <!-- Filters Header -->
 <form method="GET"
@@ -73,10 +73,10 @@
 </form>
 
     <!-- Summary Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
         <!-- Total Emissions -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[100px]">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[110px]">
             <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19 18a4 4 0 000-8 5 5 0 00-9.58-1.67A4.5 4.5 0 005 17h14z"/>
@@ -92,7 +92,7 @@
         </div>
 
         <!-- Transportation -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[100px]">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[110px]">
             <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 16v2h2v-2h10v2h2v-2M5 16H3v-4l2-5h14l2 5v4h-2M7 16a1 1 0 100-2 1 1 0 000 2zm10 0a1 1 0 100-2 1 1 0 000 2z"/>
@@ -109,7 +109,7 @@
         </div>
 
         <!-- Electricity -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[100px]">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[110px]">
             <div class="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 18h6M10 22h4M12 2a6 6 0 00-3.7 10.7c.5.4.7.9.7 1.5V15h6v-.8c0-.6.2-1.1.7-1.5A6 6 0 0012 2z"/>
@@ -126,7 +126,7 @@
         </div>
 
         <!-- Food -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[100px]">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[110px]">
             <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 15h16a1 1 0 011 1c0 2.5-2.686 4.5-6 4.5H9c-3.314 0-6-2-6-4.5a1 1 0 011-1z" />
@@ -141,25 +141,6 @@
                     <span class="text-[10px] text-gray-400 font-medium">kg CO₂e</span>
                 </div>
                 <p class="text-[11px] text-gray-400 mt-0.5">({{ number_format($foodPercentage, 1) }}%)</p>
-            </div>
-        </div>
-
-        <!-- Others -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 min-h-[100px]">
-            <div class="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="5" cy="12" r="2"/>
-                    <circle cx="12" cy="12" r="2"/>
-                    <circle cx="19" cy="12" r="2"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-gray-400">Others</p>
-                <div class="flex items-baseline gap-1 mt-0.5">
-                    <h2 class="text-xl font-bold text-gray-800 tracking-tight">{{ number_format($others, 2) }}</h2>
-                    <span class="text-[10px] text-gray-400 font-medium">kg CO₂e</span>
-                </div>
-                <p class="text-[11px] text-gray-400 mt-0.5">({{ number_format($othersPercentage, 1) }}%)</p>
             </div>
         </div>
 
@@ -231,15 +212,6 @@
                         <span class="text-[11px] text-gray-400 w-24 text-right">{{ number_format($food, 2) }} kg CO₂e</span>
                     </div>
 
-                    <!-- Others -->
-                    <div class="flex items-center justify-between text-gray-700">
-                        <div class="flex items-center gap-2 min-w-[110px]">
-                            <span class="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
-                            <span class="truncate font-medium text-[11px]">Others</span>
-                        </div>
-                        <span class="text-[11px] font-semibold text-gray-600 w-10 text-right">{{ number_format($othersPercentage, 1) }}%</span>
-                        <span class="text-[11px] text-gray-400 w-24 text-right">{{ number_format($others, 2) }} kg CO₂e</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -255,26 +227,34 @@
                 <h3 class="text-base font-bold text-gray-800">Emissions by Department / College</h3>
             </div>
 
-            @php
-                $highest = $departmentEmissions->max('total');
+           @php
+                $overallTotal = $departmentEmissions->sum('total');
             @endphp
-
             <div class="space-y-4 overflow-y-auto flex-1 pr-1">
                 @foreach($departmentEmissions as $department)
                 <div>
                     <div class="flex justify-between text-xs mb-1 text-gray-700">
                         <span class="font-medium text-gray-600">{{ $department->department }}</span>
-                        <span class="text-gray-500 font-semibold">{{ number_format($department->total, 2) }}</span>
+                                <span class="text-gray-500 font-semibold">
+                                    {{ number_format($department->total,2) }} kg CO₂e
+                                </span>
                     </div>
-                    <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                        @php
-                            $width = $highest > 0 ? ($department->total / $highest) * 100 : 0;
-                        @endphp
-                        <div
+                 @php
+                        $width = $overallTotal > 0
+                            ? round(($department->total / $overallTotal) * 100, 1)
+                            : 0;
+                    @endphp
+
+                    <div class="w-full bg-gray-100 rounded-full overflow-hidden h-2.5">
+                       <div
                             class="bg-[#166534] h-full rounded-full transition-all duration-500"
-                            @style(["width: {$width}%"])
-                        ></div>
+                            data-department-width="{{ $width }}">
+                        </div>
                     </div>
+
+                    <p class="text-right text-xs text-gray-500 mt-1">
+                        {{ $width }}%
+                    </p>
                 </div>
                 @endforeach
             </div>
@@ -309,7 +289,11 @@
 <script id="weekly-data" type="application/json">{!! $weeklyTrend->toJson() !!}</script>
 <script id="monthly-data" type="application/json">{!! $monthlyTrend->toJson() !!}</script>
 <script id="emission-source-data" type="application/json">
-    {!! json_encode([$transportation, $electricity, $food, $others]) !!}
+{!! json_encode([
+    $transportation,
+    $electricity,
+    $food
+]) !!}
 </script>
 <script id="total-emission" type="application/json">{!! json_encode($totalEmissions) !!}</script>
 
@@ -319,6 +303,13 @@
 </script>
 
 <script>
+    document.querySelectorAll('[data-department-width]').forEach(function (bar) {
+        const width = bar.getAttribute('data-department-width');
+        if (width !== null) {
+            bar.style.width = width + '%';
+        }
+    });
+
     const dailyData = JSON.parse(document.getElementById('daily-data').textContent);
     const weeklyData = JSON.parse(document.getElementById('weekly-data').textContent);
     const monthlyData = JSON.parse(document.getElementById('monthly-data').textContent);
@@ -381,7 +372,7 @@
                 sparkline: { enabled: true } 
             },
             series: emissionSources,
-            labels: ['Transportation', 'Electricity', 'Food Consumption', 'Others'],
+            labels: ['Transportation', 'Electricity', 'Food Consumption'],
             colors: ['#16a34a', '#eab308', '#ef4444', '#8b5cf6'],
             legend: { show: false },
             dataLabels: { enabled: false },
@@ -464,8 +455,7 @@
                 categories: [
                     'Transportation',
                     'Electricity',
-                    'Food Consumption',
-                    'Others'
+                    'Food Consumption'
                 ]
             },
             yaxis: {

@@ -12,11 +12,12 @@
 
     @vite(['resources/css/app.css','resources/js/app.js'])
 
-    <style>
-    :root{
-        --accent-color: {{ $setting->accent_color ?? '#15803d' }};
-    }
-</style>
+   <style>
+        :root{
+            --accent-color: {{ $setting->accent_color ?? '#15803d' }};
+            --accent-hover: {{ $setting->accent_color ?? '#15803d' }};
+        }
+        </style>
 </head>
 
 <body class="bg-gray-100">
@@ -110,7 +111,8 @@
         @csrf
         <button
             type="submit"
-            class="w-full bg-green-700 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition"
+            class="w-full text-white py-3 rounded-xl font-semibold transition"
+            style="background: var(--accent-color);"
         >
             Log Out
         </button>

@@ -103,14 +103,6 @@ class DashboardController extends Controller
 
         $foodTotal = $foodQuery->sum('food');
 
-        $wasteQuery = CarbonRecord::query();
-
-        if ($year && $month) {
-            $wasteQuery->whereYear('record_date', $year)
-                    ->whereMonth('record_date', $month);
-        }
-
-        $wasteTotal = $wasteQuery->sum('waste');
 
         /*
          Monthly Emissions Trend (Current Year)
@@ -132,31 +124,36 @@ class DashboardController extends Controller
         Top Emitting Departments
         */
 
-        $topDepartments = DB::table('carbon_records')
-            ->join(
-                'user_info',
-                'carbon_records.g_suite',
-                '=',
-                'user_info.g_suite'
-            )
-            ->select(
-                'user_info.department',
-                DB::raw('SUM(carbon_records.total_emission) as total_emissions')
-            )
-            ->whereYear('carbon_records.record_date', $year)
-            ->whereMonth('carbon_records.record_date', $month)
-            ->groupBy('user_info.department')
-            ->orderByDesc('total_emissions')
-            ->limit(5)
-            ->get();
+            $topDepartments = DB::table('carbon_records')
+                ->join(
+                    'user_info',
+                    'carbon_records.g_suite',
+                    '=',
+                    'user_info.g_suite'
+                )
+                ->select(
+                    'user_info.department',
+                    DB::raw('SUM(carbon_records.total_emission) as total_emissions')
+                );
+
+            if ($year && $month) {
+                $topDepartments
+                    ->whereYear('carbon_records.record_date', $year)
+                    ->whereMonth('carbon_records.record_date', $month);
+            }
+
+            $topDepartments = $topDepartments
+                ->groupBy('user_info.department')
+                ->orderByDesc('total_emissions')
+                ->limit(5)
+                ->get();
 
             foreach ($topDepartments as $department) {
-
-            $department->percentage = $totalEmissions > 0
-                ? round(($department->total_emissions / $totalEmissions) * 100, 1)
-                : 0;
-
-}
+                $department->percentage = $totalEmissions > 0
+                    ? round(($department->total_emissions / $totalEmissions) * 100, 1)
+                    : 0;
+            }
+            
         /*
          User Engagement
         */
@@ -185,9 +182,9 @@ class DashboardController extends Controller
         }
 
         $recentAlerts = $recentAlertsQuery
-            ->latest()
-            ->take(5)
-            ->get();
+        ->latest()
+        ->limit(3)
+        ->get();
 
         /*
         Recommended Mitigation StrategiesRecent Alerts
@@ -224,7 +221,6 @@ class DashboardController extends Controller
             'transportationTotal',
             'electricityTotal',
             'foodTotal',
-            'wasteTotal',
 
             'monthlyEmissions',
 

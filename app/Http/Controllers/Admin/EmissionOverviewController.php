@@ -45,18 +45,15 @@ class EmissionOverviewController extends Controller
         $transportation = (clone $records)->sum('transportation');
         $electricity    = (clone $records)->sum('electricity');
         $food           = (clone $records)->sum('food');
-        $others         = (clone $records)->sum('waste');
 
         if ($totalEmissions > 0) {
             $transportationPercentage = ($transportation / $totalEmissions) * 100;
             $electricityPercentage    = ($electricity / $totalEmissions) * 100;
             $foodPercentage           = ($food / $totalEmissions) * 100;
-            $othersPercentage         = ($others / $totalEmissions) * 100;
         } else {
             $transportationPercentage = 0;
             $electricityPercentage    = 0;
             $foodPercentage           = 0;
-            $othersPercentage         = 0;
         }
 
         // Daily Chart Trend
@@ -163,13 +160,11 @@ class EmissionOverviewController extends Controller
                 (clone $currentMonth)->sum('transportation'),
                 (clone $currentMonth)->sum('electricity'),
                 (clone $currentMonth)->sum('food'),
-                (clone $currentMonth)->sum('waste'),
             ],
             'last' => [
                 (clone $lastMonth)->sum('transportation'),
                 (clone $lastMonth)->sum('electricity'),
                 (clone $lastMonth)->sum('food'),
-                (clone $lastMonth)->sum('waste'),
             ]
         ];
 
@@ -186,11 +181,9 @@ class EmissionOverviewController extends Controller
                 'transportation',
                 'electricity',
                 'food',
-                'others',
                 'transportationPercentage',
                 'electricityPercentage',
                 'foodPercentage',
-                'othersPercentage',
                 'dailyTrend',
                 'weeklyTrend',
                 'monthlyTrend',

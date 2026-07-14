@@ -119,11 +119,6 @@ class AnalyticsReportController extends Controller
 
 
 
-        // Others / Waste Total
-        $others = (clone $records)
-            ->sum('waste');
-
-
 
         // Source Data For Progress Bars
         $sources = [
@@ -132,9 +127,7 @@ class AnalyticsReportController extends Controller
 
             'Electricity' => $electricity,
 
-            'Food Consumption' => $food,
-
-            'Others' => $others
+            'Food Consumption' => $food
 
         ];
 
@@ -205,10 +198,6 @@ class AnalyticsReportController extends Controller
                 (clone $currentMonth)
                     ->sum('food'),
 
-
-                (clone $currentMonth)
-                    ->sum('waste'),
-
             ],
 
 
@@ -227,8 +216,6 @@ class AnalyticsReportController extends Controller
                     ->sum('food'),
 
 
-                (clone $lastMonth)
-                    ->sum('waste'),
 
             ]
 

@@ -351,7 +351,6 @@
         </script>
 
         <script id="emission-sources-data" type="application/json">
-            {!! json_encode([$transportation, $electricity, $food, $waste]) !!}
         </script>
 
             @push('scripts')

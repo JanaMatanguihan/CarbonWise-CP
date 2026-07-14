@@ -138,8 +138,6 @@ class UserManagementController extends Controller
                     $food = CarbonRecord::where('g_suite', $g_suite)
                         ->sum('food');
 
-                    $waste = CarbonRecord::where('g_suite', $g_suite)
-                        ->sum('waste');
 
                 return view(
                 'admin.user-profile',
@@ -153,8 +151,7 @@ class UserManagementController extends Controller
                     'emissionHistory',
                     'transportation',
                     'electricity',
-                    'food',
-                    'waste'
+                    'food'
                 )
             );
             }

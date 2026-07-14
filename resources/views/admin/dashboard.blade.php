@@ -83,7 +83,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
         <!-- Emissions Trend -->
-            <div class="bg-white rounded-2xl shadow p-5 h-full xl:col-span-1">
+            <div class="bg-white rounded-2xl shadow p-5 xl:col-span-1">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-semibold text-xl">
                     Emissions Trend
@@ -105,7 +105,7 @@
         </div>
 
         <!-- Emission by Source -->
-                <div class="bg-white rounded-2xl shadow p-5 h-full">
+                <div class="bg-white rounded-2xl shadow p-5">
                     <h3 class="font-semibold text-xl mb-4">
                         Emission by Source
                     </h3>
@@ -119,7 +119,6 @@
                             data-transportation="{{ $transportationTotal }}"
                             data-electricity="{{ $electricityTotal }}"
                             data-food="{{ $foodTotal }}"
-                            data-waste="{{ $wasteTotal }}"
                         ></canvas>
                         </div>
 
@@ -149,58 +148,72 @@
                         </div>
                         <span class="shrink-0 ml-2">{{ number_format($foodTotal, 2) }} kg</span>
                     </div>
-
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span class="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span>
-                            <span class="truncate">Waste</span>
-                        </div>
-                        <span class="shrink-0 ml-2">{{ number_format($wasteTotal, 2) }} kg</span>
+                    
                     </div>
 
                 </div>
-
-                    </div>
-                </div>
+            </div>
 
         <!-- Top Emitting Departments -->
-        <div class="bg-white rounded-2xl shadow p-5 h-full">
+        <div class="bg-white rounded-2xl shadow p-5 min-h-[280px]">
             <h3 class="font-semibold text-xl mb-4">
                 Top Emitting Departments
             </h3>
 
-            @if($topDepartments->isEmpty())
-                <p class="text-gray-500 text-sm">
-                    No department data available.
-                </p>
-            @else
-                <div class="space-y-2 max-h-28 overflow-y-auto">
-                    @foreach($topDepartments as $department)
+           @if($topDepartments->isEmpty())
 
-        <div class="mb-4">
+    <div class="h-52 flex items-center justify-center">
+        <div class="text-center">
 
-            <div class="flex justify-between text-sm mb-1">
-                <span class="font-medium">
-                    {{ $department->department }}
-                </span>
+            <img
+                src="{{ asset('icons/report.png') }}"
+                class="w-10 mx-auto opacity-40 mb-3"
+            >
 
-                <span class="text-gray-500">
-                    {{ $department->percentage }}%
-                </span>
-            </div>
-
-            <div class="w-full bg-gray-200 rounded-full h-2">
-                <div
-                    class="bg-green-700 h-2 rounded-full"
-                    @style(['width' => (int) $department->percentage . '%'])>
-                </div>
-            </div>
+            <p class="text-gray-500 text-sm">
+                No department data available.
+            </p>
 
         </div>
+    </div>
+
+@else
+
+    <div class="space-y-4">
+
+        @foreach($topDepartments as $department)
+
+            <div>
+
+                <div class="flex justify-between mb-2">
+
+                    <span class="font-medium">
+                        {{ $department->department }}
+                    </span>
+
+                    <span class="text-sm text-gray-500">
+                        {{ number_format($department->total_emissions,2) }} kg CO₂e
+                    </span>
+
+                </div>
+                    <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                            class="h-full bg-green-700 rounded-full"
+                            style="--bar-width: {{ $department->percentage }}; width: calc(var(--bar-width) * 1%);">
+                        </div>
+                    </div>
+
+                    <p class="text-right text-xs text-gray-500 mt-1">
+                        {{ $department->percentage }}%
+                    </p>
+
+            </div>
 
         @endforeach
-                </div>
-            @endif
+
+    </div>
+
+@endif
         </div>
 
         </div> <!-- End Middle Section -->
@@ -338,13 +351,6 @@
 
                                 </div>
 
-                            <!-- Text -->
-                            <div>
-                                <p class="text-sm font-medium">
-                                {{ $alert->title }}
-                                </p>
-                            </div>
-
                         </div>
 
                         <!-- Time -->
@@ -436,7 +442,6 @@
                     Number(sourceCanvas.dataset.transportation || 0),
                     Number(sourceCanvas.dataset.electricity || 0),
                     Number(sourceCanvas.dataset.food || 0),
-                    Number(sourceCanvas.dataset.waste || 0)
                 ];
 
                 const totalEmission = chartData.reduce((a, b) => a + b, 0);
@@ -478,16 +483,14 @@
                         labels: [
                             'Transportation',
                             'Electricity',
-                            'Food',
-                            'Waste'
+                            'Food'
                         ],
                         datasets: [{
                             data: chartData,
                             backgroundColor: [
                                 '#1B5E20',
                                 '#66BB6A',
-                                '#FBC02D',
-                                '#FB8C00'
+                                '#FBC02D'
                             ],
                             borderWidth: 0
                         }]

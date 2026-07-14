@@ -18,3 +18,51 @@
 
     padding-right: 40px;
 }
+
+/* ===========================
+   GLOBAL THEME VARIABLES
+=========================== */
+
+:root{
+    --accent:#15803d;
+    --bg:#f3f4f6;
+    --card:#ffffff;
+    --text:#111827;
+    --header:#ffffff;
+}
+
+.theme-dark{
+    --bg:#111827;
+    --card:#1f2937;
+    --text:#f9fafb;
+    --header:#1f2937;
+}
+
+.theme-light{
+    --bg:#f3f4f6;
+    --card:#ffffff;
+    --text:#111827;
+    --header:#ffffff;
+}
+
+/* ===========================
+   APPLY THEME VARIABLES
+=========================== */
+
+body{
+    background: var(--bg);
+    color: var(--text);
+    transition: .25s ease;
+}
+
+.theme-card{
+    background: var(--card);
+    color: var(--text);
+    transition: .25s ease;
+}
+
+.theme-header{
+    background: var(--header);
+    color: var(--text);
+    transition: .25s ease;
+}

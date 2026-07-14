@@ -182,9 +182,11 @@
 
                 </div>
 
-                <button
+                 <button
+                    id="saveButton"
                     type="submit"
-                    class="mt-8 bg-green-700 hover:bg-green-800 text-white px-8 py-3 rounded-lg">
+                    class="mt-8 text-white px-8 py-3 rounded-lg transition"
+                    style="background-color: var(--accent-color);">
 
                     Save Changes
 
@@ -255,16 +257,49 @@
 
                 <div class="flex gap-3 mt-3">
 
-                    <div class="w-10 h-10 rounded-full bg-green-700 ring-4 ring-green-200"></div>
-                    <div class="w-10 h-10 rounded-full bg-blue-600"></div>
-                    <div class="w-10 h-10 rounded-full bg-cyan-500"></div>
-                    <div class="w-10 h-10 rounded-full bg-purple-600"></div>
-                    <div class="w-10 h-10 rounded-full bg-orange-500"></div>
-                    <div class="w-10 h-10 rounded-full bg-red-600"></div>
-                    <div class="w-10 h-10 rounded-full bg-gray-700"></div>
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-green-700"
+                            data-color="#15803d">
+                        </button>
 
-                </div>
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-blue-600"
+                            data-color="#2563eb">
+                        </button>
 
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-cyan-500"
+                            data-color="#06b6d4">
+                        </button>
+
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-purple-600"
+                            data-color="#9333ea">
+                        </button>
+
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-orange-500"
+                            data-color="#f97316">
+                        </button>
+
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-red-600"
+                            data-color="#dc2626">
+                        </button>
+
+                        <button
+                            type="button"
+                            class="color-btn w-10 h-10 rounded-full bg-gray-700"
+                            data-color="#374151">
+                        </button>
+
+                    </div>
             </div>
 
             {{-- Session --}}
@@ -419,14 +454,56 @@ document.querySelectorAll('.theme-btn').forEach(button => {
 
         });
 
-        this.classList.remove('border-gray-300');
-
        this.classList.remove('border-gray-300');
 
         this.classList.add(
             'border-green-600',
             'bg-green-50'
         );
+    });
+
+});
+
+const accentInput = document.getElementById('accent_color');
+
+document.querySelectorAll('.color-btn').forEach(button => {
+
+    // Highlight the saved color when the page loads
+    if (button.dataset.color === accentInput.value) {
+
+        button.classList.add(
+            'ring-4',
+            'ring-offset-2',
+            'ring-gray-400'
+        );
+
+    }
+
+    button.addEventListener('click', function () {
+
+        accentInput.value = this.dataset.color;
+
+        document.documentElement.style.setProperty(
+            '--accent-color',
+            this.dataset.color
+        );
+
+        document.querySelectorAll('.color-btn').forEach(btn => {
+
+            btn.classList.remove(
+                'ring-4',
+                'ring-offset-2',
+                'ring-gray-400'
+            );
+
+        });
+
+        this.classList.add(
+            'ring-4',
+            'ring-offset-2',
+            'ring-gray-400'
+        );
+
     });
 
 });
