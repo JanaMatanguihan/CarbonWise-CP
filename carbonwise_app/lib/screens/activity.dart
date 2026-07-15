@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:carbonwise_app/services/location_service.dart';
+import 'package:carbonwise_app/utils/strategy_notifier.dart';
+import 'package:flutter/services.dart';
 
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
@@ -30,11 +32,13 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final List<String> _officeEmissions = [];
   final List<String> _foodEmissions = [];
   final LocationService _locationService = LocationService();
-  final TextEditingController _homeAddressController = TextEditingController();
   double? _distanceKm;
   bool _isCalculatingDistance = false;
 
+  final TextEditingController _homeAddressController = TextEditingController();
   final TextEditingController _officeUsageController = TextEditingController();
+  final TextEditingController _officeHoursController = TextEditingController();
+  final TextEditingController _servingSizeController = TextEditingController();
 
   final Map<String, String> campusAddresses = {
     "Lipa Campus": "Batangas State University Lipa Campus",
@@ -202,6 +206,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   void dispose() {
     _homeAddressController.dispose();
     _officeUsageController.dispose();
+    _servingSizeController.dispose();
     super.dispose();
   }
 
@@ -213,8 +218,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     return (distance * 2) * emissionFactor;
   }
 
-  double _calculateOfficeResourceEmission(String category) {
-    return officeResourceEmissionFactors[category] ?? 0.0;
+  double _calculateOfficeResourceEmission(String category, double hours) {
+    final power = officeResourcePowerRatings[category] ?? 0;
+    return (power * hours / 1000) * 0.527;
   }
 
   double _calculateFoodEmission(String foodCategory) {
@@ -388,6 +394,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         recordDate: now.toIso8601String().split('T').first,
         createdAt: now.toIso8601String(),
       );
+
+      strategyRefreshNotifier.value++;
 
       DialogHelper.showSuccess(
         context: context,
@@ -698,9 +706,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       _transportationTotalEmission += emission;
 
                       _transportEmissions.add(
-                        "$_selectedTransportType\n"
-                        "${_distanceKm!.toStringAsFixed(2)} km\n"
-                        "${emission.toStringAsFixed(2)} kg CO₂e",
+                        "$_selectedTransportType - ${emission.toStringAsFixed(2)} kg CO₂e",
                       );
 
                       _selectedTransportType = null;
@@ -721,6 +727,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           _buildFormCard(
             title: 'Office Resource',
             children: [
+              // First Row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -757,7 +764,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   Expanded(
                     flex: 4,
                     child: _buildDropdownField(
-                      label: 'Office Resource Category',
+                      label: 'Resource Category',
                       hint: _selectedOfficeResourceType == null
                           ? 'Select resource type'
                           : 'Select resource category',
@@ -772,40 +779,67 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                   const SizedBox(width: 10),
 
-                  const SizedBox(width: 10),
-
-                  _buildAddButton(
-                    onPressed: () {
-                      if (_selectedOfficeResourceType == null ||
-                          _selectedOfficeResourceCategory == null) {
-                        DialogHelper.showWarning(
-                          context: context,
-                          title: "Incomplete Information",
-                          message:
-                              "Please select an office resource type and category before adding an emission.",
-                        );
-                        return;
-                      }
-
-                      final emission = _calculateOfficeResourceEmission(
-                        _selectedOfficeResourceCategory!,
-                      );
-
-                      setState(() {
-                        _officeEmissions.add(
-                          '${_selectedOfficeResourceType!} - '
-                          '${_selectedOfficeResourceCategory!}\n'
-                          '${emission.toStringAsFixed(2)} kg CO₂e',
-                        );
-
-                        _officeResourceTotalEmission += emission;
-
-                        _selectedOfficeResourceType = null;
-                        _selectedOfficeResourceCategory = null;
-                      });
-                    },
+                  SizedBox(
+                    width: 120,
+                    child: _buildTextField(
+                      label: "Usage (in hours)",
+                      hint: "Input usage in hours",
+                      controller: _officeHoursController,
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Second Row (Button)
+              SizedBox(
+                width: double.infinity,
+                child: _buildAddButton(
+                  onPressed: () {
+                    if (_selectedOfficeResourceType == null ||
+                        _selectedOfficeResourceCategory == null) {
+                      DialogHelper.showWarning(
+                        context: context,
+                        title: "Incomplete Information",
+                        message:
+                            "Please select an office resource type and category before adding an emission.",
+                      );
+                      return;
+                    }
+
+                    if (_officeHoursController.text.isEmpty) {
+                      DialogHelper.showWarning(
+                        context: context,
+                        title: "Incomplete Information",
+                        message: "Please enter the number of hours used.",
+                      );
+                      return;
+                    }
+
+                    final hours = double.parse(_officeHoursController.text);
+
+                    final emission = _calculateOfficeResourceEmission(
+                      _selectedOfficeResourceCategory!,
+                      hours,
+                    );
+
+                    setState(() {
+                      _officeEmissions.add(
+                        '${_selectedOfficeResourceCategory!}\n'
+                        '$hours hour(s)\n'
+                        '${emission.toStringAsFixed(2)} kg CO₂e',
+                      );
+
+                      _officeResourceTotalEmission += emission;
+
+                      _selectedOfficeResourceType = null;
+                      _selectedOfficeResourceCategory = null;
+                      _officeHoursController.clear();
+                    });
+                  },
+                ),
               ),
             ],
           ),
@@ -816,11 +850,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           _buildFormCard(
             title: 'Food Consumption',
             children: [
+              // First Row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    flex: 5,
+                    flex: 4,
                     child: _buildDropdownField(
                       label: 'Food Type',
                       hint: 'Select food type',
@@ -840,9 +875,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       },
                     ),
                   ),
+
                   const SizedBox(width: 10),
+
                   Expanded(
-                    flex: 5,
+                    flex: 4,
                     child: _buildDropdownField(
                       label: 'Food Category',
                       hint: _selectedFoodType == null
@@ -856,38 +893,69 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                                 setState(() => _selectedFoodCategory = val),
                     ),
                   ),
+
                   const SizedBox(width: 10),
-                  _buildAddButton(
-                    onPressed: () {
-                      if (_selectedFoodCategory == null ||
-                          _selectedFoodType == null) {
-                        DialogHelper.showWarning(
-                          context: context,
-                          title: "Incomplete Information",
-                          message:
-                              "Please select a food category and food item before adding an emission.",
-                        );
-                        return;
-                      }
 
-                      final emission = _calculateFoodEmission(
-                        _selectedFoodCategory!,
-                      );
-
-                      setState(() {
-                        _foodEmissions.add(
-                          '${_selectedFoodType!} (${_selectedFoodCategory!}) '
-                          '(${emission.toStringAsFixed(2)} kg CO2e)',
-                        );
-
-                        _foodTotalEmission += emission;
-
-                        _selectedFoodType = null;
-                        _selectedFoodCategory = null;
-                      });
-                    },
+                  SizedBox(
+                    width: 120,
+                    child: _buildTextField(
+                      label: "Serving Size",
+                      hint: "In cups",
+                      controller: _servingSizeController,
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Second Row
+              SizedBox(
+                width: double.infinity,
+                child: _buildAddButton(
+                  onPressed: () {
+                    if (_selectedFoodType == null ||
+                        _selectedFoodCategory == null) {
+                      DialogHelper.showWarning(
+                        context: context,
+                        title: "Incomplete Information",
+                        message:
+                            "Please select a food type and food category before adding an emission.",
+                      );
+                      return;
+                    }
+
+                    if (_servingSizeController.text.isEmpty) {
+                      DialogHelper.showWarning(
+                        context: context,
+                        title: "Incomplete Information",
+                        message: "Please enter the serving size.",
+                      );
+                      return;
+                    }
+
+                    final serving = double.parse(_servingSizeController.text);
+
+                    final emission =
+                        _calculateFoodEmission(_selectedFoodCategory!) *
+                        serving;
+
+                    setState(() {
+                      _foodEmissions.add(
+                        '${_selectedFoodCategory!}\n'
+                        '$serving cup(s)\n'
+                        '${emission.toStringAsFixed(2)} kg CO₂e',
+                      );
+
+                      _foodTotalEmission += emission;
+
+                      _selectedFoodType = null;
+                      _selectedFoodCategory = null;
+                      _servingSizeController.clear();
+                    });
+                  },
+                ),
               ),
             ],
           ),
@@ -1077,6 +1145,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required String hint,
     required TextEditingController controller,
     bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
     ValueChanged<String>? onChanged,
   }) {
     return Column(
@@ -1098,6 +1167,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             controller: controller,
             enabled: enabled,
             onChanged: onChanged,
+            keyboardType: keyboardType,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+            ],
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(fontSize: 8, color: Colors.black38),

@@ -673,19 +673,65 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (srCode.isEmpty ||
-        name.isEmpty ||
+    print("Role: $selectedRole");
+    print("SR Code: $srCode");
+    print("Name: $name");
+    print("Email: $email");
+    print("Campus: $selectedCampus");
+    print("Year: $selectedYearLevel");
+    print("Department: $selectedDepartment");
+    print("Faculty Type: $selectedFacultyType");
+    print("Office: $selectedOffice");
+
+    if (name.isEmpty ||
         email.isEmpty ||
         password.isEmpty ||
         selectedCampus == null ||
-        selectedYearLevel == null ||
-        selectedDepartment == null) {
-      DialogHelper.showError(
+        selectedRole == null) {
+      DialogHelper.showInfo(
         context: context,
         title: "Missing Information",
-        message: "Please fill out all fields and selections.",
+        message: "Please fill in all required fields.",
       );
       return;
+    }
+
+    // STUDENT
+    if (selectedRole == "Student") {
+      if (srCode.isEmpty ||
+          selectedDepartment == null ||
+          selectedYearLevel == null) {
+        DialogHelper.showInfo(
+          context: context,
+          title: "Missing Information",
+          message: "Please complete all student information.",
+        );
+        return;
+      }
+    }
+
+    // FACULTY
+    if (selectedRole == "Faculty") {
+      if (selectedFacultyType == null || selectedDepartment == null) {
+        DialogHelper.showInfo(
+          context: context,
+          title: "Missing Information",
+          message: "Please complete all faculty information.",
+        );
+        return;
+      }
+    }
+
+    // NON-TEACHING STAFF
+    if (selectedRole == "Non-Teaching Staff") {
+      if (selectedOffice == null) {
+        DialogHelper.showInfo(
+          context: context,
+          title: "Missing Information",
+          message: "Please select your office.",
+        );
+        return;
+      }
     }
 
     if (password != confirmPassword) {

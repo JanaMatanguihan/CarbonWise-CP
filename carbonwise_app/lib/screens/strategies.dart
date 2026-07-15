@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/gemini_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:carbonwise_app/utils/strategy_notifier.dart';
 
 class StrategiesScreen extends StatefulWidget {
   const StrategiesScreen({super.key});
@@ -29,86 +30,102 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   void initState() {
     super.initState();
     _loadRecommendation();
+    strategyRefreshNotifier.addListener(_refreshRecommendation);
+  }
+
+  void _refreshRecommendation() {
+    _loadRecommendation();
+  }
+
+  @override
+  void dispose() {
+    strategyRefreshNotifier.removeListener(_refreshRecommendation);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF4F6F4),
-      body: Column(
-        children: [
-          // Main Content Area Container Box
-          Expanded(
-            child: SafeArea(
-              child: Container(
-                margin: const EdgeInsets.all(16.0),
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: ListView(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFFAF2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade300),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.auto_awesome, color: primaryGreen),
-                              SizedBox(width: 8),
-                              Text(
-                                "AI Sustainability Coach",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 17,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          MarkdownBody(
-                            data: _aiRecommendation,
-                            selectable: true,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    if (_highestCategory.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
+    return RefreshIndicator(
+      onRefresh: () async {
+        _loadRecommendation();
+      },
+      child: Scaffold(
+        backgroundColor: Color(0xFFF4F6F4),
+        body: Column(
+          children: [
+            // Main Content Area Container Box
+            Expanded(
+              child: SafeArea(
+                child: Container(
+                  margin: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: ListView(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFFAF2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.green.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.star, color: Colors.amber),
-                            const SizedBox(width: 6),
-                            Text(
-                              "Recommended for you: $_highestCategory",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
+                            const Row(
+                              children: [
+                                Icon(Icons.auto_awesome, color: primaryGreen),
+                                SizedBox(width: 8),
+                                Text(
+                                  "AI Sustainability Coach",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            MarkdownBody(
+                              data: _aiRecommendation,
+                              selectable: true,
                             ),
                           ],
                         ),
                       ),
-                  ],
+
+                      const SizedBox(height: 20),
+
+                      if (_highestCategory.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.star, color: Colors.amber),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Recommended for you: $_highestCategory",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

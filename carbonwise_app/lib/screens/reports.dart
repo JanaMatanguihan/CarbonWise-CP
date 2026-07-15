@@ -42,6 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   double transportTotal = 0;
   double officeTotal = 0;
   double foodTotal = 0;
+  double? _weeklyChange;
 
   List<FlSpot> emissionSpots = [];
 
@@ -57,6 +58,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.initState();
     _loadEmissionData();
     _loadChartData(_timeframeOverTime);
+    _loadWeeklyComparison();
   }
 
   Future<void> _loadEmissionData() async {
@@ -181,6 +183,70 @@ class _ReportsScreenState extends State<ReportsScreen> {
     setState(() {});
   }
 
+  Future<void> _loadWeeklyComparison() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final now = DateTime.now();
+
+      // Monday of this week
+      final startOfThisWeek = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
+
+      // Monday of last week
+      final startOfLastWeek = startOfThisWeek.subtract(const Duration(days: 7));
+
+      // Monday of next week
+      final startOfNextWeek = startOfThisWeek.add(const Duration(days: 7));
+
+      final thisWeekRecords = await supabase
+          .from('carbon_records')
+          .select('total_emission')
+          .eq('g_suite', user.email!)
+          .gte('created_at', startOfThisWeek.toIso8601String())
+          .lt('created_at', startOfNextWeek.toIso8601String());
+
+      final lastWeekRecords = await supabase
+          .from('carbon_records')
+          .select('total_emission')
+          .eq('g_suite', user.email!)
+          .gte('created_at', startOfLastWeek.toIso8601String())
+          .lt('created_at', startOfThisWeek.toIso8601String());
+
+      double thisWeekTotal = 0;
+      double lastWeekTotal = 0;
+
+      for (final row in thisWeekRecords) {
+        thisWeekTotal += (row['total_emission'] as num?)?.toDouble() ?? 0;
+      }
+
+      for (final row in lastWeekRecords) {
+        lastWeekTotal += (row['total_emission'] as num?)?.toDouble() ?? 0;
+      }
+
+      if (lastWeekTotal == 0) {
+        setState(() {
+          _weeklyChange = null;
+        });
+        return;
+      }
+
+      final change = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
+
+      setState(() {
+        _weeklyChange = change;
+      });
+    } catch (e) {
+      print("Weekly comparison error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF3AA76D);
@@ -190,6 +256,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       onRefresh: () async {
         await _loadEmissionData();
         await _loadChartData(_timeframeOverTime);
+        await _loadWeeklyComparison();
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -278,10 +345,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildStatCard(
-                      'Your emissions\nlast month',
-                      '-12% ↓',
-                      'emissions',
-                      valueColor: primaryGreen,
+                      "This week's\nemissions",
+                      _weeklyChange == null
+                          ? "--"
+                          : "${_weeklyChange!.abs().toStringAsFixed(1)}%"
+                                "${_weeklyChange! < 0 ? " ↓" : " ↑"}",
+                      "vs last week",
+                      valueColor: _weeklyChange != null && _weeklyChange! < 0
+                          ? primaryGreen
+                          : Colors.red,
                     ),
                   ),
                 ],
