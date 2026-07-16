@@ -13,6 +13,18 @@ class DepartmentRanking {
   });
 }
 
+class CampusRanking {
+  final String campus;
+  final double averageEmission;
+  final int totalRecords;
+
+  CampusRanking({
+    required this.campus,
+    required this.averageEmission,
+    required this.totalRecords,
+  });
+}
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -26,12 +38,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double transportEmission = 0;
   double officeEmission = 0;
   double foodEmission = 0;
+  String _departmentRank = "-";
+  String _userDepartment = "";
+  String _currentRanking = "Loading...";
+  String _currentRankingDescription = "";
+  String _campusRank = "-";
+  String _userCampus = "";
 
   @override
   void initState() {
     super.initState();
     _loadDepartmentRankings();
     _loadIndividualStatus();
+    _loadCurrentRanking();
+    _loadCampusRankings();
   }
 
   @override
@@ -48,9 +68,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .from('user_info')
           .select('g_suite, department');
 
+      final now = DateTime.now();
+
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+
       final records = await supabase
           .from('carbon_records')
-          .select('g_suite, total_emission');
+          .select('g_suite, total_emission, record_date')
+          .gte(
+            'record_date',
+            firstDayOfMonth.toIso8601String().split('T').first,
+          );
 
       Map<String, String> userDepartments = {};
 
@@ -88,10 +116,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
 
+      final user = supabase.auth.currentUser;
+
+      if (user != null) {
+        final userInfo = await supabase
+            .from('user_info')
+            .select('department')
+            .eq('g_suite', user.email!)
+            .single();
+
+        _userDepartment = userInfo['department'];
+
+        final index = rankings.indexWhere(
+          (d) => d.department == _userDepartment,
+        );
+
+        if (index != -1) {
+          _departmentRank = "${index + 1}${_getOrdinal(index + 1)}";
+        }
+      }
+
       setState(() {
         _departmentRankings = rankings;
       });
     } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _loadCurrentRanking() async {
+    print("Loading Current Ranking...");
+
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      print("Current user: ${user?.email}");
+
+      if (user == null) return;
+
+      final now = DateTime.now();
+
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+
+      final records = await supabase
+          .from('carbon_records')
+          .select('g_suite, total_emission, record_date')
+          .gte(
+            'record_date',
+            firstDayOfMonth.toIso8601String().split('T').first,
+          );
+
+      print("Records:");
+      print(records);
+    } catch (e) {
+      print("Current Ranking Error:");
       print(e);
     }
   }
@@ -116,7 +195,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .gte('record_date', startOfWeek.toIso8601String().split('T').first);
 
     print("Records found: ${records.length}");
-    print(records);
+    Map<String, double> userTotals = {};
+
+    for (final record in records) {
+      final email = record['g_suite'];
+
+      if (email == null) continue;
+
+      final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
+
+      userTotals[email] = (userTotals[email] ?? 0) + emission;
+    }
+
+    print(userTotals);
+
+    final rankings = userTotals.entries.toList();
+
+    rankings.sort((a, b) => a.value.compareTo(b.value));
+
+    print(rankings);
+
+    final userIndex = rankings.indexWhere((entry) => entry.key == user.email);
+
+    print("User Rank Index: $userIndex");
+
+    final totalUsers = rankings.length;
+
+    final topPercent = (((userIndex + 1) / totalUsers) * 100).ceil();
+
+    String description;
+
+    if (topPercent <= 5) {
+      description = "Outstanding! You're among the greenest users this month.";
+    } else if (topPercent <= 10) {
+      description =
+          "Excellent! You're among the lowest carbon emitters this month.";
+    } else if (topPercent <= 25) {
+      description = "Great job! You're doing better than most users.";
+    } else if (topPercent <= 50) {
+      description = "You're on the right track. Keep reducing your emissions!";
+    } else {
+      description =
+          "Every small action counts. Keep improving your sustainability habits!";
+    }
+
+    setState(() {
+      _currentRanking = "Top $topPercent%";
+      _currentRankingDescription = description;
+    });
 
     double transport = 0;
     double office = 0;
@@ -139,6 +265,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Future<void> _loadCampusRankings() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final users = await supabase.from('user_info').select('g_suite, campus');
+
+      final now = DateTime.now();
+
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+
+      final records = await supabase
+          .from('carbon_records')
+          .select('g_suite, total_emission, record_date')
+          .gte(
+            'record_date',
+            firstDayOfMonth.toIso8601String().split('T').first,
+          );
+
+      Map<String, String> userCampuses = {};
+
+      for (var user in users) {
+        userCampuses[user['g_suite']] = user['campus'];
+      }
+
+      Map<String, List<double>> campusTotals = {};
+
+      for (var record in records) {
+        final email = record['g_suite'];
+
+        if (email == null) continue;
+
+        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
+
+        final campus = userCampuses[email];
+
+        if (campus == null) continue;
+
+        campusTotals.putIfAbsent(campus, () => []);
+        campusTotals[campus]!.add(emission);
+      }
+
+      List<CampusRanking> rankings = [];
+
+      campusTotals.forEach((campus, emissions) {
+        final average = emissions.reduce((a, b) => a + b) / emissions.length;
+
+        rankings.add(
+          CampusRanking(
+            campus: campus,
+            averageEmission: average,
+            totalRecords: emissions.length,
+          ),
+        );
+      });
+
+      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+
+      final currentUser = supabase.auth.currentUser;
+
+      if (currentUser != null) {
+        final myCampus = userCampuses[currentUser.email];
+
+        final campusIndex = rankings.indexWhere((c) => c.campus == myCampus);
+
+        setState(() {
+          _userCampus = myCampus ?? "";
+
+          if (campusIndex != -1) {
+            _campusRank = "${campusIndex + 1}${_getOrdinal(campusIndex + 1)}";
+          }
+        });
+      }
+    } catch (e) {
+      print("Campus Ranking Error:");
+      print(e);
+    }
+  }
+
+  String _getOrdinal(int number) {
+    if (number % 100 >= 11 && number % 100 <= 13) {
+      return "th";
+    }
+
+    switch (number % 10) {
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -159,8 +380,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: _buildRankingCard(
                     title: 'Your Current\nRanking',
                     icon: Icons.recycling_outlined,
-                    badgeText: 'Top 20%',
-                    description: 'Lowest carbon emissions this week.',
+                    badgeText: _currentRanking,
+                    description: _currentRankingDescription,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -168,8 +389,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: _buildRankingCard(
                     title: 'Department\nRanking',
                     icon: Icons.school_outlined,
-                    badgeText: '2nd',
-                    description: 'Among all campus departments.',
+                    badgeText: _departmentRank,
+                    description: '$_userDepartment Department',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -177,9 +398,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: _buildRankingCard(
                     title: 'Campus\nRanking',
                     icon: Icons.business_outlined,
-                    badgeText: '4th',
+                    badgeText: _campusRank,
                     description:
-                        'Out of 12 Batangas State University campuses.',
+                        '$_userCampus is ranked among all BatStateU campuses.',
                   ),
                 ),
               ],
