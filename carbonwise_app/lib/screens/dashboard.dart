@@ -1,7 +1,143 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DepartmentRanking {
+  final String department;
+  final double averageEmission;
+  final int totalRecords;
+
+  DepartmentRanking({
+    required this.department,
+    required this.averageEmission,
+    required this.totalRecords,
+  });
+}
+
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  List<DepartmentRanking> _departmentRankings = [];
+  final ScrollController _departmentScrollController = ScrollController();
+  double transportEmission = 0;
+  double officeEmission = 0;
+  double foodEmission = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartmentRankings();
+    _loadIndividualStatus();
+  }
+
+  @override
+  void dispose() {
+    _departmentScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDepartmentRankings() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final users = await supabase
+          .from('user_info')
+          .select('g_suite, department');
+
+      final records = await supabase
+          .from('carbon_records')
+          .select('g_suite, total_emission');
+
+      Map<String, String> userDepartments = {};
+
+      for (var user in users) {
+        userDepartments[user['g_suite']] = user['department'];
+      }
+
+      Map<String, List<double>> departmentTotals = {};
+
+      for (var record in records) {
+        final email = record['g_suite'];
+        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
+
+        final department = userDepartments[email];
+
+        if (department == null) continue;
+
+        departmentTotals.putIfAbsent(department, () => []);
+        departmentTotals[department]!.add(emission);
+      }
+
+      List<DepartmentRanking> rankings = [];
+
+      departmentTotals.forEach((department, emissions) {
+        final average = emissions.reduce((a, b) => a + b) / emissions.length;
+
+        rankings.add(
+          DepartmentRanking(
+            department: department,
+            averageEmission: average,
+            totalRecords: emissions.length,
+          ),
+        );
+      });
+
+      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+
+      setState(() {
+        _departmentRankings = rankings;
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _loadIndividualStatus() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    print("Current user: ${user.email}");
+
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+
+    print("Start of week: ${startOfWeek.toIso8601String().split('T').first}");
+
+    final records = await supabase
+        .from('carbon_records')
+        .select('transportation, electricity, food, record_date, g_suite')
+        .eq('g_suite', user.email!)
+        .gte('record_date', startOfWeek.toIso8601String().split('T').first);
+
+    print("Records found: ${records.length}");
+    print(records);
+
+    double transport = 0;
+    double office = 0;
+    double food = 0;
+
+    for (final record in records) {
+      transport += (record['transportation'] as num?)?.toDouble() ?? 0;
+      office += (record['electricity'] as num?)?.toDouble() ?? 0;
+      food += (record['food'] as num?)?.toDouble() ?? 0;
+    }
+
+    print("Transport: $transport");
+    print("Office: $office");
+    print("Food: $food");
+
+    setState(() {
+      transportEmission = transport;
+      officeEmission = office;
+      foodEmission = food;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,41 +192,142 @@ class DashboardScreen extends StatelessWidget {
             // =========================
             // CHART SECTION
             // =========================
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildStatusCard(
-                    title: 'Individual Status',
-                    child: Container(
-                      height: 110,
-                      color: Colors.black12,
-                      child: const Center(
-                        child: Text(
-                          'Bar Chart Placeholder',
-                          style: TextStyle(fontSize: 10),
+
+            // Individual Status Section
+            _buildStatusCard(
+              title: "Individual Status",
+              child: Column(
+                children: [
+                  _buildEmissionBar("🚗 Transportation", transportEmission),
+
+                  const SizedBox(height: 15),
+
+                  _buildEmissionBar("🏢 Office Resource", officeEmission),
+
+                  const SizedBox(height: 15),
+
+                  _buildEmissionBar("🍽️ Food Consumption", foodEmission),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Department Ranking Section
+            _buildStatusCard(
+              title: "Department Ranking",
+              child: SizedBox(
+                height: 260,
+                child: Scrollbar(
+                  controller: _departmentScrollController,
+                  thumbVisibility: true,
+                  radius: const Radius.circular(20),
+                  child: ListView.builder(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _departmentRankings.length,
+                    controller: _departmentScrollController,
+                    itemBuilder: (context, index) {
+                      final dept = _departmentRankings[index];
+
+                      IconData medal;
+                      Color medalColor;
+
+                      switch (index) {
+                        case 0:
+                          medal = Icons.workspace_premium;
+                          medalColor = Colors.amber;
+                          break;
+
+                        case 1:
+                          medal = Icons.workspace_premium;
+                          medalColor = Colors.grey;
+                          break;
+
+                        case 2:
+                          medal = Icons.workspace_premium;
+                          medalColor = const Color(0xFFCD7F32);
+                          break;
+
+                        default:
+                          medal = Icons.eco;
+                          medalColor = const Color(0xFF3AA76D);
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
                         ),
-                      ),
-                    ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FBF9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(medal, color: medalColor, size: 22),
+
+                            const SizedBox(width: 10),
+
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dept.department,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 2),
+
+                                  Text(
+                                    "Average Carbon Emission",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+
+                                  Text(
+                                    "${dept.totalRecords} record(s)",
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF265D3B),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                "${dept.averageEmission.toStringAsFixed(2)} kg CO₂e",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildStatusCard(
-                    title: 'Department Ranking',
-                    child: Container(
-                      height: 110,
-                      color: Colors.black12,
-                      child: const Center(
-                        child: Text(
-                          'Chart Placeholder',
-                          style: TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -210,6 +447,47 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmissionBar(String label, double value) {
+    final maxValue = [
+      transportEmission,
+      officeEmission,
+      foodEmission,
+      1.0,
+    ].reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+
+            Text(
+              "${value.toStringAsFixed(2)} kg",
+              style: const TextStyle(
+                color: Color(0xFF265D3B),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: value / maxValue,
+            minHeight: 14,
+            backgroundColor: Colors.green.shade100,
+            valueColor: const AlwaysStoppedAnimation(Color(0xFF3AA76D)),
+          ),
+        ),
+      ],
     );
   }
 

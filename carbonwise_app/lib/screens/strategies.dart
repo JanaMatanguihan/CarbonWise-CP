@@ -34,6 +34,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   }
 
   void _refreshRecommendation() {
+    print("Notifier received!");
     _loadRecommendation();
   }
 
@@ -131,6 +132,11 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   }
 
   Future<void> _loadRecommendation() async {
+    setState(() {
+      _aiRecommendation =
+          "🤖 Analyzing your emissions and preparing personalized recommendations...";
+    });
+
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -269,4 +275,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       );
     }
   }
+
+  final ValueNotifier<void> strategyRefreshNotifier = ValueNotifier(null);
 }

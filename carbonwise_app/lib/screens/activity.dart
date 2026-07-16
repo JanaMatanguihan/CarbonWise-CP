@@ -394,8 +394,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         recordDate: now.toIso8601String().split('T').first,
         createdAt: now.toIso8601String(),
       );
-
-      strategyRefreshNotifier.value++;
+      // Refresh AI Sustainability Coach immediately
+      strategyRefreshNotifier.notifyListeners();
+      print("Notifier sent!");
 
       DialogHelper.showSuccess(
         context: context,
@@ -782,10 +783,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   SizedBox(
                     width: 120,
                     child: _buildTextField(
-                      label: "Usage (in hours)",
-                      hint: "Input usage in hours",
+                      label: "Hours",
+                      hint: "Enter hours",
                       controller: _officeHoursController,
                       keyboardType: TextInputType.number,
+                      numbersOnly: true,
                     ),
                   ),
                 ],
@@ -899,10 +901,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   SizedBox(
                     width: 120,
                     child: _buildTextField(
-                      label: "Serving Size",
-                      hint: "In cups",
+                      label: "Servings",
+                      hint: "Enter servings",
                       controller: _servingSizeController,
                       keyboardType: TextInputType.number,
+                      numbersOnly: true,
                     ),
                   ),
                 ],
@@ -937,9 +940,15 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                     final serving = double.parse(_servingSizeController.text);
 
+                    // Emission factors are in kg CO₂e per kilogram of food.
+                    // Approximate 1 serving = 100 g (0.1 kg).
+
+                    const servingWeight = 0.1;
+
                     final emission =
                         _calculateFoodEmission(_selectedFoodCategory!) *
-                        serving;
+                        serving *
+                        servingWeight;
 
                     setState(() {
                       _foodEmissions.add(
@@ -1145,6 +1154,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required String hint,
     required TextEditingController controller,
     bool enabled = true,
+    bool numbersOnly = false,
     TextInputType keyboardType = TextInputType.text,
     ValueChanged<String>? onChanged,
   }) {
@@ -1168,9 +1178,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             enabled: enabled,
             onChanged: onChanged,
             keyboardType: keyboardType,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-            ],
+            inputFormatters: numbersOnly
+                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$'))]
+                : [],
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(fontSize: 8, color: Colors.black38),
