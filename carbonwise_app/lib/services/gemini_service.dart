@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_constants.dart';
+import '../utils/smart_suggestion.dart';
 
 class GeminiService {
   Future<String> askGemini(String question) async {
@@ -148,5 +149,102 @@ Do not use tables.
     print(response.body);
 
     return "Error ${response.statusCode}\n${response.body}";
+  }
+
+  Future<List<SmartSuggestion>> generateSmartSuggestions({
+    required double transportation,
+    required double electricity,
+    required double food,
+  }) async {
+    final url = Uri.parse(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+    );
+
+    final prompt =
+        """
+You are CarbonWise AI.
+
+A student's carbon emissions are:
+
+Transportation: $transportation kg CO₂
+Electricity: $electricity kg CO₂
+Food: $food kg CO₂
+
+For EACH category provide:
+
+Suggestion: one sentence (maximum 15 words)
+
+Impact: one sentence (maximum 8 words)
+
+Return ONLY this format:
+
+Transportation
+Suggestion: ...
+Impact: ...
+
+Electricity
+Suggestion: ...
+Impact: ...
+
+Food
+Suggestion: ...
+Impact: ...
+
+Do not use markdown.
+Do not use bullet points.
+Do not add explanations.
+""";
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": ApiConstants.geminiApiKey,
+      },
+      body: jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+            ],
+          },
+        ],
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+
+      final text = json["candidates"][0]["content"]["parts"][0]["text"];
+
+      final lines = text
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      List<SmartSuggestion> suggestions = [];
+
+      String suggestion = "";
+      String impact = "";
+
+      for (final line in lines) {
+        if (line.startsWith("Suggestion:")) {
+          suggestion = line.replaceFirst("Suggestion:", "").trim();
+        }
+
+        if (line.startsWith("Impact:")) {
+          impact = line.replaceFirst("Impact:", "").trim();
+
+          suggestions.add(
+            SmartSuggestion(suggestion: suggestion, impact: impact),
+          );
+        }
+      }
+
+      return suggestions;
+    }
+    throw Exception(
+      "Failed to generate smart suggestions. Status: ${response.statusCode}\n${response.body}",
+    );
   }
 }

@@ -395,7 +395,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         createdAt: now.toIso8601String(),
       );
       // Refresh AI Sustainability Coach immediately
-      strategyRefreshNotifier.notifyListeners();
+      strategyRefreshNotifier.value++;
       print("Notifier sent!");
 
       DialogHelper.showSuccess(
