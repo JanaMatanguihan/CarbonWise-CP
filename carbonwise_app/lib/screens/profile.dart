@@ -113,6 +113,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String _weekdayPattern = "Loading...";
+  String _highestImpactPattern = "Loading...";
+  String _insightPattern = "Loading...";
+
   List<Map<String, dynamic>> last4Weeks = [];
 
   @override
@@ -123,6 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadRecentActivities();
     _loadDepartmentRankings();
     _loadLast4Weeks();
+    _loadPatterns();
   }
 
   Future<void> _loadRecentActivities() async {
@@ -340,6 +345,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       last4Weeks = data.reversed.toList();
+    });
+  }
+
+  Future<void> _loadPatterns() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    final records = await Supabase.instance.client
+        .from('carbon_records')
+        .select()
+        .eq('email', user.email!);
+
+    if (records.isEmpty) {
+      setState(() {
+        _weekdayPattern = "No emission records yet.";
+        _highestImpactPattern = "No emission records yet.";
+        _insightPattern = "Start tracking your emissions!";
+      });
+      return;
+    }
+
+    double weekdayTotal = 0;
+    double weekendTotal = 0;
+
+    double transportTotal = 0;
+    double electricityTotal = 0;
+    double foodTotal = 0;
+
+    for (final record in records) {
+      final date = DateTime.parse(record['record_date']);
+
+      final transport = (record['transportation'] ?? 0).toDouble();
+
+      final electricity = (record['electricity'] ?? 0).toDouble();
+
+      final food = (record['food'] ?? 0).toDouble();
+
+      transportTotal += transport;
+      electricityTotal += electricity;
+      foodTotal += food;
+
+      if (date.weekday <= 5) {
+        weekdayTotal += transport + electricity + food;
+      } else {
+        weekendTotal += transport + electricity + food;
+      }
+    }
+
+    // Highest impact activity
+    String highestActivity = "Transportation";
+    double highestValue = transportTotal;
+
+    if (electricityTotal > highestValue) {
+      highestActivity = "Electricity usage";
+      highestValue = electricityTotal;
+    }
+
+    if (foodTotal > highestValue) {
+      highestActivity = "Food consumption";
+      highestValue = foodTotal;
+    }
+
+    final totalEmission = transportTotal + electricityTotal + foodTotal;
+
+    final percentage = totalEmission == 0
+        ? 0
+        : (highestValue / totalEmission * 100);
+
+    setState(() {
+      if (weekdayTotal > weekendTotal && weekendTotal > 0) {
+        final diff = ((weekdayTotal - weekendTotal) / weekendTotal * 100)
+            .round();
+
+        _weekdayPattern =
+            "You emit about $diff% more CO₂ on weekdays than weekends.";
+      } else if (weekendTotal > weekdayTotal && weekdayTotal > 0) {
+        final diff = ((weekendTotal - weekdayTotal) / weekdayTotal * 100)
+            .round();
+
+        _weekdayPattern =
+            "You emit about $diff% more CO₂ on weekends than weekdays.";
+      } else {
+        _weekdayPattern =
+            "Your weekday and weekend emissions are nearly the same.";
+      }
+
+      _highestImpactPattern =
+          "Your highest impact activity is $highestActivity.";
+
+      _insightPattern =
+          "$highestActivity contributes ${percentage.toStringAsFixed(0)}% of your total emissions.";
     });
   }
 
@@ -965,20 +1062,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Your Patterns',
             child: Column(
               children: [
-                _buildPatternItem(
-                  Icons.calendar_month,
-                  'You emit more than 23% of CO2 on weekdays than weekends.',
-                ),
+                _buildPatternItem(Icons.calendar_month, _weekdayPattern),
                 const Divider(height: 12),
-                _buildPatternItem(
-                  Icons.directions_bus,
-                  'Your highest impact activity is commuting.',
-                ),
+                _buildPatternItem(Icons.directions_bus, _highestImpactPattern),
                 const Divider(height: 12),
-                _buildPatternItem(
-                  Icons.directions_walk,
-                  'You reduced paper usage by 18%.',
-                ),
+                _buildPatternItem(Icons.insights, _insightPattern),
               ],
             ),
           ),
