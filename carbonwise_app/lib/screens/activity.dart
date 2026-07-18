@@ -6,6 +6,9 @@ import 'package:carbonwise_app/services/location_service.dart';
 import 'package:carbonwise_app/utils/strategy_notifier.dart';
 import 'package:flutter/services.dart';
 
+const primaryGreen = Color(0xFF3AA76D);
+const darkGreen = Color(0xFF1E5631);
+
 class ActivityInputScreen extends StatefulWidget {
   const ActivityInputScreen({super.key});
 
@@ -354,19 +357,29 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         if (transportation != null &&
             transportation.toString() != "0" &&
             transportation.toString() != "0.0") {
-          _transportEmissions.add("${transportation.toString()} kg CO₂");
+          final transportItem = record["transport_item"] ?? "";
+
+          _transportEmissions.add(
+            "$transportItem\n${transportation.toString()} kg CO₂e",
+          );
         }
 
         if (electricity != null &&
             electricity.toString() != "0" &&
             electricity.toString() != "0.0") {
-          _officeEmissions.add("${electricity.toString()} kg CO₂");
+          final officeItem = record["office_item"] ?? "";
+
+          _officeEmissions.add(
+            "$officeItem\n${electricity.toString()} kg CO₂e",
+          );
         }
 
         if (food != null &&
             food.toString() != "0" &&
             food.toString() != "0.0") {
-          _foodEmissions.add("${food.toString()} kg CO₂");
+          final foodItem = record["food_item"] ?? "";
+
+          _foodEmissions.add("$foodItem\n${food.toString()} kg CO₂e");
         }
       }
     });
@@ -384,6 +397,18 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         _officeResourceTotalEmission +
         _foodTotalEmission;
 
+    final transportItem = _transportEmissions.isNotEmpty
+        ? _transportEmissions.last.split(" - ").first
+        : "";
+
+    final officeItem = _officeEmissions.isNotEmpty
+        ? _officeEmissions.last.split("\n").first
+        : "";
+
+    final foodItem = _foodEmissions.isNotEmpty
+        ? _foodEmissions.last.split("(").first.trim()
+        : "";
+
     try {
       await _apiService.addCarbonRecord(
         email: user.email!,
@@ -393,6 +418,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         totalEmission: totalEmission,
         recordDate: now.toIso8601String().split('T').first,
         createdAt: now.toIso8601String(),
+        transportItem: transportItem,
+        officeItem: officeItem,
+        foodItem: foodItem,
       );
       // Refresh AI Sustainability Coach immediately
       strategyRefreshNotifier.value++;
@@ -517,9 +545,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF3AA76D);
-    const darkGreen = Color(0xFF1E5631);
-
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -953,7 +978,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     setState(() {
                       _foodEmissions.add(
                         '${_selectedFoodCategory!}\n'
-                        '$serving cup(s)\n'
+                        '$serving serving(s)\n'
                         '${emission.toStringAsFixed(2)} kg CO₂e',
                       );
 
@@ -994,6 +1019,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 ),
               ),
               const SizedBox(width: 12),
+
               Expanded(
                 child: _buildDynamicListCard(
                   'Office Resource',
@@ -1001,6 +1027,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 ),
               ),
               const SizedBox(width: 12),
+
               Expanded(
                 child: _buildDynamicListCard(
                   'Food Consumption',
@@ -1009,6 +1036,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 24),
 
           // 🟢 POP-UP LOGIC ADDED BELOW
@@ -1054,6 +1082,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
         ],
       ),
@@ -1244,43 +1273,67 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               color: Color(0xFF3AA76D),
             ),
           ),
-          const Divider(height: 8, color: Color(0xFF3AA76D)),
+
+          const Divider(height: 8),
+
           Expanded(
             child: items.isEmpty
                 ? const Center(
                     child: Text(
-                      'No entries yet',
+                      "No entries yet",
                       style: TextStyle(fontSize: 9, color: Colors.black38),
                     ),
                   )
                 : ListView.builder(
                     itemCount: items.length,
                     itemBuilder: (context, index) {
+                      final parts = items[index].split("\n");
+
+                      String itemTitle = "";
+                      String emission = "";
+
+                      if (parts.length >= 2) {
+                        itemTitle = parts[0];
+                        emission = parts[1];
+                      } else {
+                        emission = parts[0];
+                      }
+
+                      IconData icon = Icons.eco;
+
+                      if (itemTitle.toLowerCase().contains("jeep") ||
+                          itemTitle.toLowerCase().contains("car") ||
+                          itemTitle.toLowerCase().contains("bus") ||
+                          itemTitle.toLowerCase().contains("walk")) {
+                        icon = Icons.directions_bus;
+                      } else if (itemTitle.toLowerCase().contains("laptop") ||
+                          itemTitle.toLowerCase().contains("ac") ||
+                          itemTitle.toLowerCase().contains("fan") ||
+                          itemTitle.toLowerCase().contains("computer") ||
+                          itemTitle.toLowerCase().contains("led")) {
+                        icon = Icons.computer;
+                      } else if (itemTitle.toLowerCase().contains("beef") ||
+                          itemTitle.toLowerCase().contains("chicken") ||
+                          itemTitle.toLowerCase().contains("rice") ||
+                          itemTitle.toLowerCase().contains("fish") ||
+                          itemTitle.toLowerCase().contains("pork")) {
+                        icon = Icons.restaurant;
+                      }
+
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Row(
                           children: [
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: const Color(0xFF3AA76D),
+                            ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                items[index],
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.black87,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  items.removeAt(index);
-                                });
-                              },
-                              child: const Icon(
-                                Icons.cancel_outlined,
-                                color: Colors.redAccent,
-                                size: 12,
+                                "$itemTitle - $emission",
+                                style: const TextStyle(fontSize: 10),
                               ),
                             ),
                           ],

@@ -215,11 +215,15 @@ Do not add explanations.
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
 
-      final text = json["candidates"][0]["content"]["parts"][0]["text"];
+      final responseData = jsonDecode(response.body);
+
+      final text =
+          responseData["candidates"][0]["content"]["parts"][0]["text"]
+              as String;
 
       final lines = text
           .split('\n')
-          .where((line) => line.trim().isNotEmpty)
+          .where((String line) => line.trim().isNotEmpty)
           .toList();
 
       List<SmartSuggestion> suggestions = [];

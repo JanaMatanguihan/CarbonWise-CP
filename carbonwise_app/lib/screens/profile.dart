@@ -3,6 +3,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
 
+class DepartmentRanking {
+  final String department;
+  final double averageEmission;
+  final int totalRecords;
+
+  DepartmentRanking({
+    required this.department,
+    required this.averageEmission,
+    required this.totalRecords,
+  });
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -22,12 +34,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double carbonScore = 0.0;
   bool isLoadingScore = true;
 
+  double transportationEmission = 0;
+  double officeEmission = 0;
+  double foodEmission = 0;
+
+  List<DepartmentRanking> _departmentRankings = [];
+  String _departmentRank = "";
+  String? _userDepartment;
+
+  String _selectedBreakdown = "Transportation";
+
+  String _transportItem = "";
+  String _officeItem = "";
+  String _foodItem = "";
+
+  IconData get currentIcon {
+    switch (_selectedBreakdown) {
+      case "Transportation":
+        return Icons.directions_bus;
+
+      case "Office Resource":
+        return Icons.computer;
+
+      case "Food Consumption":
+        return Icons.restaurant;
+
+      default:
+        return Icons.eco;
+    }
+  }
+
+  String get currentTitle {
+    switch (_selectedBreakdown) {
+      case "Transportation":
+        return "Transportation";
+
+      case "Office Resource":
+        return "Office Resource";
+
+      case "Food Consumption":
+        return "Food Consumption";
+
+      default:
+        return "";
+    }
+  }
+
+  double get currentEmission {
+    switch (_selectedBreakdown) {
+      case "Transportation":
+        return transportationEmission;
+
+      case "Office Resource":
+        return officeEmission;
+
+      case "Food Consumption":
+        return foodEmission;
+
+      default:
+        return 0;
+    }
+  }
+
+  String _getOrdinal(int number) {
+    if (number >= 11 && number <= 13) {
+      return "${number}th";
+    }
+
+    switch (number % 10) {
+      case 1:
+        return "${number}st";
+      case 2:
+        return "${number}nd";
+      case 3:
+        return "${number}rd";
+      default:
+        return "${number}th";
+    }
+  }
+
+  List<Map<String, dynamic>> last4Weeks = [];
+
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _loadCarbonScore();
     _loadRecentActivities();
+    _loadDepartmentRankings();
+    _loadLast4Weeks();
   }
 
   Future<void> _loadRecentActivities() async {
@@ -114,10 +209,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       carbonScore = (record?['total_emission'] ?? 0).toDouble();
+
+      transportationEmission = (record?['transportation'] ?? 0).toDouble();
+      officeEmission = (record?['electricity'] ?? 0).toDouble();
+      foodEmission = (record?['food'] ?? 0).toDouble();
+
+      _transportItem = record?["transport_item"] ?? "";
+      _officeItem = record?["office_item"] ?? "";
+      _foodItem = record?["food_item"] ?? "";
+
       isLoadingScore = false;
     });
 
     print("Carbon Score: $carbonScore");
+    print("Transportation: $transportationEmission");
+    print("Office Resource: $officeEmission");
+    print("Food: $foodEmission");
+
+    print(record);
   }
 
   Future<void> _loadUserInfo() async {
@@ -135,6 +244,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       userInfo = response;
       isLoadingProfile = false;
+    });
+  }
+
+  Future<void> _loadDepartmentRankings() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final users = await supabase
+          .from('user_info')
+          .select('g_suite, department');
+
+      final now = DateTime.now();
+
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+
+      final records = await supabase
+          .from('carbon_records')
+          .select('g_suite, total_emission, record_date')
+          .gte(
+            'record_date',
+            firstDayOfMonth.toIso8601String().split('T').first,
+          );
+
+      Map<String, String> userDepartments = {};
+
+      for (var user in users) {
+        userDepartments[user['g_suite']] = user['department'];
+      }
+
+      Map<String, List<double>> departmentTotals = {};
+
+      for (var record in records) {
+        final email = record['g_suite'];
+        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
+
+        final department = userDepartments[email];
+
+        if (department == null) continue;
+
+        departmentTotals.putIfAbsent(department, () => []);
+        departmentTotals[department]!.add(emission);
+      }
+
+      List<DepartmentRanking> rankings = [];
+
+      departmentTotals.forEach((department, emissions) {
+        final average = emissions.reduce((a, b) => a + b) / emissions.length;
+
+        rankings.add(
+          DepartmentRanking(
+            department: department,
+            averageEmission: average,
+            totalRecords: emissions.length,
+          ),
+        );
+      });
+
+      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+
+      final user = supabase.auth.currentUser;
+
+      if (user != null) {
+        final userInfo = await supabase
+            .from('user_info')
+            .select('department')
+            .eq('g_suite', user.email!)
+            .single();
+
+        _userDepartment = userInfo['department'];
+
+        final index = rankings.indexWhere(
+          (d) => d.department == _userDepartment,
+        );
+
+        if (index != -1) {
+          _departmentRank = _getOrdinal(index + 1);
+        }
+      }
+
+      setState(() {
+        _departmentRankings = rankings;
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _loadLast4Weeks() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    final data = await _apiService.getLast4WeeksRecords(user.email!);
+
+    setState(() {
+      last4Weeks = data.reversed.toList();
     });
   }
 
@@ -343,6 +548,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 3. Carbon Emission Breakdown Card
   Widget _buildCarbonBreakdownCard() {
+    String currentTitle = "";
+
+    switch (_selectedBreakdown) {
+      case "Transportation":
+        currentTitle = _transportItem;
+        break;
+
+      case "Office Resource":
+        currentTitle = _officeItem;
+        break;
+
+      case "Food Consumption":
+        currentTitle = _foodItem;
+        break;
+    }
+
+    double maxEmission = 1;
+
+    for (final item in last4Weeks) {
+      double value;
+
+      switch (_selectedBreakdown) {
+        case "Transportation":
+          value = (item["transportation"] ?? 0).toDouble();
+          break;
+
+        case "Office Resource":
+          value = (item["electricity"] ?? 0).toDouble();
+          break;
+
+        case "Food Consumption":
+          value = (item["food"] ?? 0).toDouble();
+          break;
+
+        default:
+          value = (item["total_emission"] ?? 0).toDouble();
+      }
+
+      if (value > maxEmission) {
+        maxEmission = value;
+      }
+    }
     return _buildSectionCard(
       title: 'Your Carbon Emission Breakdown',
       child: Column(
@@ -350,9 +597,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSubTab('Transportation', true),
-              _buildSubTab('Office Resource', false),
-              _buildSubTab('Food Consumption', false),
+              _buildSubTab(
+                'Transportation',
+                _selectedBreakdown == "Transportation",
+                onTap: () {
+                  setState(() {
+                    _selectedBreakdown = "Transportation";
+                  });
+                },
+              ),
+
+              _buildSubTab(
+                'Office Resource',
+                _selectedBreakdown == "Office Resource",
+                onTap: () {
+                  setState(() {
+                    _selectedBreakdown = "Office Resource";
+                  });
+                },
+              ),
+
+              _buildSubTab(
+                'Food Consumption',
+                _selectedBreakdown == "Food Consumption",
+                onTap: () {
+                  setState(() {
+                    _selectedBreakdown = "Food Consumption";
+                  });
+                },
+              ),
             ],
           ),
           const Divider(height: 16, thickness: 1),
@@ -380,7 +653,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text(
                           isLoadingScore
                               ? '--'
-                              : carbonScore.toStringAsFixed(2),
+                              : currentEmission.toStringAsFixed(2),
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -424,20 +697,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: badgeGrey,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.directions_bus,
-                            size: 16,
-                            color: darkGreen,
-                          ),
+                          child: Icon(currentIcon, size: 16, color: darkGreen),
                         ),
                         const SizedBox(width: 6),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Commuting',
-                                style: TextStyle(
+                                currentTitle.isEmpty
+                                    ? "No data yet"
+                                    : currentTitle,
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   overflow: TextOverflow.ellipsis,
@@ -472,7 +743,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      'Last 4 Weeks',
+                      'Recent Records',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -485,10 +756,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _buildGraphBar('22.1', 0.9, 'Apr 28-\nMay 4'),
-                          _buildGraphBar('20.3', 0.8, 'May 5-\nMay 11'),
-                          _buildGraphBar('19.6', 0.75, 'May 12-\nMay 18'),
-                          _buildGraphBar('18.4', 0.68, 'May 19-\nMay 25'),
+                          ...last4Weeks.map((record) {
+                            double emission;
+                            final date = DateTime.parse(record["record_date"]);
+                            final label = "${date.month}/${date.day}";
+
+                            switch (_selectedBreakdown) {
+                              case "Transportation":
+                                emission = (record["transportation"] ?? 0)
+                                    .toDouble();
+                                break;
+
+                              case "Office Resource":
+                                emission = (record["electricity"] ?? 0)
+                                    .toDouble();
+                                break;
+
+                              case "Food Consumption":
+                                emission = (record["food"] ?? 0).toDouble();
+                                break;
+
+                              default:
+                                emission = (record["total_emission"] ?? 0)
+                                    .toDouble();
+                            }
+
+                            return _buildGraphBar(
+                              emission.toStringAsFixed(1),
+                              (emission / maxEmission).clamp(0.1, 1.0),
+                              label,
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -557,92 +855,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _buildSectionCard(
       title: 'Department Comparison',
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 105,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+            width: 110,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: badgeGrey.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            child: Column(
               children: [
-                Text(
-                  'Your Department\nRank',
+                const Text(
+                  "Your Department\nRank",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(height: 4),
+
+                const SizedBox(height: 10),
+
                 Text(
-                  '3rd',
+                  _departmentRank.isEmpty ? "-" : _departmentRank,
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: darkGreen,
                   ),
                 ),
-                SizedBox(height: 4),
+
+                const SizedBox(height: 8),
+
                 Text(
-                  'Out of 5 departments',
+                  "Out of ${_departmentRankings.length} departments",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 9, color: textMuted),
                 ),
               ],
             ),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               children: [
-                _buildDeptBar('1', 'CET', 56.2, Colors.grey[400]!),
-                _buildDeptBar('2', 'CAS', 42.8, Colors.grey[400]!),
-                _buildDeptBar(
-                  '3',
-                  'CICS',
-                  36.7,
-                  primaryGreen,
-                  isUserDept: true,
+                SizedBox(
+                  height: 220,
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      itemCount: _departmentRankings.length,
+                      itemBuilder: (context, index) {
+                        final dept = _departmentRankings[index];
+
+                        return _buildDeptBar(
+                          "${index + 1}",
+                          dept.department,
+                          dept.averageEmission,
+                          dept.department == _userDepartment
+                              ? primaryGreen
+                              : Colors.grey.shade400,
+                          isUserDept: dept.department == _userDepartment,
+                        );
+                      },
+                    ),
+                  ),
                 ),
-                _buildDeptBar('4', 'CABE', 28.9, Colors.grey[400]!),
-                _buildDeptBar('5', 'CTE', 24.1, Colors.grey[400]!),
-                const SizedBox(height: 6),
+
+                const SizedBox(height: 10),
+
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 4,
-                    horizontal: 6,
-                  ),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: badgeGrey.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.eco, size: 12, color: primaryGreen),
-                      const SizedBox(width: 4),
+                      const Icon(Icons.eco, color: primaryGreen, size: 14),
+
+                      const SizedBox(width: 6),
+
                       Expanded(
-                        child: RichText(
-                          overflow: TextOverflow.ellipsis,
-                          text: const TextSpan(
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.black87,
-                            ),
-                            children: [
-                              TextSpan(text: 'You contribute '),
-                              TextSpan(
-                                text: '0.8% ',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              TextSpan(text: 'of '),
-                              TextSpan(
-                                text: 'CICS ',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              TextSpan(text: 'total emissions'),
-                            ],
-                          ),
+                        child: Text(
+                          "Your department is currently ranked ${_departmentRank.isEmpty ? "-" : _departmentRank} out of ${_departmentRankings.length} departments.",
+                          style: const TextStyle(fontSize: 10),
                         ),
                       ),
                     ],
@@ -887,26 +1185,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSubTab(String label, bool isActive) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
+  Widget _buildSubTab(
+    String label,
+    bool selected, {
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? primaryGreen : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? primaryGreen : Colors.black54,
+            color: selected ? Colors.white : Colors.black87,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        if (isActive)
-          Container(
-            margin: const EdgeInsets.only(top: 3),
-            width: 45,
-            height: 2,
-            color: primaryGreen,
-          ),
-      ],
+      ),
     );
   }
 
@@ -1007,20 +1307,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool isUserDept = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           SizedBox(
-            width: 12,
+            width: 18,
             child: Text(
               rank,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
-          SizedBox(
-            width: 32,
+
+          const SizedBox(width: 4),
+
+          Expanded(
+            flex: 3,
             child: Text(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isUserDept ? FontWeight.bold : FontWeight.normal,
@@ -1028,36 +1333,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+
+          const SizedBox(width: 8),
+
           Expanded(
+            flex: 5,
             child: Stack(
               alignment: Alignment.centerLeft,
               children: [
                 Container(
-                  height: 5,
-                  width: double.infinity,
+                  height: 7,
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
+
                 FractionallySizedBox(
-                  widthFactor: score / 60.0,
+                  widthFactor: (score / 60).clamp(0.0, 1.0),
                   child: Container(
-                    height: 5,
+                    height: 7,
                     decoration: BoxDecoration(
                       color: color,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(width: 8),
+
           SizedBox(
-            width: 55,
+            width: 58,
             child: Text(
-              '$score kg',
+              "${score.toStringAsFixed(2)} kg",
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 10,

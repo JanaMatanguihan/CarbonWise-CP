@@ -32,7 +32,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     'User Profile Summary',
   ];
 
-  final List<Widget> _pages = const [
+  final List<Widget> _pages = [
     DashboardScreen(),
     ReportsScreen(),
     ActivityInputScreen(),
