@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_constants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
+import 'package:path/path.dart' as path;
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
@@ -121,7 +123,7 @@ class ApiService {
   Future<Map<String, dynamic>> getUserInfo(String email) async {
     final response = await http.get(
       Uri.parse(
-        "${ApiConstants.baseUrl}/user_info?g_suite=eq.$email&select=sr_code,g_suite,full_name,campus,department",
+        "${ApiConstants.baseUrl}/user_info?g_suite=eq.$email&select=sr_code,g_suite,full_name,campus,department,profile_picture",
       ),
       headers: {
         "apikey": ApiConstants.apiKey,
@@ -231,7 +233,7 @@ class ApiService {
     }
   }
 
-  // Get User Campus
+  // GET: User Campus
   Future<String?> getUserCampus(String email) async {
     final data = await getUserInfo(email);
 
@@ -240,7 +242,7 @@ class ApiService {
     return data["campus"];
   }
 
-  // Get last 4 weeks record
+  // GET: last 4 weeks record
   Future<List<Map<String, dynamic>>> getLast4WeeksRecords(String email) async {
     final now = DateTime.now();
     final fourWeeksAgo = now.subtract(const Duration(days: 28));
@@ -253,5 +255,28 @@ class ApiService {
         .order('record_date', ascending: true);
 
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // POST: Upload Profile Picture
+  Future<String> uploadProfilePicture(File imageFile) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) {
+      throw Exception("User not logged in.");
+    }
+
+    final filePath = "${user.id}/profile${path.extension(imageFile.path)}";
+
+    await Supabase.instance.client.storage
+        .from('profile-pictures')
+        .upload(
+          filePath,
+          imageFile,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    return Supabase.instance.client.storage
+        .from('profile-pictures')
+        .getPublicUrl(filePath);
   }
 }

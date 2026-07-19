@@ -470,9 +470,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildDepartmentComparisonCard(),
                   const SizedBox(height: 12),
                   _buildPatternsAndTimelineRow(),
-                  const SizedBox(height: 12),
-                  _buildAccountSettingsCard(),
-                  const SizedBox(height: 24), // Bottom breathing room
+                  const SizedBox(height: 12), // Bottom breathing room
                 ],
               ),
             ),
@@ -499,17 +497,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 36,
             backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 44, color: primaryGreen),
+            backgroundImage:
+                (userInfo?['profile_picture'] != null &&
+                    userInfo!['profile_picture'].toString().isNotEmpty)
+                ? NetworkImage(userInfo!['profile_picture'])
+                : null,
+            child:
+                (userInfo?['profile_picture'] == null ||
+                    userInfo!['profile_picture'].toString().isEmpty)
+                ? const Icon(Icons.person, size: 44, color: primaryGreen)
+                : null,
           ),
+
           const SizedBox(width: 16),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   isLoadingProfile ? 'Loading...' : fullName,
@@ -519,7 +528,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 3),
+
                 Text(
                   isLoadingProfile ? '' : '$department\n$campus',
                   style: TextStyle(
@@ -527,6 +538,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                     height: 1.3,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  height: 34,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text(
+                      "Edit Profile",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 1),
+                      backgroundColor: Colors.white.withValues(alpha: 0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+
+                    onPressed: () async {
+                      if (userInfo == null) return;
+
+                      final updated = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => EditProfileDialog(
+                          fullName: userInfo!['full_name'] ?? '',
+                          studentNumber: userInfo!['sr_code'] ?? '',
+                          email: userInfo!['g_suite'] ?? '',
+                          department: userInfo!['department'] ?? '',
+                          campus: userInfo!['campus'] ?? '',
+                          profilePicture: userInfo!['profile_picture'],
+                        ),
+                      );
+
+                      if (updated == true) {
+                        await _loadUserInfo();
+                        await _loadCarbonScore();
+                        await _loadRecentActivities();
+                      }
+                    },
                   ),
                 ),
               ],
@@ -1126,79 +1186,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  // 7. Account Settings Box
-  Widget _buildAccountSettingsCard() {
-    return Container(
-      padding: const EdgeInsets.all(12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.black12, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.settings, size: 26, color: Colors.black87),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Account Settings',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Manage configurations and user info preferences.',
-                  style: TextStyle(fontSize: 11, color: textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          OutlinedButton(
-            onPressed: () async {
-              if (userInfo == null) return;
-
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EditProfileScreen(
-                    fullName: userInfo!['full_name'] ?? '',
-                    studentNumber: userInfo!['sr_code'] ?? '',
-                    email: userInfo!['g_suite'] ?? '',
-                    department: userInfo!['department'] ?? '',
-                    campus: userInfo!['campus'] ?? '',
-                    profilePicture: userInfo!['profile_picture'],
-                  ),
-                ),
-              );
-
-              await _loadUserInfo();
-              await _loadCarbonScore();
-              await _loadRecentActivities();
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: primaryGreen, width: 0.8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-              minimumSize: const Size(64, 28),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            child: const Text(
-              'Edit Profile',
-              style: TextStyle(
-                fontSize: 10.5,
-                color: primaryGreen,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

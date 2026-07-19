@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileDialog extends StatefulWidget {
   final String fullName;
   final String studentNumber;
   final String email;
@@ -10,7 +12,7 @@ class EditProfileScreen extends StatefulWidget {
   final String campus;
   final String? profilePicture;
 
-  const EditProfileScreen({
+  const EditProfileDialog({
     super.key,
     required this.fullName,
     required this.studentNumber,
@@ -21,14 +23,18 @@ class EditProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  State<EditProfileDialog> createState() => _EditProfileDialogState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileDialogState extends State<EditProfileDialog> {
   late TextEditingController _nameController;
   final ApiService _apiService = ApiService();
 
   bool isSaving = false;
+
+  File? _selectedImage;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -41,6 +47,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedImage = File(picked.path);
+    });
   }
 
   Widget readOnlyField(String label, String value, IconData icon) {
@@ -71,189 +90,227 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF2E7D32);
+    const primaryGreen = Color(0xFF3AA76D);
+    const darkGreen = Color(0xFF265D3B);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFEFEFEA),
-
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF265D3B),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "Edit Profile",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 520,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
         ),
-      ),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              /// HEADER
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Edit Profile",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: darkGreen,
+                      ),
+                    ),
+                  ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 55,
-                  backgroundColor: const Color(0xFFDDEBDD),
-                  child: const Icon(Icons.person, size: 60, color: green),
-                ),
-
-                FloatingActionButton.small(
-                  backgroundColor: const Color(0xFF265D3B),
-                  onPressed: () {
-                    // We'll add Image Picker later
-                  },
-                  child: const Icon(Icons.camera_alt),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 15),
-
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF265D3B),
+                  IconButton(
+                    splashRadius: 20,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-              onPressed: () {},
-              child: const Text("Change Profile Picture"),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            TextField(
-              controller: _nameController,
+              /// PROFILE PHOTO
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 55,
+                    backgroundColor: const Color(0xFFDDEBDD),
+                    backgroundImage: _selectedImage != null
+                        ? FileImage(_selectedImage!)
+                        : (widget.profilePicture != null &&
+                              widget.profilePicture!.isNotEmpty)
+                        ? NetworkImage(widget.profilePicture!)
+                        : null,
+                    child:
+                        (_selectedImage == null &&
+                            (widget.profilePicture == null ||
+                                widget.profilePicture!.isEmpty))
+                        ? const Icon(Icons.person, size: 60)
+                        : null,
+                  ),
 
-              decoration: InputDecoration(
-                labelText: "Full Name",
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: primaryGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      splashRadius: 18,
+                      icon: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: () {},
+                    ),
+                  ),
+                ],
+              ),
 
-                labelStyle: const TextStyle(color: Color(0xFF265D3B)),
+              const SizedBox(height: 10),
 
-                prefixIcon: const Icon(Icons.person, color: Color(0xFF265D3B)),
-
-                filled: true,
-                fillColor: Colors.white,
-
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 16,
+              TextButton(
+                onPressed: _pickImage,
+                child: const Text(
+                  "Change Profile Picture",
+                  style: TextStyle(color: darkGreen),
                 ),
+              ),
 
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
+              const SizedBox(height: 18),
 
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF265D3B),
-                    width: 2,
+              /// NAME
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: "Full Name",
+                  prefixIcon: const Icon(Icons.person, color: primaryGreen),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FBF9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-            readOnlyField("Student Number", widget.studentNumber, Icons.badge),
+              readOnlyField(
+                "Student Number",
+                widget.studentNumber,
+                Icons.badge,
+              ),
 
-            readOnlyField("G-Suite", widget.email, Icons.email),
+              readOnlyField("G-Suite", widget.email, Icons.email),
 
-            readOnlyField("Department", widget.department, Icons.school),
+              readOnlyField("Department", widget.department, Icons.school),
 
-            readOnlyField("Campus", widget.campus, Icons.location_city),
+              readOnlyField("Campus", widget.campus, Icons.location_city),
 
-            const SizedBox(height: 10),
+              const SizedBox(height: 20),
 
-            SizedBox(
-              width: double.infinity,
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
 
-              height: 55,
-
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-
-                onPressed: () async {
-                  if (_nameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Name cannot be empty.")),
-                    );
-
-                    return;
-                  }
-
-                  setState(() {
-                    isSaving = true;
-                  });
-
-                  try {
-                    final user = Supabase.instance.client.auth.currentUser;
-
-                    if (user == null) return;
-
-                    await _apiService.updateUserProfile(
-                      email: user.email!,
-                      fullName: _nameController.text.trim(),
-                      profilePicture: widget.profilePicture,
-                    );
-
-                    if (!mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Profile updated successfully!"),
-                        backgroundColor: Color(0xFF265D3B),
-                      ),
-                    );
-
-                    Navigator.pop(context);
-                  } catch (e) {
-                    if (!mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(e.toString()),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  } finally {
-                    if (mounted) {
-                      setState(() {
-                        isSaving = false;
-                      });
-                    }
-                  }
-                },
-
-                // PATCH goes here
-                child: isSaving
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
-                    : const Text(
-                        "Save Changes",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryGreen,
+                        side: const BorderSide(color: primaryGreen),
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+
+                      child: const Text("Cancel"),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryGreen,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+
+                      onPressed: () async {
+                        if (_nameController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Name cannot be empty."),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setState(() {
+                          isSaving = true;
+                        });
+
+                        try {
+                          final user =
+                              Supabase.instance.client.auth.currentUser;
+
+                          if (user == null) return;
+
+                          String? profileUrl = widget.profilePicture;
+
+                          if (_selectedImage != null) {
+                            profileUrl = await _apiService.uploadProfilePicture(
+                              _selectedImage!,
+                            );
+                          }
+
+                          await _apiService.updateUserProfile(
+                            email: user.email!,
+                            fullName: _nameController.text.trim(),
+                            profilePicture: profileUrl,
+                          );
+
+                          if (!mounted) return;
+
+                          Navigator.pop(context, true);
+                        } catch (e) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(e.toString())));
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              isSaving = false;
+                            });
+                          }
+                        }
+                      },
+
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              "Save Changes",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
