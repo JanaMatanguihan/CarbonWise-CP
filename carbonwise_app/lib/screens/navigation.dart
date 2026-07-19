@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dialog_helper.dart';
 import 'package:carbonwise_app/main.dart';
 import 'package:carbonwise_app/widgets/chatbot_button.dart';
+import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 
 class CustomMainNavigation extends StatefulWidget {
   const CustomMainNavigation({super.key});
@@ -45,16 +46,42 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     super.initState();
     loadUserName();
     _loadCarbonScore();
+    profileRefreshNotifier.addListener(_refreshProfile);
+  }
+
+  Future<void> _refreshProfile() async {
+    await loadUserName();
   }
 
   Future<void> loadUserName() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
 
-    if (!mounted) return;
-    setState(() {
-      userName = user.userMetadata?['full_name'] ?? 'User';
-    });
+    if (user == null) {
+      print("No logged in user");
+      return;
+    }
+
+    print("Logged in email: ${user.email}");
+
+    try {
+      final response = await Supabase.instance.client
+          .from('user_info')
+          .select('full_name')
+          .eq('g_suite', user.email!)
+          .single();
+
+      print("Database response: $response");
+
+      if (!mounted) return;
+
+      setState(() {
+        userName = response['full_name'] ?? 'User';
+      });
+
+      print("Loaded name: $userName");
+    } catch (e) {
+      print("ERROR: $e");
+    }
   }
 
   Future<void> _loadCarbonScore() async {

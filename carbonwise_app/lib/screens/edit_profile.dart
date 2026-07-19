@@ -3,6 +3,7 @@ import 'package:carbonwise_app/services/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 
 class EditProfileDialog extends StatefulWidget {
   final String fullName;
@@ -276,6 +277,8 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                             fullName: _nameController.text.trim(),
                             profilePicture: profileUrl,
                           );
+
+                          profileRefreshNotifier.value++;
 
                           if (!mounted) return;
 
