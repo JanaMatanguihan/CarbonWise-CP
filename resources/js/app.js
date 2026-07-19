@@ -16,6 +16,10 @@ import monthSelectPlugin from "flatpickr/dist/plugins/monthSelect/index.js";
 import "flatpickr/dist/flatpickr.min.css";
 import "flatpickr/dist/plugins/monthSelect/style.css";
 
+import Swal from 'sweetalert2';
+
+window.Swal = Swal;
+
 document.addEventListener("DOMContentLoaded", () => {
 
     const picker = document.querySelector("#monthPicker");

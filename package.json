@@ -23,6 +23,7 @@
         "@popperjs/core": "^2.11.8",
         "bootstrap": "^5.3.8",
         "flatpickr": "^4.6.13",
-        "lucide": "^1.21.0"
+        "lucide": "^1.21.0",
+        "sweetalert2": "^11.26.25"
     }
 }

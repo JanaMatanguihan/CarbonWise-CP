@@ -59,7 +59,10 @@ class UserManagementController extends Controller
             $query->where('status', request('status'));
         }
 
-        $users = $query->orderBy('created_at', 'desc')->get();
+        $users = $query
+        ->orderBy('created_at', 'desc')
+        ->paginate(8)
+        ->withQueryString();
 
         return view('admin.user-management', compact('users', 'roles', 'departments'));
     }

@@ -284,6 +284,28 @@
                     @endforeach
                     </tbody>
                 </table>
+
+                    <!-- Pagination -->
+                    <div class="flex items-center justify-between px-6 py-4 border-t">
+
+                        <div class="text-sm text-gray-500">
+                            Showing
+                            <span class="font-semibold">{{ $users->firstItem() ?? 0 }}</span>
+                            to
+                            <span class="font-semibold">{{ $users->lastItem() ?? 0 }}</span>
+                            of
+                            <span class="font-semibold">{{ $users->total() }}</span>
+                            users
+                        </div>
+
+                        <div>
+                            {{ $users->links() }}
+                        </div>
+
+                    </div>
+
+                    </div>
+                    </div>
                 </div>
             </div>
 

@@ -12,16 +12,14 @@
       action="{{ route('admin.emissions') }}"
       class="flex justify-end items-center gap-4">
 
-
-    <!-- Date Selector -->
+    <!-- Month Selector -->
     <input
         type="month"
         name="month"
         value="{{ request('month') }}"
         onchange="this.form.submit()"
         class="border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-700 shadow-sm text-sm"
-    >
-
+    />
 
     <!-- Department Selector -->
     <div class="flex items-center gap-2">
@@ -62,13 +60,13 @@
 
 
     <!-- Export -->
-    <a href="{{ route('admin.emissions.export', request()->query()) }}"
-       class="bg-[#166534] hover:bg-green-800 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm">
+    <a id="exportBtn"
+    href="{{ route('admin.emissions.export', request()->query()) }}"
+    class="bg-[#166534] hover:bg-green-800 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm">
 
         Export Report
 
     </a>
-
 
 </form>
 
@@ -153,10 +151,10 @@
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 h-[380px] flex flex-col justify-between">
             <div class="flex justify-between items-center">
                 <h3 class="font-bold text-gray-800 text-base">Emissions Over Time</h3>
-                <select id="trendFilter" class="border border-gray-300 rounded-lg px-3 py-1 text-xs bg-white shadow-sm min-w-[100px]">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
+               <select id="trendFilter" class="border border-gray-300 rounded-lg px-3 py-1 text-xs bg-white shadow-sm min-w-[110px]">
+                    <option value="yearly">Yearly</option>
                     <option value="monthly" selected>Monthly</option>
+                    <option value="weekly">Weekly</option>
                 </select>
             </div>
             <div class="flex-1 flex items-center justify-center">
@@ -170,7 +168,7 @@
             
             <div class="grid grid-cols-1 sm:grid-cols-[45%_55%] gap-4 items-center my-auto w-full">
                 <div class="flex justify-center relative">
-                    <div id="emissionSourceWrapper" class="w-full max-w-[170px]">
+                    <div id="emissionSourceWrapper" class="w-full max-w-[250px]">
                         <div id="emissionSourceChart"></div>
                         <div id="emptyDonut" class="hidden flex items-center justify-center h-44">
                             <div class="w-32 h-32 rounded-full border-[12px] border-gray-200 flex flex-col items-center justify-center">
@@ -285,7 +283,7 @@
 </div>
 
 @push('scripts')
-<script id="daily-data" type="application/json">{!! $dailyTrend->toJson() !!}</script>
+<script id="yearly-data" type="application/json">{!! $yearlyTrend->toJson() !!}</script>
 <script id="weekly-data" type="application/json">{!! $weeklyTrend->toJson() !!}</script>
 <script id="monthly-data" type="application/json">{!! $monthlyTrend->toJson() !!}</script>
 <script id="emission-source-data" type="application/json">
@@ -310,11 +308,15 @@
         }
     });
 
-    const dailyData = JSON.parse(document.getElementById('daily-data').textContent);
+    const yearlyData = JSON.parse(document.getElementById('yearly-data').textContent);
     const weeklyData = JSON.parse(document.getElementById('weekly-data').textContent);
     const monthlyData = JSON.parse(document.getElementById('monthly-data').textContent);
     const emissionSources = JSON.parse(document.getElementById('emission-source-data').textContent).map(Number);
     const totalEmission = JSON.parse(document.getElementById('total-emission').textContent);
+
+    console.log("Yearly JSON:", JSON.stringify(yearlyData, null, 2));
+    console.log("Monthly JSON:", JSON.stringify(monthlyData, null, 2));
+    console.log("Weekly JSON:", JSON.stringify(weeklyData, null, 2));
 
     let currentData = monthlyData;
     let labels = currentData.length ? currentData.map(item => item.label) : ['No Data'];
@@ -333,7 +335,19 @@
                 name: 'CO₂e',
                 data: totals
             }],
-            xaxis: { categories: labels },
+            xaxis: {
+                categories: labels,
+
+                labels: {
+                    rotate: -45,
+                    hideOverlappingLabels: true,
+                    style: {
+                        fontSize: '11px'
+                    }
+                },
+
+                tickAmount: 8
+            },
             yaxis: {
                 labels: {
                     formatter: function(val) { return val.toFixed(0); }
@@ -350,27 +364,54 @@
     );
     trendChart.render();
 
-    document.getElementById('trendFilter').addEventListener('change', function () {
-        let selected = this.value;
-        let data = selected === 'daily' ? dailyData : (selected === 'weekly' ? weeklyData : monthlyData);
+        document.getElementById('trendFilter').addEventListener('change', function () {
 
-        const updatedLabels = data.length ? data.map(item => item.label) : ['No Data'];
-        const updatedTotals = data.length ? data.map(item => item.total) : [0];
+            let selected = this.value;
 
-        trendChart.updateOptions({ xaxis: { categories: updatedLabels } });
-        trendChart.updateSeries([{ name: 'CO₂e', data: updatedTotals }]);
-    });
+            let data;
+
+            if (selected === 'yearly') {
+                data = yearlyData;
+            }
+            else if (selected === 'monthly') {
+                data = monthlyData;
+            }
+            else {
+                data = weeklyData;
+            }
+
+            const updatedLabels = data.length
+                ? data.map(item => item.label)
+                : ['No Data'];
+
+            const updatedTotals = data.length
+                ? data.map(item => item.total)
+                : [0];
+
+            trendChart.updateOptions({
+                xaxis: {
+                    categories: updatedLabels
+                }
+            });
+
+            trendChart.updateSeries([{
+                name: 'CO₂e',
+                data: updatedTotals
+            }]);
+
+        });
 
     // 2. Donut Chart Config
     const hasEmissionData = totalEmission > 0;
     const sourceChart = new ApexCharts(
         document.querySelector("#emissionSourceChart"),
         {
-            chart: { 
-                type: 'donut', 
-                height: 210,
-                sparkline: { enabled: true } 
-            },
+          chart: {
+            type: 'donut',
+            height: 235,
+            width: 235,
+            sparkline: { enabled: true }
+        },
             series: emissionSources,
             labels: ['Transportation', 'Electricity', 'Food Consumption'],
             colors: ['#16a34a', '#eab308', '#ef4444', '#8b5cf6'],
@@ -384,23 +425,23 @@
             plotOptions: {
                 pie: {
                     donut: {
-                        size: '75%',
+                        size: '72%',
                         labels: {
                             show: true,
                             value: {
-                                show: true,
-                                fontSize: '16px',
-                                fontStyle: 'bold',
-                                color: '#1f2937',
-                                offsetVal: -4,
+                            show: true,
+                            fontSize: '18px',
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            offsetY: 8,
                                 formatter: function(val) { return Number(val).toFixed(2); }
                             },
                             total: {
-                                show: true,
-                                showAlways: true,
-                                label: 'Total Emissions',
-                                color: '#6b7280',
-                                fontSize: '11px',
+                            show: true,
+                            showAlways: true,
+                            label: 'Total Emissions',
+                            color: '#6b7280',
+                            fontSize: '12px',
                                 formatter: function () {
                                     return Number(totalEmission).toFixed(2) + ' kg CO₂e';
                                 }
@@ -486,4 +527,42 @@
     comparisonChart.render();
 </script>
 @endpush
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const exportBtn = document.getElementById('exportBtn');
+
+    if (!exportBtn) return;
+
+    exportBtn.addEventListener('click', function (e) {
+
+        e.preventDefault();
+
+        Swal.fire({
+            title: 'Preparing Report...',
+            text: 'Please wait while your Excel report is being generated.',
+            icon: 'info',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        // Start the download after a short delay
+        setTimeout(() => {
+        window.location.href = this.href;
+
+        setTimeout(() => {
+            Swal.close();
+        }, 3000);
+
+    }, 500);
+
+    });
+
+});
+</script>
+
 @endsection

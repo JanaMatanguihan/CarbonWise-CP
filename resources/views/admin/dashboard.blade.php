@@ -7,6 +7,8 @@
 
 <div class="max-w-[1800px] mx-auto p-4 space-y-4">
 
+
+
     <!-- Top Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
@@ -83,7 +85,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
         <!-- Emissions Trend -->
-            <div class="bg-white rounded-2xl shadow p-5 xl:col-span-1">
+            <div class="bg-white rounded-2xl shadow p-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-semibold text-xl">
                     Emissions Trend
@@ -99,7 +101,7 @@
         </select>
             </div>
 
-            <div class="h-48">
+            <div class="h-[350px]">
             <canvas id="emissionsTrendChart"></canvas>
         </div>
         </div>
@@ -110,10 +112,10 @@
                         Emission by Source
                     </h3>
 
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center gap-6 h-[350px]">
 
                         <!-- Donut Chart -->
-                        <div class="w-40 h-40 flex-shrink-0">
+                        <div class="w-56 h-56 flex items-center justify-center flex-shrink-0">
                             <canvas
                             id="emissionSourceChart"
                             data-transportation="{{ $transportationTotal }}"
@@ -123,7 +125,7 @@
                         </div>
 
                     <!-- Legend -->
-                <div class="flex-1 space-y-3 text-sm min-w-0">
+                <div class="flex-1 flex flex-col justify-center space-y-4 text-sm min-w-0">
 
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2 min-w-0">
@@ -535,23 +537,44 @@
                             backgroundColor: 'rgba(46,125,50,0.15)',
                             fill: true,
                             tension: 0.4,
-                            pointRadius: 4
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            borderWidth: 3
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
+                             plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                }
+                            },
+                       scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#E5E7EB'
                         },
-                        scales: {
-                            y: {
-                                beginAtZero: true
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 12
                             }
                         }
                     }
+                }
+                     }
                 });
 
                 // Dropdown UI (placeholder)

@@ -316,11 +316,14 @@
                         Emissions Breakdown
                     </h3>
 
-                    <div
-                        id="emissionBreakdownChart"
-                        class="flex-1 mt-4">
-                    </div>
+                    <div class="flex-1 flex items-center justify-center">
 
+                        <div
+                            id="emissionBreakdownChart"
+                            class="w-full h-full">
+                        </div>
+
+                    </div>
                 </div>
                 <!-- Emissions Trend -->
                 <div class="bg-white rounded-xl border shadow-sm p-6 h-[420px] flex flex-col">
@@ -328,14 +331,10 @@
                         Emissions Trend
                     </h3>
 
-                    <div class="flex-1 flex items-center justify-center">
-
-                    <div
+                   <div
                         id="emissionTrendChart"
-                        class="w-full max-w-[300px]">
+                        class="flex-1 mt-4">
                     </div>
-
-                </div>
 
                 </div>
 
@@ -351,8 +350,12 @@
         </script>
 
         <script id="emission-sources-data" type="application/json">
+        {!! json_encode([
+            $transportation,
+            $electricity,
+            $food
+        ]) !!}
         </script>
-
             @push('scripts')
             <script>
 
@@ -363,7 +366,7 @@
             const emissions = emissionHistory.map(item => item.value);
 
             const breakdownChart = new ApexCharts(
-            document.querySelector("#emissionBreakdownChart"),
+            document.querySelector("#emissionTrendChart"),
             {
                 chart: {
                     type: 'area',
@@ -431,20 +434,22 @@
         );
 
         breakdownChart.render();
+                const emissionSources = JSON.parse(
+                    document.getElementById('emission-sources-data').textContent
+                ).map(Number);
 
-            const emissionSources = JSON.parse(
-            document.getElementById('emission-sources-data').textContent
-        );
+                const totalEmission = emissionSources.reduce(
+                    (sum, value) => sum + value,
+                    0
+                );
 
-        const totalEmission =
-            emissionSources.reduce((a,b)=>a+b,0);
-
-            const trendChart = new ApexCharts(
-                document.querySelector("#emissionTrendChart"),
+                const trendChart = new ApexCharts(
+                document.querySelector("#emissionBreakdownChart"),
                 {
                     chart: {
                         type: 'donut',
-                        height: '260'
+                        height: 360,
+                        width: '100%'
                     },
 
                     series: totalEmission > 0
@@ -457,18 +462,18 @@
                     [
                         'Transportation',
                         'Electricity',
-                        'Food',
-                        'Waste'
+                        'Food'
                     ]
                     :
                     [
                         'No Data'
                     ],
 
-                    plotOptions:{
-                    pie:{
-                        donut:{
-                        size:'72%',
+                    plotOptions: {
+                    pie: {
+                        offsetY: 0,
+                        donut: {
+                            size: '68%',
 
                             labels:{
                             show:true,
@@ -476,14 +481,12 @@
                             total:{
                             show:true,
 
-                            label:'Active Users',
+                            label:'Total Emissions',
 
-                            formatter:function(){
-
+                            formatter: function () {
                                 return totalEmission > 0
-                                    ? totalEmission.toFixed(2)
-                                    : '0%';
-
+                                ? totalEmission.toFixed(2) + ' kg CO₂e'
+                                : '0 kg CO₂e';
                                         }
 
                                     }
@@ -509,13 +512,21 @@
                     [
                         '#e5e7eb'
 ],
-
-                    legend:{
-                    position:'right',
+                    legend: {
+                    position: 'right',
+                    floating: false,
+                    horizontalAlign: 'center',
+                    offsetX: -10,
+                    offsetY: 0,
+                    fontSize: '13px',
+                    itemMargin: {
+                        vertical: 8
+                    },
                     show: totalEmission > 0
                 },
+
                     dataLabels: {
-                        enabled: true
+                        enabled: false
                     }
                 }
             );

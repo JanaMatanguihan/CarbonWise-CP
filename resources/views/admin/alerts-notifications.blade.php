@@ -433,6 +433,22 @@
 
                     @endforeach
 
+                    <div class="flex items-center justify-between px-6 py-5 border-t">
+
+                        <div class="text-sm text-gray-600">
+                            Showing
+                            {{ $recentAlerts->firstItem() }}
+                            to
+                            {{ $recentAlerts->lastItem() }}
+                            of
+                            {{ $recentAlerts->total() }}
+                            alerts
+                        </div>
+
+                        {{ $recentAlerts->links() }}
+
+                    </div>
+
                 </tbody>
 
             </table>

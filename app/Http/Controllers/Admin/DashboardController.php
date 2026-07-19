@@ -14,13 +14,13 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $selectedMonth = request('month');
+        // Selected filters
+        $year = request('year', 2026);
+        $month = request('month');
 
-        $year = null;
-        $month = null;
-
-        if ($selectedMonth) {
-            [$year, $month] = explode('-', $selectedMonth);
+        // If "all" is selected, ignore the month filter
+        if ($month === 'all') {
+            $month = null;
         }
 
         /*
@@ -32,20 +32,26 @@ class DashboardController extends Controller
         // Total registered users
         $userQuery = UserInfo::query();
 
-        if ($year && $month) {
-            $userQuery->whereYear('created_at', $year)
-                    ->whereMonth('created_at', $month);
+       if ($year) {
+        $userQuery->whereYear('created_at', $year);
+
+        if ($month) {
+            $userQuery->whereMonth('created_at', $month);
         }
+    }
 
         $totalUsers = $userQuery->count();
 
         // Total carbon emissions
         $emissionQuery = CarbonRecord::query();
 
-        if ($year && $month) {
-            $emissionQuery->whereYear('record_date', $year)
-                        ->whereMonth('record_date', $month);
+        if ($year) {
+        $emissionQuery->whereYear('record_date', $year);
+
+        if ($month) {
+            $emissionQuery->whereMonth('record_date', $month);
         }
+    }
 
         $totalEmissions = $emissionQuery->sum('total_emission');
 
@@ -54,11 +60,14 @@ class DashboardController extends Controller
             ? $totalEmissions / $totalUsers
             : 0;
         // Total mitigation strategies
-        $mitigationQuery = MitigationStrategy::query();
+       $mitigationQuery = MitigationStrategy::query();
 
-        if ($year && $month) {
-            $mitigationQuery->whereYear('created_at', $year)
-                            ->whereMonth('created_at', $month);
+        if ($year) {
+            $mitigationQuery->whereYear('created_at', $year);
+
+            if ($month) {
+                $mitigationQuery->whereMonth('created_at', $month);
+            }
         }
 
         $mitigationCount = $mitigationQuery->count();
@@ -66,9 +75,14 @@ class DashboardController extends Controller
         // Total SDO reports
        $reportQuery = SdoReport::query();
 
-        if ($year && $month) {
-            $reportQuery->whereYear('created_at', $year)
-                        ->whereMonth('created_at', $month);
+       $reportQuery = SdoReport::query();
+
+        if ($year) {
+            $reportQuery->whereYear('created_at', $year);
+
+            if ($month) {
+                $reportQuery->whereMonth('created_at', $month);
+            }
         }
 
         $reportCount = $reportQuery->count();
@@ -148,24 +162,37 @@ class DashboardController extends Controller
                 ->limit(5)
                 ->get();
 
+           $maxEmission = $topDepartments->max('total_emissions');
+
             foreach ($topDepartments as $department) {
-                $department->percentage = $totalEmissions > 0
-                    ? round(($department->total_emissions / $totalEmissions) * 100, 1)
+
+                $department->percentage = $maxEmission > 0
+                    ? round(($department->total_emissions / $maxEmission) * 100, 1)
                     : 0;
+
             }
             
         /*
          User Engagement
         */
 
-        $activeUsers = CarbonRecord::whereYear('record_date', $year)
-        ->whereMonth('record_date', $month)
-        ->distinct('g_suite')
-        ->count('g_suite');
+       $activeUsersQuery = CarbonRecord::query();
+
+        if ($year) {
+            $activeUsersQuery->whereYear('record_date', $year);
+
+            if ($month) {
+                $activeUsersQuery->whereMonth('record_date', $month);
+            }
+        }
+
+        $activeUsers = $activeUsersQuery
+            ->distinct('g_suite')
+            ->count('g_suite');
 
         $engagementRate = $totalUsers > 0
             ? round(($activeUsers / $totalUsers) * 100)
-            : 0;
+    : 0;
 
         /*
         Recent Alerts

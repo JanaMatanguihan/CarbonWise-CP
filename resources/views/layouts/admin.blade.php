@@ -84,24 +84,9 @@
         <span>Alerts & Notifications</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
-        <img src="{{ asset('icons/sdo.png') }}" class="w-5 h-5">
-        <span>SDO Monitoring</span>
-    </a>
-
     <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.settings') }}">
         <img src="{{ asset('icons/settings.png') }}" class="w-5 h-5">
         <span>Settings</span>
-    </a>
-
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
-        <img src="{{ asset('icons/audit.png') }}" class="w-5 h-5">
-        <span>Audit Logs</span>
-    </a>
-
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
-        <img src="{{ asset('icons/help.png') }}" class="w-5 h-5">
-        <span>Help & Support</span>
     </a>
 
 </nav>
@@ -154,53 +139,59 @@
 
 
     <!-- Date Picker -->
-<form 
-    method="GET"
-    class="
-    bg-white
-    border
-    border-gray-300
-    rounded-lg
-    shadow-sm
-    h-[42px]
-    px-5
-    flex
-    items-center
-    gap-3
-    "
->
+<form method="GET" class="flex items-center gap-3">
 
-
-    <svg xmlns="http://www.w3.org/2000/svg"
-        class="w-4 h-4 text-gray-700"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor">
-
-
-        <path stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-
-
-    </svg>
-
-
-    <input
-        type="month"
-        name="month"
-        value="{{ request('month') }}"
+    <!-- Year -->
+    <select
+        name="year"
         onchange="this.form.submit()"
-        class="
-        w-[130px]
-        bg-transparent
-        text-sm
-        outline-none
-        cursor-pointer
-        "
-    >
+       class="border rounded-xl px-5 py-2.5 text-sm min-w-[110px] bg-white">
+        @for($y = 2021; $y <= 2026; $y++)
+            <option
+                value="{{ $y }}"
+                {{ request('year', 2026) == $y ? 'selected' : '' }}>
+                {{ $y }}
+            </option>
+        @endfor
 
+    </select>
+
+    <!-- Month -->
+    <select
+        name="month"
+        onchange="this.form.submit()"
+        class="border rounded-xl px-5 py-2.5 text-sm min-w-[170px] bg-white">
+
+        <option
+            value="all"
+            {{ request('month') == 'all' || !request('month') ? 'selected' : '' }}>
+            All Months
+        </option>
+
+        @foreach([
+            1=>'January',
+            2=>'February',
+            3=>'March',
+            4=>'April',
+            5=>'May',
+            6=>'June',
+            7=>'July',
+            8=>'August',
+            9=>'September',
+            10=>'October',
+            11=>'November',
+            12=>'December'
+        ] as $num => $name)
+
+            <option
+                value="{{ $num }}"
+                {{ request('month') == $num ? 'selected' : '' }}>
+                {{ $name }}
+            </option>
+
+        @endforeach
+
+    </select>
 
 </form>
 

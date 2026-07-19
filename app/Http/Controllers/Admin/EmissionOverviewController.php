@@ -8,12 +8,23 @@ use App\Models\UserInfo;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
+use App\Exports\EmissionOverviewExport;
+use Maatwebsite\Excel\Facades\Excel;
+
 class EmissionOverviewController extends Controller
 {
     public function index()
     {
         // Base query for filters
         $records = CarbonRecord::query();
+
+        $selectedYear = request('month')
+            ? Carbon::parse(request('month'))->year
+            : now()->year;
+
+        $selectedMonth = request('month')
+            ? Carbon::parse(request('month'))->month
+            : now()->month;
 
         // Month filter
         if (request('month')) {
@@ -67,30 +78,77 @@ class EmissionOverviewController extends Controller
             ->orderBy(DB::raw("DATE(record_date)"))
             ->get();
 
-        // Weekly Chart Trend
-        $weeklyTrend = (clone $records)
+       // Weekly Chart Trend (Weeks within selected month)
+        $weeklyTrend = CarbonRecord::query()
+            ->whereYear('record_date', $selectedYear)
+            ->whereMonth('record_date', $selectedMonth)
+            ->when(request('department'), function ($query) {
+                $query->whereIn(
+                    'g_suite',
+                    UserInfo::where('department', request('department'))
+                        ->pluck('g_suite')
+                );
+            })
             ->select(
-                DB::raw("'Week ' || EXTRACT(WEEK FROM record_date)::int as label"),
+                DB::raw("
+                    'Week ' ||
+                    (
+                        FLOOR((EXTRACT(DAY FROM record_date) - 1) / 7) + 1
+                    )::int as label
+                "),
                 DB::raw("SUM(total_emission) as total")
             )
             ->groupBy(
-                DB::raw("EXTRACT(YEAR FROM record_date)"),
-                DB::raw("EXTRACT(WEEK FROM record_date)")
+                DB::raw("
+                    FLOOR((EXTRACT(DAY FROM record_date) - 1) / 7)
+                ")
             )
-            ->orderBy(DB::raw("EXTRACT(YEAR FROM record_date)"))
-            ->orderBy(DB::raw("EXTRACT(WEEK FROM record_date)"))
+            ->orderBy(
+                DB::raw("
+                    FLOOR((EXTRACT(DAY FROM record_date) - 1) / 7)
+                ")
+            )
             ->get();
 
-        // Monthly Chart Trend
-        $monthlyTrend = (clone $records)
+        // Monthly Chart Trend (Jan–Dec of selected year)
+        $monthlyTrend = CarbonRecord::query()
+            ->whereYear('record_date', $selectedYear)
+            ->when(request('department'), function ($query) {
+                $query->whereIn(
+                    'g_suite',
+                    UserInfo::where('department', request('department'))
+                        ->pluck('g_suite')
+                );
+            })
             ->select(
-                DB::raw("DATE_TRUNC('month', record_date) as month"),
-                DB::raw("TO_CHAR(DATE_TRUNC('month', record_date),'Mon YYYY') as label"),
+                DB::raw("EXTRACT(MONTH FROM record_date) as month"),
+                DB::raw("TO_CHAR(record_date, 'Mon') as label"),
                 DB::raw("SUM(total_emission) as total")
             )
-            ->groupBy(DB::raw("DATE_TRUNC('month', record_date)"))
-            ->orderBy(DB::raw("DATE_TRUNC('month', record_date)"))
+            ->groupBy(
+                DB::raw("EXTRACT(MONTH FROM record_date)"),
+                DB::raw("TO_CHAR(record_date, 'Mon')")
+            )
+            ->orderBy(DB::raw("EXTRACT(MONTH FROM record_date)"))
             ->get();
+
+            // Yearly Chart Trend (2021–2026)
+            $yearlyTrend = CarbonRecord::query()
+                ->when(request('department'), function ($query) {
+                    $query->whereIn(
+                        'g_suite',
+                        UserInfo::where('department', request('department'))
+                            ->pluck('g_suite')
+                    );
+                })
+                ->select(
+                    DB::raw("EXTRACT(YEAR FROM record_date) as year"),
+                    DB::raw("EXTRACT(YEAR FROM record_date)::text as label"),
+                    DB::raw("SUM(total_emission) as total")
+                )
+                ->groupBy(DB::raw("EXTRACT(YEAR FROM record_date)"))
+                ->orderBy(DB::raw("EXTRACT(YEAR FROM record_date)"))
+                ->get();
 
         // Department breakdown table
         $departmentQuery = DB::table('carbon_records')
@@ -184,7 +242,7 @@ class EmissionOverviewController extends Controller
                 'transportationPercentage',
                 'electricityPercentage',
                 'foodPercentage',
-                'dailyTrend',
+                'yearlyTrend',
                 'weeklyTrend',
                 'monthlyTrend',
                 'departmentEmissions',
@@ -195,8 +253,16 @@ class EmissionOverviewController extends Controller
     }
 
     // Export emissions report
-    public function export()
-    {
-        return back()->with('success', 'Export feature coming soon.');
-    }
+   public function export()
+{
+    return Excel::download(
+
+        new EmissionOverviewExport(
+            request('month'),
+            request('department')
+        ),
+
+        'Emission_Overview_Report.xlsx'
+    );
+}
 }
