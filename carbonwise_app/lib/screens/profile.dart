@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
+import 'package:intl/intl.dart';
 
 class DepartmentRanking {
   final String department;
@@ -25,6 +26,88 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
+
+  double getAverageEmission() {
+    if (last4Weeks.isEmpty) return 0;
+
+    final now = DateTime.now();
+
+    final monthlyRecords = last4Weeks.where((record) {
+      final recordDate = DateTime.parse(record["record_date"]);
+
+      return recordDate.year == now.year && recordDate.month == now.month;
+    }).toList();
+
+    if (monthlyRecords.isEmpty) return 0;
+
+    double total = 0;
+
+    for (final record in monthlyRecords) {
+      total += (record["total_emission"] ?? 0).toDouble();
+    }
+
+    return total / monthlyRecords.length;
+  }
+
+  String getSustainabilityLevel() {
+    final avg = getAverageEmission();
+
+    if (avg <= 5) {
+      return "Eco Champion";
+    } else if (avg <= 10) {
+      return "Green Advocate";
+    } else if (avg <= 20) {
+      return "Conscious User";
+    } else {
+      return "Sustainability Builder";
+    }
+  }
+
+  String getSustainabilityMessage() {
+    final avg = getAverageEmission();
+
+    if (avg <= 5) {
+      return "Excellent! Your emissions are consistently very low.";
+    } else if (avg <= 10) {
+      return "Great job! You're maintaining sustainable habits.";
+    } else if (avg <= 20) {
+      return "You're making progress. Every small action counts.";
+    } else {
+      return "You're improving. Try lowering this week's emissions.";
+    }
+  }
+
+  double getSustainabilityProgress() {
+    final avg = getAverageEmission();
+
+    if (avg <= 5) return 1.0;
+    if (avg <= 10) return 0.75;
+    if (avg <= 20) return 0.50;
+    return 0.25;
+  }
+
+  Color getSustainabilityColor() {
+    final avg = getAverageEmission();
+
+    if (avg <= 5) return Colors.green;
+    if (avg <= 10) return primaryGreen;
+    if (avg <= 20) return Colors.orange;
+    return Colors.redAccent;
+  }
+
+  IconData getSustainabilityIcon() {
+    final avg = getAverageEmission();
+
+    if (avg <= 5) {
+      return Icons.emoji_events;
+    } else if (avg <= 10) {
+      return Icons.eco;
+    } else if (avg <= 20) {
+      return Icons.energy_savings_leaf;
+    } else {
+      return Icons.trending_up;
+    }
+  }
 
   Map<String, dynamic>? userInfo;
   bool isLoadingProfile = true;
@@ -119,6 +202,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _insightPattern = "Loading...";
 
   List<Map<String, dynamic>> last4Weeks = [];
+
+  bool hasStartedJourney() {
+    return carbonScore > 0;
+  }
+
+  bool hasEcoCommute() {
+    return transportationEmission > 0 && transportationEmission <= 5;
+  }
+
+  bool hasGreenStreak() {
+    final uniqueDates = <String>{};
+
+    for (final activity in recentActivities) {
+      uniqueDates.add(activity["time"]);
+    }
+
+    return uniqueDates.length >= 7;
+  }
+
+  bool hasEnergySaver() {
+    return officeEmission > 0 && officeEmission <= 10;
+  }
+
+  bool hasPlantLover() {
+    return foodEmission > 0 && foodEmission <= 8;
+  }
+
+  bool hasEcoChampion() {
+    return carbonScore > 0 && carbonScore <= 20;
+  }
 
   @override
   void initState() {
@@ -583,7 +696,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       final updated = await showDialog<bool>(
                         context: context,
-                        barrierDismissible: false,
                         builder: (_) => EditProfileDialog(
                           fullName: userInfo!['full_name'] ?? '',
                           studentNumber: userInfo!['sr_code'] ?? '',
@@ -593,6 +705,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           profilePicture: userInfo!['profile_picture'],
                         ),
                       );
+
+                      if (updated == true) {
+                        _loadUserInfo();
+                      }
 
                       if (updated == true) {
                         await _loadUserInfo();
@@ -670,40 +786,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   alignment: Alignment.center,
                   children: [
                     SizedBox(
-                      width: 38,
-                      height: 38,
+                      width: 36,
+                      height: 36,
                       child: CircularProgressIndicator(
-                        value: 0.75,
-                        strokeWidth: 3.5,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          primaryGreen,
+                        value: getSustainabilityProgress(),
+                        strokeWidth: 4,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          getSustainabilityColor(),
                         ),
                       ),
                     ),
-                    const Icon(Icons.eco, size: 18, color: primaryGreen),
+
+                    Icon(
+                      getSustainabilityIcon(),
+                      color: getSustainabilityColor(),
+                      size: 18,
+                    ),
                   ],
                 ),
-                const SizedBox(width: 8),
-                const Expanded(
+
+                const SizedBox(width: 10),
+
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Conscious User',
-                        overflow: TextOverflow.ellipsis,
+                        getSustainabilityLevel(),
                         style: TextStyle(
-                          fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: darkGreen,
+                          fontSize: 12,
+                          color: getSustainabilityColor(),
                         ),
                       ),
+
+                      const SizedBox(height: 2),
+
                       Text(
-                        'Keep it up! You are on track.',
-                        overflow: TextOverflow.ellipsis,
+                        getSustainabilityMessage(),
                         maxLines: 2,
-                        style: TextStyle(fontSize: 10, color: textMuted),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 9, color: textMuted),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      Text(
+                        "${DateFormat('MMMM').format(DateTime.now())} Average: ${getAverageEmission().toStringAsFixed(1)} kg CO₂",
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
+                        ),
                       ),
                     ],
                   ),
@@ -985,35 +1120,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 4. Achievements Section
   Widget _buildAchievementsCard() {
     return _buildSectionCard(
-      title: 'Achievements',
-      trailing: Text(
-        'View All',
-        style: TextStyle(
-          fontSize: 12,
-          color: darkGreen.withValues(alpha: 0.8),
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      title: "Achievements",
+      child: GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: .9,
         children: [
           _buildAchievementItem(
-            'Going Green',
-            'Start your journey.',
+            "First Footprint",
+            "You've recorded your first carbon activity!",
             Icons.eco,
-            true,
+            hasStartedJourney(),
+            "Log your first carbon emission.",
           ),
+
           _buildAchievementItem(
-            'Eco Commute',
-            'Greener travels.',
+            "Eco Commuter",
+            "Transportation emissions kept below 5 kg CO₂.",
             Icons.directions_bike,
-            true,
+            hasEcoCommute(),
+            "Keep transportation emissions below 5 kg CO₂.",
           ),
+
           _buildAchievementItem(
-            'Green Streak',
-            '3/7 days completed',
-            Colors.grey,
-            false,
+            "Green Streak",
+            "You've logged emissions for 7 different days!",
+            Icons.local_fire_department,
+            hasGreenStreak(),
+            "Log emissions for 7 different days.",
+          ),
+
+          _buildAchievementItem(
+            "Energy Saver",
+            "You kept your office resource emissions low!",
+            Icons.bolt,
+            hasEnergySaver(),
+            "Keep your Office Resource emissions below 10 kg CO₂.",
+          ),
+
+          _buildAchievementItem(
+            "Plant Lover",
+            "Excellent food choices this month!",
+            Icons.park,
+            hasPlantLover(),
+            "Keep your Food Consumption emissions below 8 kg CO₂.",
+          ),
+
+          _buildAchievementItem(
+            "Eco Champion",
+            "Outstanding carbon footprint!",
+            Icons.workspace_premium,
+            hasEcoChampion(),
+            "Keep your total carbon emission below 20 kg CO₂.",
           ),
         ],
       ),
@@ -1327,61 +1488,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildAchievementItem(
     String title,
-    String desc,
-    dynamic iconData,
-    bool isUnlocked,
+    String unlockedDescription,
+    IconData icon,
+    bool unlocked,
+    String unlockRequirement,
   ) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        height: 100, // Explicit bounded constraint for equal grid look
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.black12, width: 0.5),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isUnlocked ? Colors.white : Colors.grey[100],
-                border: Border.all(
-                  color: isUnlocked ? primaryGreen : Colors.grey,
-                  width: 1,
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (_) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+
+              title: Row(
+                children: [
+                  Icon(
+                    unlocked ? Icons.emoji_events : Icons.lock,
+                    color: unlocked ? primaryGreen : Colors.grey,
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(child: Text(title)),
+                ],
+              ),
+
+              content: Text(unlocked ? unlockedDescription : unlockRequirement),
+
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text("OK"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: unlocked ? 1 : .5,
+
+        child: Container(
+          decoration: BoxDecoration(
+            color: unlocked ? const Color(0xFFF6FFF8) : Colors.grey.shade100,
+
+            borderRadius: BorderRadius.circular(12),
+
+            border: Border.all(
+              color: unlocked
+                  ? primaryGreen.withValues(alpha: .3)
+                  : Colors.grey.shade300,
+            ),
+          ),
+
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+
+            children: [
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: unlocked
+                        ? const Color(0xFFE8F5E9)
+                        : Colors.white,
+
+                    child: Icon(
+                      icon,
+                      color: unlocked ? primaryGreen : Colors.grey,
+                    ),
+                  ),
+
+                  if (!unlocked)
+                    const CircleAvatar(
+                      radius: 8,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.lock, size: 10, color: Colors.grey),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  color: unlocked ? darkGreen : Colors.grey,
                 ),
               ),
-              child: Icon(
-                iconData is IconData ? iconData : Icons.workspace_premium,
-                size: 20,
-                color: isUnlocked ? primaryGreen : Colors.grey[400],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: isUnlocked ? primaryGreen : Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Expanded(
-              child: Text(
-                desc,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 9, color: textMuted),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

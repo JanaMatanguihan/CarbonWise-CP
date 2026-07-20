@@ -321,9 +321,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
         message = "Start your sustainability journey!";
         subtitle = "Record more activities to compare your monthly progress.";
       } else {
-        final reduction =
-            ((lastMonthTotal - thisMonthTotal) / lastMonthTotal) * 100;
-
         double score;
         double change = 0;
 

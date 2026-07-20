@@ -213,8 +213,6 @@ Do not add explanations.
     );
 
     if (response.statusCode == 200) {
-      final json = jsonDecode(response.body);
-
       final responseData = jsonDecode(response.body);
 
       final text =

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/gemini_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:carbonwise_app/utils/strategy_notifier.dart';
 
 class StrategiesScreen extends StatefulWidget {
   const StrategiesScreen({super.key});
@@ -12,19 +11,12 @@ class StrategiesScreen extends StatefulWidget {
 }
 
 class _StrategiesScreenState extends State<StrategiesScreen> {
-  // Filter States
-  double _transportation = 0;
-  double _electricity = 0;
-  double _food = 0;
-
   String _aiRecommendation =
       "Loading your personalized sustainability recommendation...";
 
   String _highestCategory = "";
 
   static const Color primaryGreen = Color(0xFF3AA76D);
-  static const Color darkGreen = Color(0xFF1E5631);
-  static const Color badgeGrey = Color(0xFFCCEAD8);
 
   @override
   void initState() {
@@ -217,63 +209,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     );
 
     const SizedBox(height: 10);
-
-    // --- UI Helpers ---
-    Widget _buildFilterDropdown({
-      required String value,
-      required List<String> items,
-      required ValueChanged<String?> onChanged,
-    }) {
-      return Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.black45, width: 0.8),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            icon: const Icon(
-              Icons.arrow_drop_down,
-              size: 18,
-              color: Colors.black87,
-            ),
-            style: const TextStyle(fontSize: 10, color: Colors.black87),
-            items: items.map((String val) {
-              return DropdownMenuItem<String>(
-                value: val,
-                child: Text(val, overflow: TextOverflow.ellipsis),
-              );
-            }).toList(),
-            onChanged: onChanged,
-          ),
-        ),
-      );
-    }
-
-    Widget _buildPaginationButton(IconData icon, VoidCallback onPressed) {
-      return IconButton(
-        icon: Icon(icon, size: 18),
-        onPressed: onPressed,
-        visualDensity: VisualDensity.compact,
-      );
-    }
-
-    Widget _buildPaginationPageNum(String pageNum, bool isActive) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Text(
-          pageNum,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? darkGreen : Colors.black54,
-          ),
-        ),
-      );
-    }
   }
 
   final ValueNotifier<void> strategyRefreshNotifier = ValueNotifier(null);
