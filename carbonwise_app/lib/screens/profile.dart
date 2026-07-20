@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
+import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 
 class DepartmentRanking {
   final String department;
@@ -128,6 +129,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadDepartmentRankings();
     _loadLast4Weeks();
     _loadPatterns();
+    profileRefreshNotifier.addListener(_refreshProfileData);
+  }
+
+  @override
+  void dispose() {
+    profileRefreshNotifier.removeListener(_refreshProfileData);
+    super.dispose();
+  }
+
+  void _refreshProfileData() {
+    if (mounted) {
+      _loadUserInfo();
+    }
   }
 
   Future<void> _loadRecentActivities() async {
@@ -485,6 +499,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String fullName = userInfo?['full_name'] ?? 'Loading...';
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
+    final String? profilePicture = userInfo?['profile_picture'];
 
     return Container(
       width: double.infinity,
@@ -502,14 +517,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 36,
             backgroundColor: Colors.white,
-            backgroundImage:
-                (userInfo?['profile_picture'] != null &&
-                    userInfo!['profile_picture'].toString().isNotEmpty)
-                ? NetworkImage(userInfo!['profile_picture'])
+            backgroundImage: profilePicture != null && profilePicture.isNotEmpty
+                ? NetworkImage(
+                    "$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}",
+                  )
                 : null,
-            child:
-                (userInfo?['profile_picture'] == null ||
-                    userInfo!['profile_picture'].toString().isEmpty)
+            child: profilePicture == null || profilePicture.isEmpty
                 ? const Icon(Icons.person, size: 44, color: primaryGreen)
                 : null,
           ),

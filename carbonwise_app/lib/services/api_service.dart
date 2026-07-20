@@ -279,4 +279,24 @@ class ApiService {
         .from('profile-pictures')
         .getPublicUrl(filePath);
   }
+
+  // GET: User Notification
+  Future<void> addNotification({
+    required String email,
+    required String title,
+    required String message,
+    required String type,
+  }) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    await Supabase.instance.client.from('notifications').insert({
+      'user_id': user.id,
+      'g_suite': email,
+      'title': title,
+      'message': message,
+      'type': type,
+    });
+  }
 }

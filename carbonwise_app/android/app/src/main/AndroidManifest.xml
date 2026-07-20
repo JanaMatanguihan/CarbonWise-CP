@@ -30,6 +30,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <activity
+        android:name="com.yalantis.ucrop.UCropActivity"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:screenOrientation="portrait"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

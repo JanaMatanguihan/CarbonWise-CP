@@ -25,6 +25,8 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   String userName = 'User';
   double _carbonScore = 100;
 
+  List<Map<String, dynamic>> notifications = [];
+
   final List<String> _pageTitles = [
     '',
     'View your Reports',
@@ -41,12 +43,35 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     ProfileScreen(),
   ];
 
+  Future<void> loadNotifications() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) return;
+
+    try {
+      final data = await Supabase.instance.client
+          .from('notifications')
+          .select()
+          .eq('g_suite', user.email!)
+          .order('created_at', ascending: false);
+
+      if (!mounted) return;
+
+      setState(() {
+        notifications = List<Map<String, dynamic>>.from(data);
+      });
+    } catch (e) {
+      print("Error loading notifications: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     loadUserName();
     _loadCarbonScore();
     profileRefreshNotifier.addListener(_refreshProfile);
+    loadNotifications();
   }
 
   Future<void> _refreshProfile() async {
@@ -329,32 +354,124 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
+      onSelected: (value) {
+        if (value == 'all') {
+          _showAllNotifications();
+        }
+      },
       child: _circleIcon(Icons.notifications_none),
-      itemBuilder: (context) => const <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
-          enabled: false,
-          child: SizedBox(
-            width: 260,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Notifications',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E5631),
+      itemBuilder: (context) {
+        if (notifications.isEmpty) {
+          return [
+            const PopupMenuItem<String>(
+              enabled: false,
+              child: SizedBox(
+                width: 340,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Text(
+                      "No notifications yet.",
+                      style: TextStyle(color: Colors.black54),
+                    ),
                   ),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Reminder: Do not forget to complete your green activity today.',
-                  style: TextStyle(color: Colors.black87, fontSize: 13),
+              ),
+            ),
+          ];
+        }
+
+        return [
+          const PopupMenuItem<String>(
+            enabled: false,
+            child: SizedBox(
+              width: 340,
+              child: Text(
+                "Notifications",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF1E5631),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+
+          ...notifications.take(3).map((notification) {
+            IconData icon = Icons.notifications;
+
+            switch (notification['type']) {
+              case 'success':
+                icon = Icons.check_circle;
+                break;
+              case 'info':
+                icon = Icons.info;
+                break;
+              case 'warning':
+                icon = Icons.warning_amber_rounded;
+                break;
+              case 'achievement':
+                icon = Icons.emoji_events;
+                break;
+            }
+
+            return PopupMenuItem<String>(
+              enabled: false,
+              child: SizedBox(
+                width: 340,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, size: 18, color: const Color(0xFF3AA76D)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                notification['title'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E5631),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                notification['message'] ?? '',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(thickness: 0.8),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+
+          const PopupMenuDivider(),
+
+          const PopupMenuItem<String>(
+            value: 'all',
+            child: Center(
+              child: Text(
+                "Show all notifications",
+                style: TextStyle(
+                  color: Color(0xFF3AA76D),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ];
+      },
     );
   }
 
@@ -585,5 +702,111 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
       passwordController.dispose();
       confirmPasswordController.dispose();
     }
+  }
+
+  void _showAllNotifications() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Container(
+            width: 420,
+            constraints: const BoxConstraints(maxHeight: 550),
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                const Text(
+                  "All Notifications",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E5631),
+                  ),
+                ),
+
+                const SizedBox(height: 15),
+
+                Expanded(
+                  child: notifications.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "No notifications yet.",
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: notifications.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(thickness: 0.8),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+
+                            IconData icon = Icons.notifications;
+
+                            switch (notification['type']) {
+                              case 'success':
+                                icon = Icons.check_circle;
+                                break;
+
+                              case 'warning':
+                                icon = Icons.warning_amber_rounded;
+                                break;
+
+                              case 'achievement':
+                                icon = Icons.emoji_events;
+                                break;
+
+                              case 'info':
+                                icon = Icons.info;
+                                break;
+                            }
+
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0xFFCCEAD8),
+                                child: Icon(
+                                  icon,
+                                  color: const Color(0xFF3AA76D),
+                                ),
+                              ),
+
+                              title: Text(
+                                notification['title'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(notification['message'] ?? ''),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+
+                const SizedBox(height: 15),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3AA76D),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Close"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

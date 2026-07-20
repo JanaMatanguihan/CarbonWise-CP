@@ -422,6 +422,14 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         officeItem: officeItem,
         foodItem: foodItem,
       );
+
+      await _apiService.addNotification(
+        email: user.email!,
+        title: "Carbon Record Saved",
+        message: "Your carbon emission record has been saved successfully.",
+        type: "success",
+      );
+
       // Refresh AI Sustainability Coach immediately
       strategyRefreshNotifier.value++;
       print("Notifier sent!");

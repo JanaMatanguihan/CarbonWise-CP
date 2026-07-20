@@ -30,6 +30,7 @@ class EditProfileDialog extends StatefulWidget {
 class _EditProfileDialogState extends State<EditProfileDialog> {
   late TextEditingController _nameController;
   final ApiService _apiService = ApiService();
+  String? _profilePicture;
 
   bool isSaving = false;
 
@@ -42,6 +43,8 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
     super.initState();
 
     _nameController = TextEditingController(text: widget.fullName);
+
+    _profilePicture = widget.profilePicture;
   }
 
   @override
@@ -68,23 +71,11 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
       padding: const EdgeInsets.only(bottom: 18),
       child: TextField(
         readOnly: true,
-        decoration: InputDecoration(
-          labelText: "Full Name",
-          prefixIcon: const Icon(Icons.person, color: Color(0xFF2E7D32)),
-          filled: true,
-          fillColor: Colors.white,
-
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-          ),
-        ),
         controller: TextEditingController(text: value),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
+        ),
       ),
     );
   }
@@ -139,15 +130,19 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                     backgroundColor: const Color(0xFFDDEBDD),
                     backgroundImage: _selectedImage != null
                         ? FileImage(_selectedImage!)
-                        : (widget.profilePicture != null &&
-                              widget.profilePicture!.isNotEmpty)
-                        ? NetworkImage(widget.profilePicture!)
+                        : (_profilePicture != null &&
+                              _profilePicture!.isNotEmpty)
+                        ? NetworkImage(_profilePicture!)
                         : null,
                     child:
                         (_selectedImage == null &&
-                            (widget.profilePicture == null ||
-                                widget.profilePicture!.isEmpty))
-                        ? const Icon(Icons.person, size: 60)
+                            (_profilePicture == null ||
+                                _profilePicture!.isEmpty))
+                        ? const Icon(
+                            Icons.person,
+                            size: 60,
+                            color: primaryGreen,
+                          )
                         : null,
                   ),
 
@@ -163,7 +158,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                         color: Colors.white,
                         size: 18,
                       ),
-                      onPressed: () {},
+                      onPressed: _pickImage,
                     ),
                   ),
                 ],
@@ -270,12 +265,24 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                             profileUrl = await _apiService.uploadProfilePicture(
                               _selectedImage!,
                             );
+
+                            setState(() {
+                              _profilePicture = profileUrl;
+                            });
                           }
 
                           await _apiService.updateUserProfile(
                             email: user.email!,
                             fullName: _nameController.text.trim(),
                             profilePicture: profileUrl,
+                          );
+
+                          await _apiService.addNotification(
+                            email: user.email!,
+                            title: "Profile Updated",
+                            message:
+                                "Your profile information has been updated.",
+                            type: "info",
                           );
 
                           profileRefreshNotifier.value++;
