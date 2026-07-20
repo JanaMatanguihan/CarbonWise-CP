@@ -19,12 +19,18 @@ class CarbonRecordsSeeder extends Seeder
 
         foreach ($users as $user) {
 
-            // Generate ONLY 2026 data
-            for ($year = 2026; $year <= 2026; $year++) {
+           // Generate daily records for 2026
+                for ($year = 2021; $year <= 2026; $year++) {
 
-                for ($month = 1; $month <= 12; $month++) {
+                    $startDate = Carbon::create($year, 1, 1);
 
-                    $recordDate = Carbon::create($year, $month, 1);
+                    $endDate = Carbon::create($year, 12, 31);
+
+                    for (
+                        $recordDate = $startDate->copy();
+                        $recordDate->lte($endDate);
+                        $recordDate->addDay()
+                    ) {
 
 
                     // Transportation based on role
@@ -39,7 +45,7 @@ class CarbonRecordsSeeder extends Seeder
                     $electricity = rand(180, 350) / 100;
 
                     // Summer months (March-May)
-                    if (in_array($month, [3, 4, 5])) {
+                    if (in_array($recordDate->month, [3, 4, 5])) {
                         $electricity += rand(20, 60) / 100;
                     }
 
@@ -47,7 +53,7 @@ class CarbonRecordsSeeder extends Seeder
                     $food = rand(220, 500) / 100;
 
                     // Continue annual growth from previous years
-                    $growthMultiplier = 1 + (($year - 2021) * 0.06);
+                    $growthMultiplier = 1 + (($recordDate->year - 2021) * 0.06);
 
                     $transportation *= $growthMultiplier;
                     $electricity *= $growthMultiplier;

@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\MitigationStrategyController;
 use App\Http\Controllers\Admin\AlertController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\ForecastController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -61,6 +62,12 @@ Route::middleware(['auth'])->group(function () {
         [AnalyticsReportController::class, 'exportExcel']
     )->name('admin.analytics.export.excel');
 
+    // Forecasting
+    Route::get(
+        '/admin/forecasting',
+        [ForecastController::class, 'index']
+    )->name('admin.forecasting');
+
     // Alerts & Notifications
     Route::get(
         '/admin/alerts-notifications',
@@ -94,18 +101,24 @@ Route::middleware(['auth'])->group(function () {
 
     )->name('admin.mitigation.store');
 
-    // View User Profile
-    Route::get('/admin/users/{g_suite}', [UserManagementController::class, 'show'])
-    ->name('admin.users.show');
+        // View User Profile
+        Route::get('/admin/users/{g_suite}', [UserManagementController::class, 'show'])
+            ->name('admin.users.show');
 
-    Route::get('/admin/users/{g_suite}/edit', [UserManagementController::class, 'edit'])
-    ->name('admin.users.edit');
+        // User Carbon Records
+        Route::get(
+            '/admin/users/{g_suite}/records',
+            [UserManagementController::class, 'carbonRecords']
+        )->name('admin.users.records');
 
-    Route::put('/admin/users/{g_suite}', [UserManagementController::class, 'update'])
-    ->name('admin.users.update');
+        Route::get('/admin/users/{g_suite}/edit', [UserManagementController::class, 'edit'])
+            ->name('admin.users.edit');
 
-    Route::delete('/admin/users/{g_suite}', [UserManagementController::class, 'destroy'])
-    ->name('admin.users.destroy');
+        Route::put('/admin/users/{g_suite}', [UserManagementController::class, 'update'])
+            ->name('admin.users.update');
+
+        Route::delete('/admin/users/{g_suite}', [UserManagementController::class, 'destroy'])
+            ->name('admin.users.destroy');
 
      Route::get(
     '/admin/settings',

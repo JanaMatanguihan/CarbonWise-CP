@@ -57,34 +57,22 @@
         </select>
 
         <!-- Department -->
-        <select
-                    name="department"
-                    class="border rounded-lg px-4 py-2 w-48"
-                    onchange="document.getElementById('filterForm').submit();"
-                >
-                    <option value="">All Departments</option>
+                <select
+                name="department"
+                class="border rounded-lg px-4 py-2 w-64"
+                onchange="document.getElementById('filterForm').submit();"
+            >
+                <option value="">All Departments</option>
 
-                    <option value="CICS" {{ request('department') == 'CICS' ? 'selected' : '' }}>
-                        CICS
+                @foreach($departments as $department)
+                    <option
+                        value="{{ $department }}"
+                        {{ request('department') == $department ? 'selected' : '' }}>
+                        {{ $department }}
                     </option>
-
-                    <option value="CET" {{ request('department') == 'CET' ? 'selected' : '' }}>
-                        CET
-                    </option>
-
-                    <option value="CAS" {{ request('department') == 'CAS' ? 'selected' : '' }}>
-                        CAS
-                    </option>
-
-                    <option value="CABE" {{ request('department') == 'CABE' ? 'selected' : '' }}>
-                        CABE
-                    </option>
-
-                    <option value="CTE" {{ request('department') == 'CTE' ? 'selected' : '' }}>
-                        CTE
-                    </option>
-                </select>
-
+                @endforeach
+            </select>
+            
                 <!-- Campus -->
                 <select
                     name="campus"

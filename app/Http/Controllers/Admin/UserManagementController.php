@@ -214,4 +214,18 @@ class UserManagementController extends Controller
                 ->route('admin.users')
                 ->with('success', 'User deleted successfully.');
         }
+
+     public function carbonRecords($g_suite)
+    {
+        $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
+
+        $records = CarbonRecord::where('g_suite', $g_suite)
+        ->orderBy('record_date', 'desc')
+        ->simplePaginate(5);
+
+        return view('admin.user-carbon-records', compact(
+            'user',
+            'records'
+        ));
+    }
 }

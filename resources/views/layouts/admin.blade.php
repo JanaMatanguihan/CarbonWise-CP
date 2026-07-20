@@ -20,13 +20,13 @@
         </style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-gray-100 overflow-x-hidden">
 
-<div class="flex h-screen">
+<div class="flex h-screen w-full overflow-hidden">
 
     <!-- Sidebar -->
    <aside
-    class="w-72 h-screen text-white flex flex-col"
+    class="w-64 xl:w-72 flex-shrink-0 min-h-screen text-white flex flex-col"
     style="background-color: var(--accent-color);">
 
         <div class="p-5 border-b border-green-700 flex items-center gap-3">
@@ -44,7 +44,7 @@
 
         </div>
 
-        <nav class="flex-1 py-4 overflow-hidden">
+        <nav class="flex-1 py-4 overflow-y-auto overflow-x-hidden">
             
     <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="/dashboard">
         <img src="{{ asset('icons/dashboard.png') }}" class="w-5 h-5">
@@ -69,9 +69,9 @@
         <span>Analytics & Reports</span>
     </a>
 
-    <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="#">
-        <img src="{{ asset('icons/forecast.png') }}" class="w-5 h-5">
-        <span>Forecasting</span>
+    <a href="{{ route('admin.forecasting') }}" class="flex items-center gap-3 px-6 py-3 hover:bg-green-700">
+    <img src="{{ asset('icons/forecast.png') }}" class="w-5 h-5">
+    <span>Forecasting</span>
     </a>
 
     <a class="flex items-center gap-3 px-6 py-3 hover:bg-green-700" href="{{ route('admin.mitigation') }}">
@@ -107,9 +107,9 @@
     </aside>
 
     <!-- Main -->
-    <main class="flex-1 overflow-y-auto">
+    <main class="flex-1 min-w-0 overflow-y-auto bg-gray-100">
 
-       <div class="bg-white shadow px-8 py-4 flex justify-between items-center">
+       <div class="bg-white shadow px-4 lg:px-6 xl:px-8 py-4 flex justify-between items-center gap-4 flex-wrap">
 
     <!-- Left -->
     <div class="flex items-center gap-4">
@@ -332,9 +332,9 @@
 
 </div>
 
-      <div class="px-4 pb-4 pt-0">
-    @yield('content')
-</div>
+            <div class="px-6 lg:px-8 xl:px-10 py-6">
+            @yield('content')
+        </div>
     </main>
 
 </div>
