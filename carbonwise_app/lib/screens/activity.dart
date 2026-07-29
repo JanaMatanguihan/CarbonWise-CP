@@ -5,6 +5,7 @@ import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:carbonwise_app/services/location_service.dart';
 import 'package:carbonwise_app/utils/strategy_notifier.dart';
 import 'package:flutter/services.dart';
+import 'package:carbonwise_app/utils/carbon_score_refresh_notifier.dart';
 
 const primaryGreen = Color(0xFF3AA76D);
 const darkGreen = Color(0xFF1E5631);
@@ -422,6 +423,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         officeItem: officeItem,
         foodItem: foodItem,
       );
+
+      carbonScoreRefreshNotifier.value++;
 
       await _apiService.addNotification(
         email: user.email!,

@@ -12,6 +12,7 @@ import '../utils/dialog_helper.dart';
 import 'package:carbonwise_app/main.dart';
 import 'package:carbonwise_app/widgets/chatbot_button.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
+import 'package:carbonwise_app/utils/carbon_score_refresh_notifier.dart';
 
 class CustomMainNavigation extends StatefulWidget {
   const CustomMainNavigation({super.key});
@@ -26,6 +27,18 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   double _carbonScore = 100;
 
   List<Map<String, dynamic>> notifications = [];
+
+  String getGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) {
+      return "🌅 Good morning";
+    } else if (hour < 18) {
+      return "☀️ Good afternoon";
+    } else {
+      return "🌙 Good evening";
+    }
+  }
 
   final List<String> _pageTitles = [
     '',
@@ -72,6 +85,13 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     _loadCarbonScore();
     profileRefreshNotifier.addListener(_refreshProfile);
     loadNotifications();
+    carbonScoreRefreshNotifier.addListener(_loadCarbonScore);
+  }
+
+  @override
+  void dispose() {
+    carbonScoreRefreshNotifier.removeListener(_loadCarbonScore);
+    super.dispose();
   }
 
   Future<void> _refreshProfile() async {
@@ -201,7 +221,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                             children: [
                               Text(
                                 _currentIndex == 0
-                                    ? 'Good morning, $userName!'
+                                    ? '${getGreeting()}, $userName!'
                                     : _pageTitles[_currentIndex],
                                 style: const TextStyle(
                                   color: Colors.white,

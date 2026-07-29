@@ -45,6 +45,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _campusRank = "-";
   String _userCampus = "";
 
+  List<CampusRanking> _campusRankings = [];
+
   @override
   void initState() {
     super.initState();
@@ -125,20 +127,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             .eq('g_suite', user.email!)
             .single();
 
-        _userDepartment = userInfo['department'];
+        final myDepartment = userInfo['department'];
 
-        final index = rankings.indexWhere(
-          (d) => d.department == _userDepartment,
-        );
+        final index = rankings.indexWhere((d) => d.department == myDepartment);
 
-        if (index != -1) {
-          _departmentRank = "${index + 1}${_getOrdinal(index + 1)}";
-        }
+        setState(() {
+          _departmentRankings = rankings;
+          _userDepartment = myDepartment;
+
+          if (index != -1) {
+            _departmentRank = "${index + 1}${_getOrdinal(index + 1)}";
+          } else {
+            _departmentRank = "-";
+          }
+        });
       }
-
-      setState(() {
-        _departmentRankings = rankings;
-      });
     } catch (e) {
       print(e);
     }
@@ -322,18 +325,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
 
+      print("Campus Totals:");
+      print(campusTotals);
+
+      print("Campus Rankings:");
+      print(rankings.length);
+
       final currentUser = supabase.auth.currentUser;
 
       if (currentUser != null) {
-        final myCampus = userCampuses[currentUser.email];
+        final userInfo = await supabase
+            .from('user_info')
+            .select('campus')
+            .eq('g_suite', currentUser.email!)
+            .single();
+
+        final myCampus = userInfo['campus'];
 
         final campusIndex = rankings.indexWhere((c) => c.campus == myCampus);
 
         setState(() {
-          _userCampus = myCampus ?? "";
+          _campusRankings = rankings;
+          _userCampus = myCampus;
 
           if (campusIndex != -1) {
             _campusRank = "${campusIndex + 1}${_getOrdinal(campusIndex + 1)}";
+          } else {
+            _campusRank = "-";
           }
         });
       }

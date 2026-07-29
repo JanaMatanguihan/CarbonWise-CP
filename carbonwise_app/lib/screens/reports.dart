@@ -460,15 +460,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             color: Colors.black87,
                           ),
                         ),
-                        Text(
-                          '+5% since last month',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.red[400],
-                            fontWeight: FontWeight.w600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 12),

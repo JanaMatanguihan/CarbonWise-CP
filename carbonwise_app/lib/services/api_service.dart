@@ -243,18 +243,15 @@ class ApiService {
   }
 
   // GET: last 4 weeks record
-  Future<List<Map<String, dynamic>>> getLast4WeeksRecords(String email) async {
-    final now = DateTime.now();
-    final fourWeeksAgo = now.subtract(const Duration(days: 28));
-
+  Future<List<dynamic>> getLast4WeeksRecords(String email) async {
     final response = await Supabase.instance.client
         .from('carbon_records')
         .select()
         .eq('g_suite', email)
-        .gte('record_date', fourWeeksAgo.toIso8601String().split('T').first)
-        .order('record_date', ascending: true);
+        .order('record_date', ascending: false)
+        .limit(4);
 
-    return List<Map<String, dynamic>>.from(response);
+    return response;
   }
 
   // POST: Upload Profile Picture

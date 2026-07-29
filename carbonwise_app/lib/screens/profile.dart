@@ -471,7 +471,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final data = await _apiService.getLast4WeeksRecords(user.email!);
 
     setState(() {
-      last4Weeks = data.reversed.toList();
+      last4Weeks = data.reversed
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     });
   }
 
@@ -1061,7 +1063,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          ...last4Weeks.map((record) {
+                          ...last4Weeks.reversed.take(4).toList().reversed.map((
+                            record,
+                          ) {
                             double emission;
                             final date = DateTime.parse(record["record_date"]);
                             final label = "${date.month}/${date.day}";
