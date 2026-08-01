@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/screens/navigation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // for supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:flutter/services.dart';
+import 'package:carbonwise_app/widgets/terms_conditions_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -204,8 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('------------------ SUPABASE LOGIN ATTEMPT ------------------');
-
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -232,11 +231,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      print('SUCCESS: User Logged In!');
-      print('UUID: ${user.id}');
-      print('Email: ${user.email}');
-      print('------------------------------------------------------------');
-
       if (mounted) {
         DialogHelper.showSuccess(
           context: context,
@@ -254,14 +248,12 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on AuthException catch (error) {
-      print('SUPABASE AUTH ERROR: ${error.message}');
       DialogHelper.showError(
         context: context,
         title: "Login Failed",
         message: error.message,
       );
     } catch (error) {
-      print('UNEXPECTED ERROR: $error');
       DialogHelper.showError(
         context: context,
         title: "Unexpected Error",
@@ -520,6 +512,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool agreedToTerms = false;
 
   String? selectedRole;
 
@@ -673,16 +666,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    print("Role: $selectedRole");
-    print("SR Code: $srCode");
-    print("Name: $name");
-    print("Email: $email");
-    print("Campus: $selectedCampus");
-    print("Year: $selectedYearLevel");
-    print("Department: $selectedDepartment");
-    print("Faculty Type: $selectedFacultyType");
-    print("Office: $selectedOffice");
-
     if (name.isEmpty ||
         email.isEmpty ||
         password.isEmpty ||
@@ -693,6 +676,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         title: "Missing Information",
         message: "Please fill in all required fields.",
       );
+      return;
+    }
+
+    final accepted = await showTermsDialog(context);
+
+    if (accepted != true) {
       return;
     }
 
@@ -746,8 +735,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('Attempting insert into user_info...');
-
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
@@ -763,8 +750,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final user = response.user;
 
       if (user != null) {
-        print('Attempting insert into user_info...');
-
         await Supabase.instance.client.from('user_info').insert({
           'role': selectedRole,
           'sr_code': selectedRole == "Student" ? srCode : null,
@@ -784,13 +769,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               : null,
           'created_at': DateTime.now().toIso8601String(),
         });
-
-        print('SUCCESS: user_info insert completed');
       }
-
-      print('SUCCESS: User Registered via Authentication module!');
-      print('Assigned User UUID: ${response.user?.id}');
-      print('-------------------------------------------------------------');
 
       // redirects page from sign up to main navigation page after successful registration
       DialogHelper.showSuccess(
@@ -813,14 +792,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         },
       );
     } on AuthException catch (error) {
-      print('SUPABASE AUTH ERROR: ${error.message}');
       DialogHelper.showError(
         context: context,
         title: "Login Failed",
         message: error.message,
       );
     } catch (error) {
-      print('UNEXPECTED ERROR: $error');
       DialogHelper.showError(
         context: context,
         title: "Unexpected Error",
@@ -1133,7 +1110,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 },
                               ),
                             ],
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 18),
+
+                            const SizedBox(height: 16),
+
                             SizedBox(
                               width: double.infinity,
                               height: 48,

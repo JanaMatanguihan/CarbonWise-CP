@@ -435,7 +435,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
       // Refresh AI Sustainability Coach immediately
       strategyRefreshNotifier.value++;
-      print("Notifier sent!");
 
       DialogHelper.showSuccess(
         context: context,
