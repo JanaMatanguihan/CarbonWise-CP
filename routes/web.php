@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\MitigationStrategyController;
 use App\Http\Controllers\Admin\AlertController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ForecastController;
+
 use Illuminate\Support\Facades\Route;
 
 
@@ -110,6 +111,11 @@ Route::middleware(['auth'])->group(function () {
             '/admin/users/{g_suite}/records',
             [UserManagementController::class, 'carbonRecords']
         )->name('admin.users.records');
+
+        Route::get(
+        '/admin/users/{g_suite}/badges',
+        [UserManagementController::class, 'badges']
+        )->name('admin.users.badges');
 
         Route::get('/admin/users/{g_suite}/edit', [UserManagementController::class, 'edit'])
             ->name('admin.users.edit');

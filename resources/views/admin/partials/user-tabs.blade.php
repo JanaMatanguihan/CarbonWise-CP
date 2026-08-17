@@ -20,11 +20,14 @@
             Carbon Records
         </a>
 
-        {{-- Badges --}}
-        <span
-            class="pb-4 border-b-[3px] border-transparent text-gray-700 font-medium text-[16px] cursor-default">
+       {{-- Badges --}}
+        <a href="{{ route('admin.users.badges', $user->g_suite) }}"
+            class="pb-4 border-b-[3px] transition-all duration-200
+            {{ request()->routeIs('admin.users.badges')
+                ? 'border-green-600 text-green-700 font-semibold text-[16px]'
+                : 'border-transparent text-gray-700 font-medium text-[16px] hover:text-green-600' }}">
             Badges
-        </span>
+        </a>
 
     </div>
 

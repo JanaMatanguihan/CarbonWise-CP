@@ -2,24 +2,30 @@
 
 @section('content')
 
-<div class="p-8">
+<div class="container-fluid py-4">
 
-    <div class="grid grid-cols-12 gap-6">
+    <div class="row">
 
-        {{-- LEFT PROFILE CARD --}}
-        <div class="col-span-4">
+        {{-- Left Sidebar --}}
+        <div class="col-lg-4 mb-4">
+
             @include('admin.partials.user-sidebar')
+
         </div>
 
-        {{-- RIGHT CONTENT --}}
-        <div class="col-span-8 bg-white rounded-2xl shadow">
+        {{-- Right Content --}}
+        <div class="col-lg-8">
 
-            {{-- Tabs --}}
-            @include('admin.partials.user-tabs')
+            <div class="card shadow-sm border-0 rounded-4">
 
-            {{-- Dynamic Content --}}
-            <div class="p-6">
-                @yield('user-content')
+                @include('admin.partials.user-tabs')
+
+                <div class="card-body p-4">
+
+                    @yield('user-content')
+
+                </div>
+
             </div>
 
         </div>

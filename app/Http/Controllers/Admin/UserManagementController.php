@@ -7,6 +7,8 @@ use App\Models\UserInfo;
 use App\Models\CarbonRecord;
 use App\Models\MitigationStrategy;
 use App\Services\AlertService;
+use App\Services\GreenPointService;
+use App\Services\StreakService;
 use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
@@ -68,7 +70,7 @@ class UserManagementController extends Controller
     }
 
     // NEW METHOD
-                    public function show($g_suite)
+                    public function show(string $g_suite)
             {
                 
                 $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
@@ -159,18 +161,18 @@ class UserManagementController extends Controller
             );
             }
 
-            public function edit($g_suite)
+            public function edit(string $g_suite)
             {
                 $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
 
                 return view('admin.edit-user', compact('user'));
             }
 
-            public function update(Request $request, $g_suite)
-{
-    $user = UserInfo::findOrFail($g_suite);
+            public function update(Request $request, string $g_suite)
+            {
+                $user = UserInfo::findOrFail($g_suite);
 
-    $request->validate([
+                $request->validate([
         'full_name' => 'required|string|max:255',
         'g_suite' => 'required|email',
         'sr_code' => 'required',
@@ -204,7 +206,7 @@ class UserManagementController extends Controller
         ->with('success', 'User updated successfully.');
 }
 
-    public function destroy($g_suite)
+    public function destroy(string $g_suite)
         {
             $user = UserInfo::findOrFail($g_suite);
 
@@ -215,7 +217,7 @@ class UserManagementController extends Controller
                 ->with('success', 'User deleted successfully.');
         }
 
-     public function carbonRecords($g_suite)
+     public function carbonRecords(string$g_suite)
     {
         $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
 
@@ -227,5 +229,30 @@ class UserManagementController extends Controller
             'user',
             'records'
         ));
+    }
+
+       public function badges(
+        GreenPointService $greenPointService,
+        StreakService $streakService,
+        string $g_suite
+    )
+    {
+        $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
+
+        $greenPoints = $greenPointService->calculate($g_suite);
+
+        $currentStreak = $streakService->calculate($g_suite);
+
+        $weekActivity = $streakService->getCurrentWeekActivity($g_suite);
+
+        return view(
+            'admin.user-badges',
+            compact(
+                'user',
+                'greenPoints',
+                'currentStreak',
+                'weekActivity'
+            )
+        );
     }
 }

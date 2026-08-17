@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+tft-env/
+lightning_logs/
+__pycache__/
+*.pyc
