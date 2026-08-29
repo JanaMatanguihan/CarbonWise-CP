@@ -555,546 +555,433 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Transport Form Card
-          _buildFormCard(
-            title: 'Transport',
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  /// LEFT SIDE
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      children: [
-                        _buildDropdownField(
-                          label: 'Transport Type',
-                          hint: 'Select your transport type',
-                          value: _selectedTransportType,
-                          items: const [
-                            'Traditional Jeepney',
-                            'Modern Jeepney',
-                            'Car',
-                            'Motorcycle',
-                            'Bicycle/Walking',
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedTransportType = value;
-                            });
-                          },
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        _buildTextField(
-                          label: "Starting Point",
-                          hint: "Input Address Here",
-                          controller: _homeAddressController,
-                          onChanged: (_) {
-                            _distanceKm = null;
-                          },
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Ending Point",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3AA76D),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              height: 38,
-                              width: double.infinity,
-                              alignment: Alignment.centerLeft,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.black38),
-                                borderRadius: BorderRadius.circular(6),
-                                color: Colors.grey.shade100,
-                              ),
-                              child: Text(
-                                _userCampus.isEmpty
-                                    ? "Loading campus..."
-                                    : _userCampus,
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 14),
-
-                  /// RIGHT SIDE
-                  Expanded(
-                    flex: 6,
-                    child: Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.map,
-                              size: 45,
-                              color: Color(0xFF3AA76D),
-                            ),
-
-                            const SizedBox(height: 9),
-
-                            Text(
-                              _distanceKm == null
-                                  ? "Map Preview"
-                                  : "${_distanceKm!.toStringAsFixed(2)} km",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Color(0xFF3AA76D),
-                              ),
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF3AA76D),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () async {
-                                await _calculateDistance();
-                              },
-                              child: _isCalculatingDistance
-                                  ? const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        SizedBox(width: 10),
-                                        Text("Calculating..."),
-                                      ],
-                                    )
-                                  : const Text("Calculate Distance"),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 15),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC7D8CE),
-                    foregroundColor: const Color(0xFF265D3B),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  onPressed: () {
-                    if (_selectedTransportType == null || _distanceKm == null) {
-                      DialogHelper.showWarning(
-                        context: context,
-                        title: "Incomplete Information",
-                        message:
-                            "Please select a transport type and input your address to calculate the distance before adding an emission.",
-                      );
-                      return;
-                    }
-
-                    final emission = _calculateTransportationEmission(
-                      _selectedTransportType!,
-                      _distanceKm!,
-                    );
-
+    return SafeArea(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Transport Form Card
+            _buildFormCard(
+              title: 'Transportation',
+              icon: Icons.directions_car_rounded,
+              subtitle: 'Record how you traveled today.',
+              children: [
+                _buildDropdownField(
+                  label: 'Transport Type',
+                  hint: 'Select your mode of transportation',
+                  value: _selectedTransportType,
+                  items: const [
+                    'Traditional Jeepney',
+                    'Modern Jeepney',
+                    'Car',
+                    'Motorcycle',
+                    'Bicycle/Walking',
+                  ],
+                  onChanged: (value) {
                     setState(() {
-                      _transportationTotalEmission += emission;
-
-                      _transportEmissions.add(
-                        "$_selectedTransportType - ${emission.toStringAsFixed(2)} kg CO₂e",
-                      );
-
-                      _selectedTransportType = null;
+                      _selectedTransportType = value;
                     });
                   },
-                  child: const Text(
-                    "+ Add Emission",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 14),
+
+                _buildTextField(
+                  label: "Starting Point",
+                  hint: "Enter your starting address",
+                  controller: _homeAddressController,
+                  onChanged: (_) {
+                    setState(() {
+                      _distanceKm = null;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 14),
+
+                _buildCampusField(),
+
+                const SizedBox(height: 16),
+
+                _buildDistancePreview(),
+
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isCalculatingDistance
+                        ? null
+                        : () async {
+                            await _calculateDistance();
+                          },
+                    icon: _isCalculatingDistance
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.route_rounded),
+                    label: Text(
+                      _isCalculatingDistance
+                          ? "Calculating..."
+                          : "Calculate Distance",
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: darkGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
-          // 2. Office Resource Form Card
-          _buildFormCard(
-            title: 'Office Resource',
-            children: [
-              // First Row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: _buildDropdownField(
-                      label: 'Office Resource Type',
-                      hint: 'Select resource type',
-                      value: _selectedOfficeResourceType,
-                      items: const [
-                        'Air Conditioner',
-                        'Desktop Computer (CPU + Monitor)',
-                        'Electric Fan',
-                        'Lights',
-                        'Laptop',
-                        'Viewboard / Smart Screen',
-                        'Projector',
-                        'Printer (Laser)',
-                        'Photocopier / Multifunction Printer',
-                        'Scanner',
-                        'Sound Speaker',
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedOfficeResourceType = val;
-                          _selectedOfficeResourceCategory = null;
-                        });
-                      },
-                    ),
-                  ),
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildAddButton(
+                    onPressed: () {
+                      if (_selectedTransportType == null ||
+                          _distanceKm == null) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please select a transport type and calculate the distance before adding this activity.",
+                        );
+                        return;
+                      }
 
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    flex: 4,
-                    child: _buildDropdownField(
-                      label: 'Resource Category',
-                      hint: _selectedOfficeResourceType == null
-                          ? 'Select resource type'
-                          : 'Select resource category',
-                      value: _selectedOfficeResourceCategory,
-                      items: _getOfficeResourceCategories(
-                        _selectedOfficeResourceType,
-                      ),
-                      onChanged: (val) =>
-                          setState(() => _selectedOfficeResourceCategory = val),
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  SizedBox(
-                    width: 120,
-                    child: _buildTextField(
-                      label: "Hours",
-                      hint: "Enter hours",
-                      controller: _officeHoursController,
-                      keyboardType: TextInputType.number,
-                      numbersOnly: true,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Second Row (Button)
-              SizedBox(
-                width: double.infinity,
-                child: _buildAddButton(
-                  onPressed: () {
-                    if (_selectedOfficeResourceType == null ||
-                        _selectedOfficeResourceCategory == null) {
-                      DialogHelper.showWarning(
-                        context: context,
-                        title: "Incomplete Information",
-                        message:
-                            "Please select an office resource type and category before adding an emission.",
+                      final emission = _calculateTransportationEmission(
+                        _selectedTransportType!,
+                        _distanceKm!,
                       );
-                      return;
-                    }
 
-                    if (_officeHoursController.text.isEmpty) {
-                      DialogHelper.showWarning(
-                        context: context,
-                        title: "Incomplete Information",
-                        message: "Please enter the number of hours used.",
-                      );
-                      return;
-                    }
+                      setState(() {
+                        _transportationTotalEmission += emission;
 
-                    final hours = double.parse(_officeHoursController.text);
+                        _transportEmissions.add(
+                          "$_selectedTransportType - ${emission.toStringAsFixed(2)} kg CO₂e",
+                        );
 
-                    final emission = _calculateOfficeResourceEmission(
-                      _selectedOfficeResourceCategory!,
-                      hours,
-                    );
+                        _selectedTransportType = null;
+                        _distanceKm = null;
+                        _homeAddressController.clear();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
 
+            const SizedBox(height: 16),
+
+            // 2. Office Resource Form Card
+            _buildFormCard(
+              title: 'Office Resource',
+              icon: Icons.devices_other_outlined,
+              subtitle: 'Record the resources you used.',
+              children: [
+                _buildDropdownField(
+                  label: 'Office Resource Type',
+                  hint: 'Select resource type',
+                  value: _selectedOfficeResourceType,
+                  items: const [
+                    'Air Conditioner',
+                    'Desktop Computer (CPU + Monitor)',
+                    'Electric Fan',
+                    'Lights',
+                    'Laptop',
+                    'Viewboard / Smart Screen',
+                    'Projector',
+                    'Printer (Laser)',
+                    'Photocopier / Multifunction Printer',
+                    'Scanner',
+                    'Sound Speaker',
+                  ],
+                  onChanged: (val) {
                     setState(() {
-                      _officeEmissions.add(
-                        '${_selectedOfficeResourceCategory!}\n'
-                        '$hours hour(s)\n'
-                        '${emission.toStringAsFixed(2)} kg CO₂e',
-                      );
-
-                      _officeResourceTotalEmission += emission;
-
-                      _selectedOfficeResourceType = null;
+                      _selectedOfficeResourceType = val;
                       _selectedOfficeResourceCategory = null;
-                      _officeHoursController.clear();
                     });
                   },
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-          // 3. Food Consumption Form Card
-          _buildFormCard(
-            title: 'Food Consumption',
-            children: [
-              // First Row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: _buildDropdownField(
-                      label: 'Food Type',
-                      hint: 'Select food type',
-                      value: _selectedFoodType,
-                      items: const [
-                        'Red Meat',
-                        'Dairy & Poultry',
-                        'Staples & Plant-based Proteins',
-                        'Grains, Vegetables, and Fruits',
-                        'Beverages and Discretionary Items',
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedFoodType = val;
-                          _selectedFoodCategory = null;
-                        });
-                      },
-                    ),
+                _buildDropdownField(
+                  label: 'Resource Category',
+                  hint: _selectedOfficeResourceType == null
+                      ? 'Select a resource type first'
+                      : 'Select resource category',
+                  value: _selectedOfficeResourceCategory,
+                  items: _getOfficeResourceCategories(
+                    _selectedOfficeResourceType,
                   ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    flex: 4,
-                    child: _buildDropdownField(
-                      label: 'Food Category',
-                      hint: _selectedFoodType == null
-                          ? 'Select food type'
-                          : 'Select food category',
-                      value: _selectedFoodCategory,
-                      items: _getFoodCategories(_selectedFoodType),
-                      onChanged: _selectedFoodType == null
-                          ? (_) {}
-                          : (val) =>
-                                setState(() => _selectedFoodCategory = val),
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  SizedBox(
-                    width: 120,
-                    child: _buildTextField(
-                      label: "Servings",
-                      hint: "Enter servings",
-                      controller: _servingSizeController,
-                      keyboardType: TextInputType.number,
-                      numbersOnly: true,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Second Row
-              SizedBox(
-                width: double.infinity,
-                child: _buildAddButton(
-                  onPressed: () {
-                    if (_selectedFoodType == null ||
-                        _selectedFoodCategory == null) {
-                      DialogHelper.showWarning(
-                        context: context,
-                        title: "Incomplete Information",
-                        message:
-                            "Please select a food type and food category before adding an emission.",
-                      );
-                      return;
-                    }
-
-                    if (_servingSizeController.text.isEmpty) {
-                      DialogHelper.showWarning(
-                        context: context,
-                        title: "Incomplete Information",
-                        message: "Please enter the serving size.",
-                      );
-                      return;
-                    }
-
-                    final serving = double.parse(_servingSizeController.text);
-
-                    // Emission factors are in kg CO₂e per kilogram of food.
-                    // Approximate 1 serving = 100 g (0.1 kg).
-
-                    const servingWeight = 0.1;
-
-                    final emission =
-                        _calculateFoodEmission(_selectedFoodCategory!) *
-                        serving *
-                        servingWeight;
-
+                  onChanged: (val) {
                     setState(() {
-                      _foodEmissions.add(
-                        '${_selectedFoodCategory!}\n'
-                        '$serving serving(s)\n'
-                        '${emission.toStringAsFixed(2)} kg CO₂e',
-                      );
-
-                      _foodTotalEmission += emission;
-
-                      _selectedFoodType = null;
-                      _selectedFoodCategory = null;
-                      _servingSizeController.clear();
+                      _selectedOfficeResourceCategory = val;
                     });
                   },
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
-          // 4. Your Carbon Emissions List Section
-          const Center(
-            child: Text(
-              'Your Carbon Emissions List',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: darkGreen,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _buildDynamicListCard(
-                  'Transportation',
-                  _transportEmissions,
+                _buildTextField(
+                  label: "Hours Used",
+                  hint: "Enter number of hours",
+                  controller: _officeHoursController,
+                  keyboardType: TextInputType.number,
+                  numbersOnly: true,
                 ),
-              ),
-              const SizedBox(width: 12),
 
-              Expanded(
-                child: _buildDynamicListCard(
-                  'Office Resource',
-                  _officeEmissions,
-                ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(height: 16),
 
-              Expanded(
-                child: _buildDynamicListCard(
-                  'Food Consumption',
-                  _foodEmissions,
-                ),
-              ),
-            ],
-          ),
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildAddButton(
+                    onPressed: () {
+                      if (_selectedOfficeResourceType == null ||
+                          _selectedOfficeResourceCategory == null) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please select an office resource type and category before adding an emission.",
+                        );
+                        return;
+                      }
 
-          const SizedBox(height: 24),
+                      if (_officeHoursController.text.isEmpty) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message: "Please enter the number of hours used.",
+                        );
+                        return;
+                      }
 
-          // 🟢 POP-UP LOGIC ADDED BELOW
-          GestureDetector(
-            onTap: () async {
-              if (_transportEmissions.isEmpty &&
-                  _officeEmissions.isEmpty &&
-                  _foodEmissions.isEmpty) {
-                DialogHelper.showWarning(
-                  context: context,
-                  title: "Incomplete Information",
-                  message: "Please add at least one emission to calculate.",
-                );
-                return;
-              }
+                      final hours = double.parse(_officeHoursController.text);
 
-              await _saveCarbonRecords();
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: primaryGreen,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  'Calculate my Carbon Emissions',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.3,
+                      final emission = _calculateOfficeResourceEmission(
+                        _selectedOfficeResourceCategory!,
+                        hours,
+                      );
+
+                      setState(() {
+                        _officeEmissions.add(
+                          '${_selectedOfficeResourceCategory!}\n'
+                          '$hours hour(s)\n'
+                          '${emission.toStringAsFixed(2)} kg CO₂e',
+                        );
+
+                        _officeResourceTotalEmission += emission;
+
+                        _selectedOfficeResourceType = null;
+                        _selectedOfficeResourceCategory = null;
+                        _officeHoursController.clear();
+                      });
+                    },
                   ),
                 ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // 3. Food Consumption Form Card
+            _buildFormCard(
+              title: 'Food Consumption',
+              icon: Icons.restaurant_outlined,
+              subtitle: 'Record what you consumed today.',
+              children: [
+                // Food Type
+                _buildDropdownField(
+                  label: 'Food Type',
+                  hint: 'Select food type',
+                  value: _selectedFoodType,
+                  items: const [
+                    'Red Meat',
+                    'Dairy & Poultry',
+                    'Staples & Plant-based Proteins',
+                    'Grains, Vegetables, and Fruits',
+                    'Beverages and Discretionary Items',
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedFoodType = val;
+                      _selectedFoodCategory = null;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 14),
+
+                // Food Category
+                _buildDropdownField(
+                  label: 'Food Category',
+                  hint: _selectedFoodType == null
+                      ? 'Select food type'
+                      : 'Select food category',
+                  value: _selectedFoodCategory,
+                  items: _getFoodCategories(_selectedFoodType),
+                  onChanged: _selectedFoodType == null
+                      ? (_) {}
+                      : (val) => setState(() => _selectedFoodCategory = val),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Servings
+                _buildTextField(
+                  label: "Servings",
+                  hint: "Enter number of servings",
+                  controller: _servingSizeController,
+                  keyboardType: TextInputType.number,
+                  numbersOnly: true,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Add Activity
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildAddButton(
+                    onPressed: () {
+                      if (_selectedFoodType == null ||
+                          _selectedFoodCategory == null) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please select a food type and food category before adding an emission.",
+                        );
+                        return;
+                      }
+
+                      if (_servingSizeController.text.isEmpty) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message: "Please enter the serving size.",
+                        );
+                        return;
+                      }
+
+                      final serving = double.parse(_servingSizeController.text);
+
+                      // Emission factors are in kg CO₂e per kilogram of food.
+                      // Approximate 1 serving = 100 g (0.1 kg).
+                      const servingWeight = 0.1;
+
+                      final emission =
+                          _calculateFoodEmission(_selectedFoodCategory!) *
+                          serving *
+                          servingWeight;
+
+                      setState(() {
+                        _foodEmissions.add(
+                          '${_selectedFoodCategory!}\n'
+                          '$serving serving(s)\n'
+                          '${emission.toStringAsFixed(2)} kg CO₂e',
+                        );
+
+                        _foodTotalEmission += emission;
+
+                        _selectedFoodType = null;
+                        _selectedFoodCategory = null;
+                        _servingSizeController.clear();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // 4. Your Carbon Emissions List Section
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Your Added Activities',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  color: darkGreen,
+                ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 4),
+
+            const Text(
+              'Review the activities you have recorded.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+
+            const SizedBox(height: 12),
+
+            _buildCombinedActivityList(),
+
+            const SizedBox(height: 24),
+
+            // 🟢 POP-UP LOGIC
+            GestureDetector(
+              onTap: () async {
+                if (_transportEmissions.isEmpty &&
+                    _officeEmissions.isEmpty &&
+                    _foodEmissions.isEmpty) {
+                  DialogHelper.showWarning(
+                    context: context,
+                    title: "Incomplete Information",
+                    message: "Please add at least one emission to calculate.",
+                  );
+                  return;
+                }
+
+                await _saveCarbonRecords();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: primaryGreen,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'Calculate my Carbon Emissions',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -1102,6 +989,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   // Component Builders
   Widget _buildFormCard({
     required String title,
+    required IconData icon,
+    required String subtitle,
     required List<Widget> children,
   }) {
     return Container(
@@ -1109,11 +998,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -1121,15 +1011,49 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E5631),
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: primaryGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: primaryGreen, size: 22),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2933),
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 20),
+
           ...children,
         ],
       ),
@@ -1157,7 +1081,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         ),
         const SizedBox(height: 6),
         Container(
-          height: 38,
+          height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black38, width: 1),
@@ -1168,7 +1092,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               value: value,
               hint: Text(
                 hint,
-                style: const TextStyle(fontSize: 10, color: Colors.black38),
+                style: const TextStyle(fontSize: 13, color: Colors.black38),
               ),
               isExpanded: true,
               icon: const Icon(
@@ -1176,7 +1100,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 color: Colors.black,
                 size: 18,
               ),
-              style: const TextStyle(fontSize: 11, color: Colors.black87),
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
               onChanged: onChanged,
               items: items.map<DropdownMenuItem<String>>((String val) {
                 return DropdownMenuItem<String>(value: val, child: Text(val));
@@ -1211,7 +1135,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: 38,
+          height: 52,
           child: TextField(
             controller: controller,
             enabled: enabled,
@@ -1222,17 +1146,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 : [],
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(fontSize: 8, color: Colors.black38),
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.black38),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 8,
+                horizontal: 14,
+                vertical: 14,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Colors.black38, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Colors.black38, width: 1),
               ),
             ),
@@ -1243,21 +1167,23 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Widget _buildAddButton({required VoidCallback onPressed}) {
-    return Container(
-      height: 38,
-      margin: const EdgeInsets.only(bottom: 1),
-      child: ElevatedButton(
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton.icon(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFCCEAD8),
-          foregroundColor: const Color(0xFF1E5631),
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+        label: const Text(
+          'Add Activity',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
-        child: const Text(
-          '+ Add Emission',
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFE1F2E7),
+          foregroundColor: darkGreen,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
     );
@@ -1351,6 +1277,306 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       );
                     },
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCampusField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Destination",
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: darkGreen,
+          ),
+        ),
+
+        const SizedBox(height: 7),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F8F5),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFD9E8DE)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: primaryGreen,
+                size: 20,
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Text(
+                  _userCampus.isEmpty ? "Loading your campus..." : _userCampus,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1F2933),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDistancePreview() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _distanceKm == null
+            ? const Color(0xFFF8FBF9)
+            : const Color(0xFFE8F6ED),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _distanceKm == null
+              ? const Color(0xFFD9E8DE)
+              : primaryGreen.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: primaryGreen.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.route_rounded, color: primaryGreen),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Estimated Distance",
+                  style: TextStyle(fontSize: 13, color: Colors.black54),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  _distanceKm == null
+                      ? "Calculate your route first"
+                      : "${_distanceKm!.toStringAsFixed(2)} km",
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: darkGreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCombinedActivityList() {
+    final List<Widget> activities = [];
+
+    // Transportation
+    for (final activity in _transportEmissions) {
+      activities.add(
+        _buildActivityItem(
+          icon: Icons.directions_car_rounded,
+          iconColor: const Color(0xFF3AA76D),
+          category: 'Transportation',
+          activity: activity,
+        ),
+      );
+    }
+
+    // Office Resource
+    for (final activity in _officeEmissions) {
+      activities.add(
+        _buildActivityItem(
+          icon: Icons.devices_other_rounded,
+          iconColor: const Color(0xFF4F7CAC),
+          category: 'Office Resource',
+          activity: activity,
+        ),
+      );
+    }
+
+    // Food Consumption
+    for (final activity in _foodEmissions) {
+      activities.add(
+        _buildActivityItem(
+          icon: Icons.restaurant_rounded,
+          iconColor: const Color(0xFFE38B3D),
+          category: 'Food Consumption',
+          activity: activity,
+        ),
+      );
+    }
+
+    if (activities.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE5EEE8)),
+        ),
+        child: const Column(
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 42,
+              color: Color(0xFF9CA3AF),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'No activities added yet',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2933),
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Your recorded activities will appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(children: activities);
+  }
+
+  Widget _buildActivityItem({
+    required IconData icon,
+    required Color iconColor,
+    required String category,
+    required String activity,
+  }) {
+    final parts = activity.split('\n');
+
+    String title = '';
+    String details = '';
+    String emission = '';
+
+    if (category == 'Transportation') {
+      // Transportation format:
+      // Traditional Jeepney - 2.98 kg CO₂e
+      // Transportation
+
+      if (parts.isNotEmpty) {
+        final firstLine = parts[0];
+
+        final emissionIndex = firstLine.lastIndexOf(' - ');
+
+        if (emissionIndex != -1) {
+          title = firstLine.substring(0, emissionIndex);
+          emission = firstLine.substring(emissionIndex + 3);
+        } else {
+          title = firstLine;
+        }
+      }
+
+      details = category;
+    } else {
+      // Office Resource and Food Consumption format:
+      // Title
+      // Details
+      // Emission
+
+      title = parts.isNotEmpty ? parts[0] : '';
+      details = parts.length > 1 ? parts[1] : '';
+      emission = parts.length > 2 ? parts[2] : '';
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: iconColor, size: 23),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2933),
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  details.isEmpty ? category : '$category · $details',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Text(
+            emission,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: darkGreen,
+            ),
           ),
         ],
       ),

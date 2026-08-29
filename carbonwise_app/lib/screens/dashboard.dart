@@ -392,249 +392,333 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // =========================
             // TOP RANKING CARDS
             // =========================
+            const SizedBox(height: 12),
+
+            const Text(
+              "Your Impact",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              "See how your carbon footprint compares.",
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+
+            const SizedBox(height: 16),
+
+            // =========================
+            // YOUR CURRENT RANKING
+            // =========================
+            _buildFeaturedRankingCard(),
+
+            const SizedBox(height: 12),
+
+            // =========================
+            // DEPARTMENT + CAMPUS
+            // =========================
             Row(
               children: [
                 Expanded(
                   child: _buildRankingCard(
-                    title: 'Your Current\nRanking',
-                    icon: Icons.recycling_outlined,
-                    badgeText: _currentRanking,
-                    description: _currentRankingDescription,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildRankingCard(
-                    title: 'Department\nRanking',
+                    title: 'Department Ranking',
                     icon: Icons.school_outlined,
                     badgeText: _departmentRank,
-                    description: '$_userDepartment Department',
+                    description: _userDepartment.isEmpty
+                        ? 'Loading department...'
+                        : _userDepartment,
                   ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(width: 12),
+
                 Expanded(
                   child: _buildRankingCard(
-                    title: 'Campus\nRanking',
+                    title: 'Campus Ranking',
                     icon: Icons.business_outlined,
                     badgeText: _campusRank,
-                    description:
-                        '$_userCampus is ranked among all BatStateU campuses.',
+                    description: _userCampus.isEmpty
+                        ? 'Loading campus...'
+                        : _userCampus,
                   ),
                 ),
               ],
             ),
 
+            const SizedBox(height: 24),
+
             const SizedBox(height: 20),
-            const Divider(color: Colors.black26, thickness: 1),
-            const SizedBox(height: 12),
 
             // =========================
             // CHART SECTION
             // =========================
 
             // Individual Status Section
-            _buildStatusCard(
-              title: "Individual Status",
+            const Text(
+              "Today's Footprint",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              "Your carbon emissions by category.",
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+
+            const SizedBox(height: 14),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 children: [
-                  _buildEmissionBar("🚗 Transportation", transportEmission),
+                  _buildFootprintItem(
+                    icon: Icons.directions_car_outlined,
+                    title: "Transportation",
+                    value: transportEmission,
+                  ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 18),
 
-                  _buildEmissionBar("🏢 Office Resource", officeEmission),
+                  _buildFootprintItem(
+                    icon: Icons.business_outlined,
+                    title: "Office Resource",
+                    value: officeEmission,
+                  ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 18),
 
-                  _buildEmissionBar("🍽️ Food Consumption", foodEmission),
+                  _buildFootprintItem(
+                    icon: Icons.restaurant_outlined,
+                    title: "Food Consumption",
+                    value: foodEmission,
+                  ),
                 ],
               ),
             ),
 
+            const SizedBox(height: 28),
+
             const SizedBox(height: 16),
 
             // Department Ranking Section
-            _buildStatusCard(
-              title: "Department Ranking",
-              child: SizedBox(
-                height: 260,
-                child: Scrollbar(
-                  controller: _departmentScrollController,
-                  thumbVisibility: true,
-                  radius: const Radius.circular(20),
-                  child: ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _departmentRankings.length,
-                    controller: _departmentScrollController,
-                    itemBuilder: (context, index) {
-                      final dept = _departmentRankings[index];
-
-                      IconData medal;
-                      Color medalColor;
-
-                      switch (index) {
-                        case 0:
-                          medal = Icons.workspace_premium;
-                          medalColor = Colors.amber;
-                          break;
-
-                        case 1:
-                          medal = Icons.workspace_premium;
-                          medalColor = Colors.grey;
-                          break;
-
-                        case 2:
-                          medal = Icons.workspace_premium;
-                          medalColor = const Color(0xFFCD7F32);
-                          break;
-
-                        default:
-                          medal = Icons.eco;
-                          medalColor = const Color(0xFF3AA76D);
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FBF9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.shade100),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(medal, color: medalColor, size: 22),
-
-                            const SizedBox(width: 10),
-
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    dept.department,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 2),
-
-                                  Text(
-                                    "Average Carbon Emission",
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-
-                                  Text(
-                                    "${dept.totalRecords} record(s)",
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF265D3B),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                "${dept.averageEmission.toStringAsFixed(2)} kg CO₂e",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+            // =========================
+            // DEPARTMENT RANKING
+            // =========================
+            const Text(
+              "Department Rankings",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
               ),
             ),
 
-            const SizedBox(height: 20),
-            const Divider(color: Colors.black26, thickness: 1),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
 
-            // =========================
-            // GOING GREEN INITIATIVES
-            // =========================
+            Text(
+              "See which departments are making the biggest impact.",
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+
+            const SizedBox(height: 14),
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
+              child: _departmentRankings.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          "No department rankings available yet.",
+                          style: TextStyle(color: Colors.black54, fontSize: 13),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        ..._departmentRankings
+                            .take(5)
+                            .toList()
+                            .asMap()
+                            .entries
+                            .map((entry) {
+                              final index = entry.key;
+                              final dept = entry.value;
+
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      index ==
+                                          _departmentRankings.take(5).length - 1
+                                      ? 0
+                                      : 12,
+                                ),
+                                child: _buildDepartmentRankingItem(
+                                  rank: index + 1,
+                                  department: dept.department,
+                                  emission: dept.averageEmission,
+                                  records: dept.totalRecords,
+                                ),
+                              );
+                            }),
+                      ],
+                    ),
+            ),
+
+            const SizedBox(height: 28),
+
+            const SizedBox(height: 28),
+
+            // =========================
+            // GOING GREEN INITIATIVES
+            // =========================
+            const Text(
+              "Going Green",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              "Join upcoming activities and make a difference.",
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+
+            const SizedBox(height: 14),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF265D3B),
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Top icon + label
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.eco_outlined,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  const Text(
+                    "The Great Green\nClean-Up Drive",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    "Join the campus community and help make our surroundings cleaner and greener.",
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _buildGreenEventDetail(
+                    Icons.calendar_today_outlined,
+                    "Friday, June 19, 2026",
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildGreenEventDetail(
+                    Icons.access_time_outlined,
+                    "8:00 AM – 12:00 PM",
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildGreenEventDetail(
+                    Icons.location_on_outlined,
+                    "Campus Facade",
+                  ),
+
+                  const SizedBox(height: 18),
+
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: const [
-                      Icon(Icons.campaign, color: Color(0xFF265D3B)),
-                      SizedBox(width: 8),
                       Text(
-                        'Going Green Initiatives',
+                        "Bring a reusable water bottle",
                         style: TextStyle(
-                          color: Color(0xFF265D3B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'What: The Great Green Clean-Up Drive\n'
-                    'When: Friday, June 19, 2026 | 8:00 AM - 12:00 PM\n'
-                    'Where: Assembly point at the Campus Facade\n'
-                    'What to bring: A reusable water bottle!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                      height: 1.4,
-                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  // =========================
-  // RANKING CARD WIDGET
-  // =========================
   Widget _buildRankingCard({
     required String title,
     required IconData icon,
@@ -642,126 +726,356 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String description,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Icon circle
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE8F5EC),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Color(0xFF3AA76D), size: 22),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Ranking
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              badgeText,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF265D3B),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Title
           Text(
             title,
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
               color: Colors.black87,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
-          Icon(icon, color: const Color(0xFF3AA76D), size: 28),
-          const SizedBox(height: 6),
-          Text(
-            badgeText,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF265D3B),
-            ),
-          ),
-          const SizedBox(height: 4),
+
+          const SizedBox(height: 5),
+
+          // Description
           Text(
             description,
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 8, color: Colors.black54),
+            style: const TextStyle(
+              fontSize: 8,
+              color: Colors.black54,
+              height: 1.2,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmissionBar(String label, double value) {
-    final maxValue = [
-      transportEmission,
-      officeEmission,
-      foodEmission,
-      1.0,
-    ].reduce((a, b) => a > b ? a : b);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-
-            Text(
-              "${value.toStringAsFixed(2)} kg",
-              style: const TextStyle(
-                color: Color(0xFF265D3B),
-                fontWeight: FontWeight.bold,
-              ),
+  Widget _buildFeaturedRankingCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF265D3B),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
-          ],
+            child: const Icon(
+              Icons.workspace_premium_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your Current Ranking',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _currentRanking,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  _currentRankingDescription,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFootprintItem({
+    required IconData icon,
+    required String title,
+    required double value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Color(0xFFE8F5EC),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: const Color(0xFF3AA76D), size: 21),
         ),
 
-        const SizedBox(height: 6),
+        const SizedBox(width: 12),
 
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: value / maxValue,
-            minHeight: 14,
-            backgroundColor: Colors.green.shade100,
-            valueColor: const AlwaysStoppedAnimation(Color(0xFF3AA76D)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: (value / 100).clamp(0.0, 1.0),
+                  minHeight: 7,
+                  backgroundColor: const Color(0xFFF0F2F1),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF3AA76D),
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              value.toStringAsFixed(2),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF265D3B),
+              ),
+            ),
+            const Text(
+              "kg CO₂e",
+              style: TextStyle(fontSize: 9, color: Colors.black54),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  // =========================
-  // STATUS CARD WIDGET
-  // =========================
-  Widget _buildStatusCard({required String title, required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+  Widget _buildDepartmentRankingItem({
+    required int rank,
+    required String department,
+    required double emission,
+    required int records,
+  }) {
+    IconData icon;
+    Color iconColor;
+    Color backgroundColor;
+
+    switch (rank) {
+      case 1:
+        icon = Icons.workspace_premium;
+        iconColor = Colors.amber;
+        backgroundColor = const Color(0xFFFFF8E1);
+        break;
+
+      case 2:
+        icon = Icons.workspace_premium;
+        iconColor = Colors.grey;
+        backgroundColor = const Color(0xFFF3F4F6);
+        break;
+
+      case 3:
+        icon = Icons.workspace_premium;
+        iconColor = const Color(0xFFCD7F32);
+        backgroundColor = const Color(0xFFFFF3E8);
+        break;
+
+      default:
+        icon = Icons.eco_outlined;
+        iconColor = const Color(0xFF3AA76D);
+        backgroundColor = const Color(0xFFEFF8F2);
+    }
+
+    return Row(
+      children: [
+        // Rank
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
+          child: Center(
+            child: rank <= 3
+                ? Icon(icon, color: iconColor, size: 21)
+                : Text(
+                    "#$rank",
+                    style: TextStyle(
+                      color: iconColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        // Department information
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                department,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+
+              const SizedBox(height: 3),
+
+              Text(
+                "$records record(s)",
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // Emission
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              emission.toStringAsFixed(2),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF265D3B),
+              ),
+            ),
+            const Text(
+              "kg CO₂e avg.",
+              style: TextStyle(fontSize: 9, color: Colors.black54),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGreenEventDetail(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 18),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 10),
-          child,
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

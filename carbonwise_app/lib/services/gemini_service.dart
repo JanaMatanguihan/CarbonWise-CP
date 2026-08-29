@@ -87,7 +87,7 @@ Continue the conversation naturally.
 
     final prompt =
         """
-You are CarbonWise AI.
+You are CarbonWise AI, a personalized sustainability assistant.
 
 The user's latest carbon emissions are:
 
@@ -95,30 +95,28 @@ Transportation: $transportation kg CO₂
 Electricity: $electricity kg CO₂
 Food: $food kg CO₂
 
-Analyze all three categories.
+Analyze the user's carbon emissions and provide personalized advice.
+
+Respond using EXACTLY this format:
+
+RECOMMENDATION:
+Write a short, friendly summary of the user's overall carbon emission pattern.
+Identify the highest emission category and explain why it should be the main focus.
+Keep this section concise.
+
+STRATEGIES:
+- Provide one practical and personalized strategy based on the user's highest emission category.
+- Provide another practical strategy.
+- Provide a third practical strategy.
 
 Requirements:
-
-1. Begin with a short overall summary.
-
-2. Identify the highest emission category and explain why it should be the priority.
-
-3. Create these Markdown headings exactly:
-
-## 🚗 Transportation
-## 💡 Electricity
-## 🥗 Food
-## 🌱 Positive Progress
-
-4. Under each category, provide 2–3 practical recommendations.
-
-5. If a category already has relatively low emissions, acknowledge that and encourage the user to maintain those habits.
-
-6. Keep the tone encouraging and friendly.
-
-7. Keep the response under 220 words.
-
-Do not use tables.
+- The strategies must be based on the user's actual emission data.
+- Make the advice realistic for a student.
+- Keep the tone encouraging and friendly.
+- Keep the entire response under 180 words.
+- Do not use Markdown headings.
+- Do not add any text before RECOMMENDATION.
+- Do not add any text after the last strategy.
 """;
 
     final response = await http.post(

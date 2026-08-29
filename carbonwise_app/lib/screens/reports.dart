@@ -6,6 +6,9 @@ import 'package:carbonwise_app/services/gemini_service.dart';
 import 'package:carbonwise_app/utils/smart_suggestion.dart';
 import 'package:carbonwise_app/utils/strategy_notifier.dart';
 
+const primaryGreen = Color(0xFF3AA76D);
+const darkGreen = Color(0xFF1E5631);
+
 enum ReportTimeframe { thisWeek, thisMonth, lastMonth }
 
 class ReportsScreen extends StatefulWidget {
@@ -13,6 +16,27 @@ class ReportsScreen extends StatefulWidget {
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _NoEmissionRecords extends StatelessWidget {
+  const _NoEmissionRecords();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bar_chart_outlined, size: 42, color: Colors.black26),
+          SizedBox(height: 8),
+          Text(
+            "No emission records yet",
+            style: TextStyle(color: Colors.black54, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Legend extends StatelessWidget {
@@ -63,6 +87,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _journeySubtitle = "";
 
   List<SmartSuggestion> _smartSuggestions = [];
+
+  double _getHorizontalInterval() {
+    if (emissionOverTime.isEmpty) return 1;
+
+    final maxValue = emissionOverTime
+        .map((spot) => spot.y)
+        .reduce((a, b) => a > b ? a : b);
+
+    if (maxValue <= 5) return 1;
+    if (maxValue <= 20) return 5;
+    if (maxValue <= 50) return 10;
+    if (maxValue <= 100) return 20;
+
+    return (maxValue / 5).ceilToDouble();
+  }
+
+  double _getXAxisInterval() {
+    if (labels.length <= 4) {
+      return 1;
+    }
+
+    if (labels.length <= 8) {
+      return 2;
+    }
+
+    return (labels.length / 4).ceilToDouble();
+  }
 
   @override
   void initState() {
@@ -178,6 +229,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .order('record_date');
 
     emissionOverTime.clear();
+    labels.clear();
 
     transportTotal = 0;
     officeTotal = 0;
@@ -186,9 +238,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     int x = 0;
 
     for (final row in records) {
+      final recordDate = DateTime.parse(row['record_date'].toString());
+
       emissionOverTime.add(
         FlSpot(x.toDouble(), (row['total_emission'] as num).toDouble()),
       );
+
+      labels.add("${recordDate.month}/${recordDate.day}");
 
       transportTotal += (row['transportation'] as num?)?.toDouble() ?? 0;
 
@@ -445,87 +501,157 @@ class _ReportsScreenState extends State<ReportsScreen> {
               // 3. Total CO2 Emissions Card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16.0),
-                decoration: _cardDecoration(),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3AA76D),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3AA76D).withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Total CO2 Emissions',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.eco_outlined,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        const Expanded(
+                          child: Text(
+                            'Your Total Carbon Footprint',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+
+                    const SizedBox(height: 22),
+
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
                           isLoading ? '--' : totalEmission.toStringAsFixed(2),
                           style: const TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.bold,
-                            color: primaryGreen,
+                            color: Colors.white,
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          'kg CO2',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+
+                        const SizedBox(width: 6),
+
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 7),
+                          child: Text(
+                            'kg CO₂e',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white70,
+                            ),
                           ),
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      'Your recorded carbon emissions so far.',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // 4. Row of Three Stat Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'This Week',
-                      isLoading ? '--' : weekEmission.toStringAsFixed(2),
-                      'kg CO₂',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'This Month',
-                      isLoading ? '--' : monthEmission.toStringAsFixed(2),
-                      'kg CO₂',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      "This week's\nemissions",
-                      _weeklyChange == null
-                          ? "--"
-                          : "${_weeklyChange!.abs().toStringAsFixed(1)}%"
-                                "${_weeklyChange! < 0 ? " ↓" : " ↑"}",
-                      "vs last week",
-                      valueColor: _weeklyChange != null && _weeklyChange! < 0
-                          ? primaryGreen
-                          : Colors.red,
-                    ),
-                  ),
-                ],
+              const Text(
+                'Quick Overview',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
+
+              const SizedBox(height: 10),
+
+              SizedBox(
+                height: 135,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      width: 150,
+                      child: _buildStatCard(
+                        'This Week',
+                        isLoading ? '--' : weekEmission.toStringAsFixed(2),
+                        'kg CO₂e',
+                        icon: Icons.calendar_today_outlined,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    SizedBox(
+                      width: 150,
+                      child: _buildStatCard(
+                        'This Month',
+                        isLoading ? '--' : monthEmission.toStringAsFixed(2),
+                        'kg CO₂e',
+                        icon: Icons.calendar_month_outlined,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    SizedBox(
+                      width: 150,
+                      child: _buildStatCard(
+                        "Weekly Change",
+                        _weeklyChange == null
+                            ? "--"
+                            : "${_weeklyChange!.abs().toStringAsFixed(1)}%"
+                                  "${_weeklyChange! < 0 ? " ↓" : " ↑"}",
+                        "vs last week",
+                        icon: _weeklyChange != null && _weeklyChange! < 0
+                            ? Icons.trending_down
+                            : Icons.trending_up,
+                        valueColor: _weeklyChange != null && _weeklyChange! < 0
+                            ? primaryGreen
+                            : Colors.red,
+                      ),
+                    ),
+
+                    const SizedBox(width: 4),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
               const SizedBox(height: 16),
 
               // 5. Charts
@@ -533,63 +659,175 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: _cardDecoration(),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Emissions Over Time",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-
-                        DropdownButton<ReportTimeframe>(
-                          value: _timeframeOverTime,
-                          underline: const SizedBox(),
-                          items: const [
-                            DropdownMenuItem(
-                              value: ReportTimeframe.thisWeek,
-                              child: Text("This Week"),
-                            ),
-
-                            DropdownMenuItem(
-                              value: ReportTimeframe.thisMonth,
-                              child: Text("This Month"),
-                            ),
-
-                            DropdownMenuItem(
-                              value: ReportTimeframe.lastMonth,
-                              child: Text("Last Month"),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-
-                            setState(() {
-                              _timeframeOverTime = value;
-                            });
-
-                            _loadChartData(value);
-                          },
-                        ),
-                      ],
+                    const Text(
+                      "Emissions Over Time",
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+
+                    _buildTimeframeSelector(),
+
+                    const SizedBox(height: 18),
 
                     SizedBox(
-                      height: 200,
-                      child: LineChart(
-                        LineChartData(
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: emissionOverTime,
-                              isCurved: true,
-                              barWidth: 4,
-                              dotData: const FlDotData(show: true),
+                      height: 230,
+                      child: emissionOverTime.isEmpty
+                          ? const _NoEmissionRecords()
+                          : LineChart(
+                              LineChartData(
+                                minX: 0,
+                                maxX: emissionOverTime.length > 1
+                                    ? (emissionOverTime.length - 1).toDouble()
+                                    : 1,
+                                minY: 0,
+
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval: _getHorizontalInterval(),
+                                  getDrawingHorizontalLine: (value) {
+                                    return FlLine(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.07,
+                                      ),
+                                      strokeWidth: 1,
+                                    );
+                                  },
+                                ),
+
+                                borderData: FlBorderData(show: false),
+
+                                titlesData: FlTitlesData(
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 38,
+                                      interval: _getHorizontalInterval(),
+                                      getTitlesWidget: (value, meta) {
+                                        if (value == 0) {
+                                          return const SizedBox();
+                                        }
+
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 6,
+                                          ),
+                                          child: Text(
+                                            value.toStringAsFixed(0),
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.black45,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 32,
+                                      interval: _getXAxisInterval(),
+                                      getTitlesWidget: (value, meta) {
+                                        final index = value.toInt();
+
+                                        if (index < 0 ||
+                                            index >= labels.length) {
+                                          return const SizedBox();
+                                        }
+
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 8,
+                                          ),
+                                          child: Text(
+                                            labels[index],
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.black45,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+
+                                lineTouchData: LineTouchData(
+                                  enabled: true,
+                                  touchTooltipData: LineTouchTooltipData(
+                                    getTooltipItems: (touchedSpots) {
+                                      return touchedSpots.map((spot) {
+                                        final index = spot.x.toInt();
+
+                                        final date =
+                                            index >= 0 && index < labels.length
+                                            ? labels[index]
+                                            : "";
+
+                                        return LineTooltipItem(
+                                          "$date\n${spot.y.toStringAsFixed(2)} kg CO₂e",
+                                          const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
+                                  ),
+                                ),
+
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: emissionOverTime,
+                                    isCurved: true,
+                                    curveSmoothness: 0.3,
+                                    color: const Color(0xFF3AA76D),
+                                    barWidth: 3,
+                                    isStrokeCapRound: true,
+
+                                    dotData: FlDotData(
+                                      show: true,
+                                      getDotPainter:
+                                          (spot, percent, barData, index) {
+                                            return FlDotCirclePainter(
+                                              radius: 4,
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                              strokeColor: const Color(
+                                                0xFF3AA76D,
+                                              ),
+                                            );
+                                          },
+                                    ),
+
+                                    belowBarData: BarAreaData(
+                                      show: true,
+                                      color: const Color(
+                                        0xFF3AA76D,
+                                      ).withValues(alpha: 0.10),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -602,102 +840,83 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Emissions by Source",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        DropdownButton<ReportTimeframe>(
-                          value: _timeframeOverTime,
-                          underline: const SizedBox(),
-                          items: const [
-                            DropdownMenuItem(
-                              value: ReportTimeframe.thisWeek,
-                              child: Text("This Week"),
-                            ),
-                            DropdownMenuItem(
-                              value: ReportTimeframe.thisMonth,
-                              child: Text("This Month"),
-                            ),
-                            DropdownMenuItem(
-                              value: ReportTimeframe.lastMonth,
-                              child: Text("Last Month"),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-
-                            setState(() {
-                              _timeframeOverTime = value;
-                            });
-
-                            _loadChartData(value);
-                          },
-                        ),
-                      ],
+                    const Text(
+                      "Emissions by Source",
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
+
+                    const SizedBox(height: 12),
+
+                    _buildTimeframeSelector(),
 
                     const SizedBox(height: 20),
 
                     SizedBox(
-                      height: 220,
-                      child: PieChart(
-                        PieChartData(
-                          centerSpaceRadius: 45,
-                          sectionsSpace: 3,
-                          borderData: FlBorderData(show: false),
+                      height: 230,
+                      child:
+                          (transportTotal == 0 &&
+                              officeTotal == 0 &&
+                              foodTotal == 0)
+                          ? const _NoEmissionRecords()
+                          : PieChart(
+                              PieChartData(
+                                centerSpaceRadius: 45,
+                                sectionsSpace: 3,
+                                borderData: FlBorderData(show: false),
 
-                          sections: [
-                            PieChartSectionData(
-                              value: transportTotal,
-                              color: Colors.green,
-                              title: "${transportTotal.toStringAsFixed(1)} kg",
-                              radius: 65,
-                              titleStyle: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
+                                sections: [
+                                  PieChartSectionData(
+                                    value: transportTotal,
+                                    color: Colors.green,
+                                    title:
+                                        "${transportTotal.toStringAsFixed(1)} kg",
+                                    radius: 65,
+                                    titleStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+
+                                  PieChartSectionData(
+                                    value: officeTotal,
+                                    color: Colors.orange,
+                                    title:
+                                        "${officeTotal.toStringAsFixed(1)} kg",
+                                    radius: 65,
+                                    titleStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+
+                                  PieChartSectionData(
+                                    value: foodTotal,
+                                    color: Colors.blue,
+                                    title: "${foodTotal.toStringAsFixed(1)} kg",
+                                    radius: 65,
+                                    titleStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-
-                            PieChartSectionData(
-                              value: officeTotal,
-                              color: Colors.orange,
-                              title: "${officeTotal.toStringAsFixed(1)} kg",
-                              radius: 65,
-                              titleStyle: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-
-                            PieChartSectionData(
-                              value: foodTotal,
-                              color: Colors.blue,
-                              title: "${foodTotal.toStringAsFixed(1)} kg",
-                              radius: 65,
-                              titleStyle: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 10,
                       children: const [
                         _Legend(color: Colors.green, text: "Transportation"),
                         _Legend(color: Colors.orange, text: "Office"),
@@ -719,8 +938,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Column(
                 children: [
                   _buildSuggestionCard(
                     Icons.directions_bus_outlined,
@@ -731,7 +949,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         ? _smartSuggestions[0].impact
                         : "",
                   ),
-                  const SizedBox(width: 8),
+
+                  const SizedBox(height: 10),
+
                   _buildSuggestionCard(
                     Icons.lightbulb_outline,
                     _smartSuggestions.length > 1
@@ -741,7 +961,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         ? _smartSuggestions[1].impact
                         : "",
                   ),
-                  const SizedBox(width: 8),
+
+                  const SizedBox(height: 10),
+
                   _buildSuggestionCard(
                     Icons.restaurant_outlined,
                     _smartSuggestions.length > 2
@@ -897,40 +1119,62 @@ class _ReportsScreenState extends State<ReportsScreen> {
     String title,
     String value,
     String unit, {
-    Color valueColor = Colors.black,
+    required IconData icon,
+    Color valueColor = const Color(0xFF265D3B),
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
-      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7F0EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: const BoxDecoration(
+              color: Color(0xFFEAF6EE),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: const Color(0xFF3AA76D)),
+          ),
+
+          const Spacer(),
+
           Text(
             title,
-            textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
               color: Colors.black54,
             ),
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 3),
+
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 21,
               fontWeight: FontWeight.bold,
               color: valueColor,
             ),
           ),
+
           const SizedBox(height: 2),
+
           Text(
             unit,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 10, color: Colors.black45),
           ),
         ],
       ),
@@ -938,42 +1182,128 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildSuggestionCard(IconData icon, String mainText, String subText) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        height: 150,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE3F0E7)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEAF6EE),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFF3AA76D), size: 22),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  mainText.isEmpty ? "Loading suggestion..." : mainText,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                if (subText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+
+                  Text(
+                    subText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: Colors.black54),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 6),
+
+          const Icon(Icons.chevron_right, color: Colors.black38),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeframeSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          _buildTimeframeChip(
+            label: "This Week",
+            timeframe: ReportTimeframe.thisWeek,
+          ),
+
+          const SizedBox(width: 8),
+
+          _buildTimeframeChip(
+            label: "This Month",
+            timeframe: ReportTimeframe.thisMonth,
+          ),
+
+          const SizedBox(width: 8),
+
+          _buildTimeframeChip(
+            label: "Last Month",
+            timeframe: ReportTimeframe.lastMonth,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeframeChip({
+    required String label,
+    required ReportTimeframe timeframe,
+  }) {
+    final isSelected = _timeframeOverTime == timeframe;
+
+    return InkWell(
+      onTap: () {
+        if (isSelected) return;
+
+        setState(() {
+          _timeframeOverTime = timeframe;
+        });
+
+        _loadChartData(timeframe);
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: const Color(0xFF3AA76D), width: 1),
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? primaryGreen : const Color(0xFFEAF6EE),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? primaryGreen : const Color(0xFFD7EBDD),
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              backgroundColor: const Color(0xFFE8F5E9),
-              radius: 18,
-              child: Icon(icon, color: const Color(0xFF3AA76D), size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              mainText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            if (subText.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                subText,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 8, color: Colors.grey[500]),
-              ),
-            ],
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF265D3B),
+          ),
         ),
       ),
     );

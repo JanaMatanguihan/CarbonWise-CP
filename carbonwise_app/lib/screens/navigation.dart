@@ -198,169 +198,291 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
               elevation: 0,
               scrolledUnderElevation: 0,
               toolbarHeight: 155,
-              titleSpacing: 14,
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: primaryGreen,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  20, // more space at the top
+                  16,
+                  10,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // =========================
+                    // GREETING + ACTIONS
+                    // =========================
+                    Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 _currentIndex == 0
                                     ? '${getGreeting()}, $userName!'
                                     : _pageTitles[_currentIndex],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  height: 1.2,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Track your impact today.',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
+
+                              const SizedBox(height: 5),
+
+                              Text(
+                                _currentIndex == 0
+                                    ? 'Track your impact today.'
+                                    : 'Manage your carbon footprint.',
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Row(
-                          children: [
-                            _buildNotificationButton(),
-                            const SizedBox(width: 6),
-                            _buildProfileMenuButton(),
-                          ],
-                        ),
+
+                        const SizedBox(width: 10),
+
+                        _buildNotificationButton(),
+
+                        const SizedBox(width: 6),
+
+                        _buildProfileMenuButton(),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: _carbonScore / 100,
-                          backgroundColor: const Color(0xFFCCEAD8),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            darkGreen,
-                          ),
-                          minHeight: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
 
-                      Text(
-                        "CarbonWise Score: ${_carbonScore.toStringAsFixed(0)}/100",
-                        style: const TextStyle(
-                          color: darkGreen,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.italic,
-                          fontSize: 15,
-                        ),
+                    const SizedBox(height: 16),
+
+                    // =========================
+                    // CARBON SCORE
+                    // =========================
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 13,
                       ),
-                    ],
-                  ),
-                ],
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF6EE),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.eco_outlined,
+                                color: primaryGreen,
+                                size: 22,
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              const Expanded(
+                                child: Text(
+                                  "CarbonWise Score",
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+
+                              Text(
+                                "${_carbonScore.toStringAsFixed(0)}/100",
+                                style: const TextStyle(
+                                  color: darkGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 9),
+
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: (_carbonScore / 100).clamp(0.0, 1.0),
+                              backgroundColor: const Color(0xFFCCEAD8),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                primaryGreen,
+                              ),
+                              minHeight: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
       body: SafeArea(
         top: isProfilePage,
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Container(
-            height: 72,
-            decoration: BoxDecoration(
-              color: primaryGreen,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
+      bottomNavigationBar: Container(
+        height: 78,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Row(
               children: [
-                _buildNavItem(Icons.home_outlined, Icons.home, 'Home', 0),
-                _buildNavItem(
-                  Icons.analytics_outlined,
-                  Icons.analytics,
-                  'Reports',
-                  1,
+                Expanded(
+                  child: _buildNavItem(
+                    index: 0,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                    label: "Home",
+                  ),
                 ),
-                _buildNavItem(
-                  Icons.edit_note_outlined,
-                  Icons.edit_note,
-                  'Input',
-                  2,
+
+                Expanded(
+                  child: _buildNavItem(
+                    index: 1,
+                    icon: Icons.bar_chart_outlined,
+                    activeIcon: Icons.bar_chart,
+                    label: "Reports",
+                  ),
                 ),
-                _buildNavItem(
-                  Icons.lightbulb_outline,
-                  Icons.lightbulb,
-                  'Strategies',
-                  3,
+
+                // Space for center button
+                const SizedBox(width: 70),
+
+                Expanded(
+                  child: _buildNavItem(
+                    index: 3,
+                    icon: Icons.lightbulb_outline,
+                    activeIcon: Icons.lightbulb,
+                    label: "Strategies",
+                  ),
                 ),
-                _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 4),
+
+                Expanded(
+                  child: _buildNavItem(
+                    index: 4,
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                    label: "Profile",
+                  ),
+                ),
               ],
             ),
-          ),
+
+            // CENTER INPUT BUTTON
+            Positioned(
+              top: -24,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentIndex = 2;
+                  });
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3AA76D),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF3AA76D,
+                            ).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      "Input",
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: _currentIndex == 2
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: _currentIndex == 2
+                            ? const Color(0xFF265D3B)
+                            : Colors.black45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: const ChatbotButton(),
     );
   }
 
-  Widget _buildNavItem(
-    IconData unselectedIcon,
-    IconData selectedIcon,
-    String label,
-    int index,
-  ) {
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+  }) {
     final bool isSelected = _currentIndex == index;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _currentIndex = index),
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 72,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              isSelected ? selectedIcon : unselectedIcon,
-              color: Colors.white,
-              size: isSelected ? 28 : 24,
+              isSelected ? activeIcon : icon,
+              size: 23,
+              color: isSelected ? const Color(0xFF3AA76D) : Colors.black45,
             ),
+
             const SizedBox(height: 3),
+
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF265D3B) : Colors.black45,
               ),
             ),
           ],

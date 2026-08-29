@@ -371,12 +371,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final response = await _apiService.getUserInfo(user.email!);
+    try {
+      final response = await Supabase.instance.client
+          .from('user_info')
+          .select()
+          .eq('g_suite', user.email!)
+          .single();
 
-    setState(() {
-      userInfo = response;
-      isLoadingProfile = false;
-    });
+      setState(() {
+        userInfo = response;
+        isLoadingProfile = false;
+      });
+    } catch (e) {
+      print("Profile Loading Error: $e");
+
+      setState(() {
+        isLoadingProfile = false;
+      });
+    }
   }
 
   Future<void> _loadDepartmentRankings() async {
@@ -572,7 +584,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color primaryGreen = Color(0xFF3AA76D);
   static const Color darkGreen = Color(0xFF1E5631);
   static const Color lightBgGrey = Color(0xFFEFEFEF);
-  static const Color badgeGrey = Color(0xFFCCEAD8);
   static const Color textMuted = Colors.black54;
 
   @override
@@ -615,84 +626,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
     final String? profilePicture = userInfo?['profile_picture'];
+    final String role = userInfo?['role'] ?? '';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 36, bottom: 24, left: 36, right: 20),
-      decoration: const BoxDecoration(
-        color: primaryGreen,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Column(
         children: [
-          CircleAvatar(
-            radius: 36,
-            backgroundColor: Colors.white,
-            backgroundImage: profilePicture != null && profilePicture.isNotEmpty
-                ? NetworkImage(
-                    "$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}",
-                  )
-                : null,
-            child: profilePicture == null || profilePicture.isEmpty
-                ? const Icon(Icons.person, size: 44, color: primaryGreen)
-                : null,
+          // PAGE TITLE
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Profile',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2933),
+              ),
+            ),
           ),
 
-          const SizedBox(width: 16),
+          const SizedBox(height: 24),
 
-          Expanded(
+          // PROFILE CARD
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE5EEE8)),
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // PROFILE PICTURE
+                CircleAvatar(
+                  radius: 44,
+                  backgroundColor: const Color(0xFFE8F5EE),
+                  backgroundImage:
+                      profilePicture != null && profilePicture.isNotEmpty
+                      ? NetworkImage(
+                          '$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}',
+                        )
+                      : null,
+                  child: profilePicture == null || profilePicture.isEmpty
+                      ? const Icon(
+                          Icons.person_rounded,
+                          size: 52,
+                          color: primaryGreen,
+                        )
+                      : null,
+                ),
+
+                const SizedBox(height: 14),
+
+                // NAME
                 Text(
                   isLoadingProfile ? 'Loading...' : fullName,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2933),
                   ),
                 ),
+
+                const SizedBox(height: 5),
+
+                // DEPARTMENT
+                if (!isLoadingProfile && (role.isNotEmpty || campus.isNotEmpty))
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (role.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            role,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+
+                      if (role.isNotEmpty && campus.isNotEmpty)
+                        const Text(
+                          '  |  ',
+                          style: TextStyle(fontSize: 13, color: Colors.black38),
+                        ),
+
+                      if (campus.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            campus,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
 
                 const SizedBox(height: 3),
 
-                Text(
-                  isLoadingProfile ? '' : '$department\n$campus',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    height: 1.3,
+                if (!isLoadingProfile && department.isNotEmpty)
+                  Text(
+                    department,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Colors.black45),
                   ),
-                ),
 
-                const SizedBox(height: 12),
-
+                // EDIT PROFILE BUTTON
                 SizedBox(
-                  height: 34,
+                  width: double.infinity,
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text(
-                      "Edit Profile",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white, width: 1),
-                      backgroundColor: Colors.white.withValues(alpha: 0.12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-
                     onPressed: () async {
                       if (userInfo == null) return;
 
@@ -709,15 +760,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
 
                       if (updated == true) {
-                        _loadUserInfo();
-                      }
-
-                      if (updated == true) {
                         await _loadUserInfo();
                         await _loadCarbonScore();
                         await _loadRecentActivities();
                       }
                     },
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text(
+                      'Edit Profile',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryGreen,
+                      side: const BorderSide(color: primaryGreen),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -728,128 +791,192 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 2. Score & Sustainability Row
+  // 2. Sustainability Summary
   Widget _buildScoreRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildMetricCard(
-            title: 'Your Carbon Score',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
+    final sustainabilityColor = getSustainabilityColor();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'YOUR SUSTAINABILITY',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              color: textMuted,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // CARBON SCORE
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5EE),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.eco_rounded,
+                  color: primaryGreen,
+                  size: 23,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      'Carbon Score',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2933),
+                      ),
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
+                      children: [
+                        Text(
+                          isLoadingScore
+                              ? '--'
+                              : carbonScore.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                            color: darkGreen,
+                          ),
+                        ),
+
+                        const Text(
+                          'kg CO₂ / week',
+                          style: TextStyle(fontSize: 11, color: textMuted),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    const Text(
+                      '12% less than last week',
+                      style: TextStyle(
+                        color: primaryGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, color: Color(0xFFE5EEE8)),
+          ),
+
+          // SUSTAINABILITY LEVEL
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: CircularProgressIndicator(
+                      value: getSustainabilityProgress(),
+                      strokeWidth: 4,
+                      backgroundColor: const Color(0xFFE8EDE9),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        sustainabilityColor,
+                      ),
+                    ),
+                  ),
+
+                  Icon(
+                    getSustainabilityIcon(),
+                    color: sustainabilityColor,
+                    size: 21,
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sustainability Level',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2933),
+                      ),
+                    ),
+
+                    const SizedBox(height: 3),
+
                     Text(
-                      isLoadingScore ? '--' : carbonScore.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 32,
+                      getSustainabilityLevel(),
+                      style: TextStyle(
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: darkGreen,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        'kg CO₂ / week',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  '12% less than last week',
-                  style: TextStyle(
-                    color: primaryGreen,
-                    fontSize: 10.5,
-                    fontStyle: FontStyle.italic,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildMetricCard(
-            title: 'Your Sustainability Level',
-            child: Row(
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: CircularProgressIndicator(
-                        value: getSustainabilityProgress(),
-                        strokeWidth: 4,
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          getSustainabilityColor(),
-                        ),
+                        color: sustainabilityColor,
                       ),
                     ),
 
-                    Icon(
-                      getSustainabilityIcon(),
-                      color: getSustainabilityColor(),
-                      size: 18,
+                    const SizedBox(height: 2),
+
+                    Text(
+                      getSustainabilityMessage(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: textMuted),
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    Text(
+                      "${DateFormat('MMMM').format(DateTime.now())} Average: "
+                      "${getAverageEmission().toStringAsFixed(1)} kg CO₂",
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        getSustainabilityLevel(),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: getSustainabilityColor(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 2),
-
-                      Text(
-                        getSustainabilityMessage(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 9, color: textMuted),
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      Text(
-                        "${DateFormat('MMMM').format(DateTime.now())} Average: ${getAverageEmission().toStringAsFixed(1)} kg CO₂",
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -897,224 +1024,245 @@ class _ProfileScreenState extends State<ProfileScreen> {
         maxEmission = value;
       }
     }
-    return _buildSectionCard(
-      title: 'Your Carbon Emission Breakdown',
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildSubTab(
-                'Transportation',
-                _selectedBreakdown == "Transportation",
-                onTap: () {
-                  setState(() {
-                    _selectedBreakdown = "Transportation";
-                  });
-                },
-              ),
-
-              _buildSubTab(
-                'Office Resource',
-                _selectedBreakdown == "Office Resource",
-                onTap: () {
-                  setState(() {
-                    _selectedBreakdown = "Office Resource";
-                  });
-                },
-              ),
-
-              _buildSubTab(
-                'Food Consumption',
-                _selectedBreakdown == "Food Consumption",
-                onTap: () {
-                  setState(() {
-                    _selectedBreakdown = "Food Consumption";
-                  });
-                },
-              ),
-            ],
+          const Text(
+            'CARBON BREAKDOWN',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              color: textMuted,
+            ),
           ),
-          const Divider(height: 16, thickness: 1),
+
+          const SizedBox(height: 14),
+
+          // CATEGORY TABS
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSubTab(
+                  'Transportation',
+                  _selectedBreakdown == "Transportation",
+                  onTap: () {
+                    setState(() {
+                      _selectedBreakdown = "Transportation";
+                    });
+                  },
+                ),
+
+                const SizedBox(width: 8),
+
+                _buildSubTab(
+                  'Office Resource',
+                  _selectedBreakdown == "Office Resource",
+                  onTap: () {
+                    setState(() {
+                      _selectedBreakdown = "Office Resource";
+                    });
+                  },
+                ),
+
+                const SizedBox(width: 8),
+
+                _buildSubTab(
+                  'Food Consumption',
+                  _selectedBreakdown == "Food Consumption",
+                  onTap: () {
+                    setState(() {
+                      _selectedBreakdown = "Food Consumption";
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // THIS WEEK
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF6FAF7),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'THIS WEEK',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                    color: textMuted,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  children: [
+                    Text(
+                      isLoadingScore
+                          ? '--'
+                          : currentEmission.toStringAsFixed(2),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: primaryGreen,
+                      ),
+                    ),
+
+                    const Text(
+                      'kg CO₂',
+                      style: TextStyle(fontSize: 12, color: textMuted),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  isLoadingScore
+                      ? 'Loading your emission data...'
+                      : '${carbonScore.toStringAsFixed(2)} kg CO₂ recorded',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // TOP CONTRIBUTOR
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Content
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5EE),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(currentIcon, color: darkGreen, size: 20),
+              ),
+
+              const SizedBox(width: 10),
+
               Expanded(
-                flex: 4,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'This Week',
+                      'Top Contributor',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          isLoadingScore
-                              ? '--'
-                              : currentEmission.toStringAsFixed(2),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'kg CO₂',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      isLoadingScore
-                          ? 'Loading...'
-                          : '${carbonScore.toStringAsFixed(2)} kg CO₂ recorded',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontStyle: FontStyle.italic,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                         color: textMuted,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Top Contributor',
-                      style: TextStyle(
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      currentTitle.isEmpty ? "No data yet" : currentTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        color: Color(0xFF1F2933),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: const BoxDecoration(
-                            color: badgeGrey,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(currentIcon, size: 16, color: darkGreen),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentTitle.isEmpty
-                                    ? "No data yet"
-                                    : currentTitle,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(
-                                'Top tracking impact item.',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: textMuted,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Vertical Divider Line
-              Container(
-                width: 1,
-                height: 120, // Adjusted height match
-                color: Colors.black12,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-              ),
-              // Right Content (Simulated Micro Graph)
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
+
+                    const SizedBox(height: 2),
+
                     const Text(
-                      'Recent Records',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 75,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          ...last4Weeks.reversed.take(4).toList().reversed.map((
-                            record,
-                          ) {
-                            double emission;
-                            final date = DateTime.parse(record["record_date"]);
-                            final label = "${date.month}/${date.day}";
-
-                            switch (_selectedBreakdown) {
-                              case "Transportation":
-                                emission = (record["transportation"] ?? 0)
-                                    .toDouble();
-                                break;
-
-                              case "Office Resource":
-                                emission = (record["electricity"] ?? 0)
-                                    .toDouble();
-                                break;
-
-                              case "Food Consumption":
-                                emission = (record["food"] ?? 0).toDouble();
-                                break;
-
-                              default:
-                                emission = (record["total_emission"] ?? 0)
-                                    .toDouble();
-                            }
-
-                            return _buildGraphBar(
-                              emission.toStringAsFixed(1),
-                              (emission / maxEmission).clamp(0.1, 1.0),
-                              label,
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'View Breakdown Details',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: darkGreen.withValues(alpha: 0.8),
-                        ),
-                      ),
+                      'Your highest-impact tracked item.',
+                      style: TextStyle(fontSize: 10, color: textMuted),
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, color: Color(0xFFE5EEE8)),
+          ),
+
+          // RECENT RECORDS
+          const Text(
+            'RECENT RECORDS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+              color: textMuted,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          SizedBox(
+            height: 65,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                ...last4Weeks.reversed.take(4).toList().reversed.map((record) {
+                  double emission;
+
+                  final date = DateTime.parse(record["record_date"]);
+                  final label = "${date.month}/${date.day}";
+
+                  switch (_selectedBreakdown) {
+                    case "Transportation":
+                      emission = (record["transportation"] ?? 0).toDouble();
+                      break;
+
+                    case "Office Resource":
+                      emission = (record["electricity"] ?? 0).toDouble();
+                      break;
+
+                    case "Food Consumption":
+                      emission = (record["food"] ?? 0).toDouble();
+                      break;
+
+                    default:
+                      emission = (record["total_emission"] ?? 0).toDouble();
+                  }
+
+                  return _buildGraphBar(
+                    emission.toStringAsFixed(1),
+                    (emission / maxEmission).clamp(0.1, 1.0),
+                    label,
+                  );
+                }),
+              ],
+            ),
           ),
         ],
       ),
@@ -1123,62 +1271,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 4. Achievements Section
   Widget _buildAchievementsCard() {
-    return _buildSectionCard(
-      title: "Achievements",
-      child: GridView.count(
-        crossAxisCount: 3,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: .9,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAchievementItem(
-            "First Footprint",
-            "You've recorded your first carbon activity!",
-            Icons.eco,
-            hasStartedJourney(),
-            "Log your first carbon emission.",
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Text(
+              'ACHIEVEMENTS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+                color: textMuted,
+              ),
+            ),
           ),
 
-          _buildAchievementItem(
-            "Eco Commuter",
-            "Transportation emissions kept below 5 kg CO₂.",
-            Icons.directions_bike,
-            hasEcoCommute(),
-            "Keep transportation emissions below 5 kg CO₂.",
-          ),
+          const SizedBox(height: 14),
 
-          _buildAchievementItem(
-            "Green Streak",
-            "You've logged emissions for 7 different days!",
-            Icons.local_fire_department,
-            hasGreenStreak(),
-            "Log emissions for 7 different days.",
-          ),
+          SizedBox(
+            height: 155,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              children: [
+                _buildAchievementItem(
+                  "First Footprint",
+                  "You've recorded your first carbon activity!",
+                  Icons.eco_rounded,
+                  hasStartedJourney(),
+                  "Log your first carbon emission.",
+                ),
 
-          _buildAchievementItem(
-            "Energy Saver",
-            "You kept your office resource emissions low!",
-            Icons.bolt,
-            hasEnergySaver(),
-            "Keep your Office Resource emissions below 10 kg CO₂.",
-          ),
+                const SizedBox(width: 10),
 
-          _buildAchievementItem(
-            "Plant Lover",
-            "Excellent food choices this month!",
-            Icons.park,
-            hasPlantLover(),
-            "Keep your Food Consumption emissions below 8 kg CO₂.",
-          ),
+                _buildAchievementItem(
+                  "Eco Commuter",
+                  "Transportation emissions kept below 5 kg CO₂.",
+                  Icons.directions_bike_rounded,
+                  hasEcoCommute(),
+                  "Keep transportation emissions below 5 kg CO₂.",
+                ),
 
-          _buildAchievementItem(
-            "Eco Champion",
-            "Outstanding carbon footprint!",
-            Icons.workspace_premium,
-            hasEcoChampion(),
-            "Keep your total carbon emission below 20 kg CO₂.",
+                const SizedBox(width: 10),
+
+                _buildAchievementItem(
+                  "Green Streak",
+                  "You've logged emissions for 7 different days!",
+                  Icons.local_fire_department_rounded,
+                  hasGreenStreak(),
+                  "Log emissions for 7 different days.",
+                ),
+
+                const SizedBox(width: 10),
+
+                _buildAchievementItem(
+                  "Energy Saver",
+                  "You kept your office resource emissions low!",
+                  Icons.bolt_rounded,
+                  hasEnergySaver(),
+                  "Keep your Office Resource emissions below 10 kg CO₂.",
+                ),
+
+                const SizedBox(width: 10),
+
+                _buildAchievementItem(
+                  "Plant Lover",
+                  "Excellent food choices this month!",
+                  Icons.park_rounded,
+                  hasPlantLover(),
+                  "Keep your Food Consumption emissions below 8 kg CO₂.",
+                ),
+
+                const SizedBox(width: 10),
+
+                _buildAchievementItem(
+                  "Eco Champion",
+                  "Outstanding carbon footprint!",
+                  Icons.workspace_premium_rounded,
+                  hasEcoChampion(),
+                  "Keep your total carbon emission below 20 kg CO₂.",
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1187,180 +1370,254 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 5. Department Comparison Section
   Widget _buildDepartmentComparisonCard() {
-    return _buildSectionCard(
-      title: 'Department Comparison',
-      child: Row(
+    final int displayCount = _departmentRankings.length > 5
+        ? 5
+        : _departmentRankings.length;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 110,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: badgeGrey.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(8),
+          const Text(
+            'DEPARTMENT RANKING',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              color: textMuted,
             ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // YOUR RANK SUMMARY
+          Center(
             child: Column(
               children: [
-                const Text(
-                  "Your Department\nRank",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                ),
-
-                const SizedBox(height: 10),
-
-                Text(
-                  _departmentRank.isEmpty ? "-" : _departmentRank,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: darkGreen,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE8F5EE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: primaryGreen,
+                    size: 28,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
                 Text(
-                  "Out of ${_departmentRankings.length} departments",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 9, color: textMuted),
+                  _departmentRank.isEmpty ? '-' : _departmentRank,
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: darkGreen,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  'out of ${_departmentRankings.length} departments',
+                  style: const TextStyle(fontSize: 11, color: textMuted),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(width: 12),
+          const SizedBox(height: 18),
 
-          Expanded(
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 220,
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: ListView.builder(
-                      itemCount: _departmentRankings.length,
-                      itemBuilder: (context, index) {
-                        final dept = _departmentRankings[index];
+          const Divider(height: 1, color: Color(0xFFE5EEE8)),
 
-                        return _buildDeptBar(
-                          "${index + 1}",
-                          dept.department,
-                          dept.averageEmission,
-                          dept.department == _userDepartment
-                              ? primaryGreen
-                              : Colors.grey.shade400,
-                          isUserDept: dept.department == _userDepartment,
-                        );
-                      },
-                    ),
-                  ),
-                ),
+          const SizedBox(height: 16),
 
-                const SizedBox(height: 10),
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: badgeGrey.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.eco, color: primaryGreen, size: 14),
-
-                      const SizedBox(width: 6),
-
-                      Expanded(
-                        child: Text(
-                          "Your department is currently ranked ${_departmentRank.isEmpty ? "-" : _departmentRank} out of ${_departmentRankings.length} departments.",
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          const Text(
+            'DEPARTMENT STANDINGS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+              color: textMuted,
             ),
           ),
+
+          const SizedBox(height: 10),
+
+          // TOP DEPARTMENTS
+          ..._departmentRankings
+              .take(displayCount)
+              .toList()
+              .asMap()
+              .entries
+              .map((entry) {
+                final index = entry.key;
+                final dept = entry.value;
+
+                final isUserDept = dept.department == _userDepartment;
+
+                return _buildDeptBar(
+                  '${index + 1}',
+                  dept.department,
+                  dept.averageEmission,
+                  isUserDept ? primaryGreen : Colors.grey.shade400,
+                  isUserDept: isUserDept,
+                );
+              }),
+
+          if (_departmentRankings.length > displayCount) ...[
+            const SizedBox(height: 4),
+
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  _showAllDepartmentRankings();
+                },
+                icon: const Icon(Icons.leaderboard_outlined, size: 16),
+                label: const Text('View all departments'),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // 6. Split Row: Patterns & Timeline
+  // 6. Patterns & Activity Timeline
   Widget _buildPatternsAndTimelineRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        // Left Box: Patterns
-        Expanded(
-          child: _buildSectionCard(
-            title: 'Your Patterns',
-            child: Column(
-              children: [
-                _buildPatternItem(Icons.calendar_month, _weekdayPattern),
-                const Divider(height: 12),
-                _buildPatternItem(Icons.directions_bus, _highestImpactPattern),
-                const Divider(height: 12),
-                _buildPatternItem(Icons.insights, _insightPattern),
-              ],
-            ),
+        // YOUR PATTERNS
+        _buildSectionCard(
+          title: 'Your Patterns',
+          child: Column(
+            children: [
+              _buildPatternItem(Icons.calendar_month_rounded, _weekdayPattern),
+
+              const Divider(height: 20),
+
+              _buildPatternItem(
+                Icons.directions_bus_rounded,
+                _highestImpactPattern,
+              ),
+
+              const Divider(height: 20),
+
+              _buildPatternItem(Icons.insights_rounded, _insightPattern),
+            ],
           ),
         ),
-        const SizedBox(width: 10),
-        // Right Box: Timeline
-        Expanded(
-          child: _buildSectionCard(
-            title: 'Activity Timeline',
-            child: Column(
-              children: [
-                if (isLoadingTimeline)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else
-                  ...recentActivities.map(
-                    (activity) => _buildTimelineItem(
-                      activity['category'],
-                      activity['title'],
-                      activity['impact'],
-                      activity['time'],
-                      activity['icon'],
-                      activity['color'],
-                    ),
+
+        const SizedBox(height: 14),
+
+        // ACTIVITY TIMELINE
+        _buildSectionCard(
+          title: 'Recent Activity',
+          child: Column(
+            children: [
+              if (isLoadingTimeline)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(
+                    child: CircularProgressIndicator(color: primaryGreen),
                   ),
-
-                const SizedBox(height: 4),
-
-                Align(
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                )
+              else if (recentActivities.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
                     children: [
+                      Icon(Icons.history_rounded, size: 38, color: textMuted),
+
+                      SizedBox(height: 8),
+
                       Text(
-                        'Full timeline',
+                        'No recent activity',
                         style: TextStyle(
-                          fontSize: 10,
-                          color: darkGreen.withValues(alpha: 0.8),
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2933),
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        Icons.arrow_forward,
-                        size: 10,
-                        color: darkGreen.withValues(alpha: 0.8),
+
+                      SizedBox(height: 4),
+
+                      Text(
+                        'Your carbon activities will appear here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: textMuted),
                       ),
                     ],
                   ),
+                )
+              else
+                ...recentActivities.map(
+                  (activity) => _buildTimelineItem(
+                    activity['category'],
+                    activity['title'],
+                    activity['impact'],
+                    activity['time'],
+                    activity['icon'],
+                    activity['color'],
+                  ),
+                ),
+
+              if (!isLoadingTimeline && recentActivities.isNotEmpty) ...[
+                const SizedBox(height: 8),
+
+                const Divider(),
+
+                const SizedBox(height: 4),
+
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    _showFullTimeline();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'View full timeline',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: darkGreen.withValues(alpha: 0.85),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(width: 5),
+
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 15,
+                          color: darkGreen.withValues(alpha: 0.85),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ],
@@ -1368,35 +1625,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // --- REUSABLE UI HELPER METHODS ---
-
-  Widget _buildMetricCard({required String title, required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      height: 85,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.black12, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
 
   Widget _buildSectionCard({
     required String title,
@@ -1465,26 +1693,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildGraphBar(String value, double fillPercent, String dateLabel) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Text(
           value,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 2),
+
+        const SizedBox(height: 1),
+
         Container(
-          width: 15,
-          height: 45 * fillPercent,
+          width: 14,
+          height: 32 * fillPercent,
           decoration: BoxDecoration(
             color: primaryGreen,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
-        const SizedBox(height: 4),
+
+        const SizedBox(height: 3),
+
         Text(
           dateLabel,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 8, color: textMuted, height: 1.1),
+          style: const TextStyle(fontSize: 10, color: textMuted, height: 1),
         ),
       ],
     );
@@ -1497,103 +1730,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool unlocked,
     String unlockRequirement,
   ) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: 125,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
 
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (_) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (_) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+
+                title: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: unlocked
+                            ? const Color(0xFFE8F5EE)
+                            : Colors.grey.shade200,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        unlocked
+                            ? Icons.emoji_events_rounded
+                            : Icons.lock_outline_rounded,
+                        color: unlocked ? primaryGreen : Colors.grey,
+                        size: 20,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                content: Text(
+                  unlocked ? unlockedDescription : unlockRequirement,
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
+
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "Got it",
+                      style: TextStyle(
+                        color: primaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 250),
+          opacity: unlocked ? 1 : 0.55,
+
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+            decoration: BoxDecoration(
+              color: unlocked ? const Color(0xFFF8FCF9) : Colors.grey.shade100,
+
+              borderRadius: BorderRadius.circular(16),
+
+              border: Border.all(
+                color: unlocked
+                    ? primaryGreen.withValues(alpha: 0.25)
+                    : Colors.grey.shade300,
               ),
+            ),
 
-              title: Row(
-                children: [
-                  Icon(
-                    unlocked ? Icons.emoji_events : Icons.lock,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: unlocked
+                            ? const Color(0xFFE8F5EE)
+                            : Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: unlocked ? primaryGreen : Colors.grey,
+                        size: 26,
+                      ),
+                    ),
+
+                    if (!unlocked)
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: unlocked ? darkGreen : Colors.grey,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  unlocked ? "Unlocked" : "Locked",
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
                     color: unlocked ? primaryGreen : Colors.grey,
                   ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(child: Text(title)),
-                ],
-              ),
-
-              content: Text(unlocked ? unlockedDescription : unlockRequirement),
-
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text("OK"),
                 ),
               ],
-            );
-          },
-        );
-      },
-
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 250),
-        opacity: unlocked ? 1 : .5,
-
-        child: Container(
-          decoration: BoxDecoration(
-            color: unlocked ? const Color(0xFFF6FFF8) : Colors.grey.shade100,
-
-            borderRadius: BorderRadius.circular(12),
-
-            border: Border.all(
-              color: unlocked
-                  ? primaryGreen.withValues(alpha: .3)
-                  : Colors.grey.shade300,
             ),
-          ),
-
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-
-            children: [
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: unlocked
-                        ? const Color(0xFFE8F5E9)
-                        : Colors.white,
-
-                    child: Icon(
-                      icon,
-                      color: unlocked ? primaryGreen : Colors.grey,
-                    ),
-                  ),
-
-                  if (!unlocked)
-                    const CircleAvatar(
-                      radius: 8,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.lock, size: 10, color: Colors.grey),
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  color: unlocked ? darkGreen : Colors.grey,
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -1607,73 +1899,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color color, {
     bool isUserDept = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: isUserDept ? const Color(0xFFEAF7EF) : const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isUserDept
+              ? primaryGreen.withValues(alpha: 0.35)
+              : const Color(0xFFE5EEE8),
+        ),
+      ),
       child: Row(
         children: [
+          // Rank
           SizedBox(
-            width: 18,
-            child: Text(
-              rank,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            ),
-          ),
-
-          const SizedBox(width: 4),
-
-          Expanded(
-            flex: 3,
-            child: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isUserDept ? FontWeight.bold : FontWeight.normal,
-                color: isUserDept ? primaryGreen : Colors.black87,
+            width: 32,
+            child: Center(
+              child: Text(
+                rank,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isUserDept ? primaryGreen : textMuted,
+                ),
               ),
             ),
           ),
 
           const SizedBox(width: 8),
 
+          // Department name
           Expanded(
-            flex: 5,
-            child: Stack(
-              alignment: Alignment.centerLeft,
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isUserDept ? darkGreen : const Color(0xFF1F2933),
                   ),
                 ),
 
-                FractionallySizedBox(
-                  widthFactor: (score / 60).clamp(0.0, 1.0),
-                  child: Container(
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(4),
+                if (isUserDept)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Your department',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: primaryGreen,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
+          // Emission score
           SizedBox(
-            width: 58,
+            width: 70,
             child: Text(
-              "${score.toStringAsFixed(2)} kg",
+              '${score.toStringAsFixed(2)} kg',
               textAlign: TextAlign.right,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isUserDept ? FontWeight.bold : FontWeight.normal,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
                 color: isUserDept ? primaryGreen : Colors.black54,
               ),
             ),
@@ -1684,30 +1984,237 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildPatternItem(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: badgeGrey,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 14, color: darkGreen),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF7EF),
+            borderRadius: BorderRadius.circular(13),
           ),
-          const SizedBox(width: 6),
-          Expanded(
+          child: Icon(icon, color: primaryGreen, size: 21),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
             child: Text(
-              text,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
+              text.isEmpty ? 'No pattern data available yet.' : text,
               style: const TextStyle(
-                fontSize: 10,
-                height: 1.2,
-                fontWeight: FontWeight.w500,
+                fontSize: 12,
+                height: 1.4,
+                color: Color(0xFF4B5563),
               ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineItem(
+    String category,
+    String title,
+    String impact,
+    String time,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
+      child: Row(
+        children: [
+          // Activity Icon
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: color, size: 21),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Activity Information
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  category,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2933),
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  time,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: textMuted),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Carbon Impact
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                impact,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: darkGreen,
+                ),
+              ),
+
+              const SizedBox(height: 3),
+
+              const Text(
+                'CO₂ impact',
+                style: TextStyle(fontSize: 9, color: textMuted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileDepartmentRankItem({
+    required int rank,
+    required String department,
+    required double averageEmission,
+    required bool isUserDept,
+  }) {
+    IconData rankIcon;
+    Color rankColor;
+
+    switch (rank) {
+      case 1:
+        rankIcon = Icons.workspace_premium_rounded;
+        rankColor = Colors.amber;
+        break;
+
+      case 2:
+        rankIcon = Icons.workspace_premium_rounded;
+        rankColor = Colors.grey;
+        break;
+
+      case 3:
+        rankIcon = Icons.workspace_premium_rounded;
+        rankColor = const Color(0xFFCD7F32);
+        break;
+
+      default:
+        rankIcon = Icons.eco_rounded;
+        rankColor = Colors.grey;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: isUserDept ? const Color(0xFFEAF7EF) : const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isUserDept
+              ? primaryGreen.withValues(alpha: 0.35)
+              : const Color(0xFFE5EEE8),
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 32,
+            child: rank <= 3
+                ? Icon(rankIcon, color: rankColor, size: 22)
+                : Text(
+                    '$rank',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: textMuted,
+                    ),
+                  ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  department,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isUserDept ? darkGreen : const Color(0xFF1F2933),
+                  ),
+                ),
+
+                if (isUserDept)
+                  const Text(
+                    'Your department',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: primaryGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Text(
+            '${averageEmission.toStringAsFixed(2)} kg',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: darkGreen,
             ),
           ),
         ],
@@ -1715,83 +2222,178 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildTimelineItem(
-    String cat,
-    String title,
-    String impact,
-    String time,
-    IconData icon,
-    Color iconColor,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+  void _showAllDepartmentRankings() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Icon(icon, size: 12, color: iconColor),
-            ),
-            Container(
-              width: 1,
-              height: 26,
-              color: Colors.black12,
-            ), // Adjusted height spacer
-          ],
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      cat,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  const SizedBox(height: 10),
+
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  Text(
-                    impact,
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Department Rankings',
                     style: TextStyle(
-                      fontSize: 9.5,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2933),
                     ),
                   ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+
+                  const SizedBox(height: 16),
+
                   Expanded(
-                    child: Text(
-                      title,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 9, color: textMuted),
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _departmentRankings.length,
+                      itemBuilder: (context, index) {
+                        final dept = _departmentRankings[index];
+
+                        return _buildMobileDepartmentRankItem(
+                          rank: index + 1,
+                          department: dept.department,
+                          averageEmission: dept.averageEmission,
+                          isUserDept: dept.department == _userDepartment,
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    time,
-                    style: const TextStyle(fontSize: 8, color: Colors.black26),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showFullTimeline() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+
+                  // Drag handle
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Activity Timeline',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2933),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: isLoadingTimeline
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: primaryGreen,
+                            ),
+                          )
+                        : recentActivities.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.history_rounded,
+                                  size: 42,
+                                  color: textMuted,
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  'No activities yet',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Your recent carbon activities will appear here.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                            itemCount: recentActivities.length,
+                            itemBuilder: (context, index) {
+                              final activity = recentActivities[index];
+
+                              return _buildTimelineItem(
+                                activity['category'],
+                                activity['title'],
+                                activity['impact'],
+                                activity['time'],
+                                activity['icon'],
+                                activity['color'],
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
