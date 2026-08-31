@@ -5,17 +5,7 @@ use Pdo\Mysql;
 
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Database Connection Name
-    |--------------------------------------------------------------------------
-    |
-    | Here you may specify which of the database connections below you wish
-    | to use as your default connection for database operations. This is
-    | the connection which will be utilized unless another connection
-    | is explicitly specified when you execute a query / statement.
-    |
-    */
+    /*Default Database Connection Name*/
 
     'default' => env('DB_CONNECTION', 'sqlite'),
 
@@ -84,7 +74,7 @@ return [
             ]) : [],
         ],
 
-        'pgsql' => [
+            'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
@@ -97,7 +87,12 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'require'),
+            'endpoint' => env('DB_ENDPOINT'),
+            'options' => [
+                PDO::ATTR_TIMEOUT => 30,
+            ],
         ],
+
 
         'sqlsrv' => [
             'driver' => 'sqlsrv',
