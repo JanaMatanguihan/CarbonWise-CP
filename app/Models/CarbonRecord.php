@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CarbonRecord extends Model
 {
@@ -10,18 +11,17 @@ class CarbonRecord extends Model
 
     protected $primaryKey = 'id';
 
-    public $timestamps = false;
-
     protected $fillable = [
-        'g_suite',
+        'user_id',
         'record_date',
         'transportation',
         'electricity',
         'food',
         'total_emission',
-        'ai_recommendation',
-        'transport_item',
-        'office_item',
-        'food_item',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

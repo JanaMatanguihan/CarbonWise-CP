@@ -31,7 +31,6 @@ class CarbonRecordController extends Controller
             'transportation' => 'required|numeric|min:0',
             'electricity' => 'required|numeric|min:0',
             'food' => 'required|numeric|min:0',
-            'waste' => 'required|numeric|min:0',
             'record_date' => 'required|date',
         ]);
 
@@ -40,8 +39,7 @@ class CarbonRecordController extends Controller
         $validated['total_emission'] =
             $validated['transportation'] +
             $validated['electricity'] +
-            $validated['food'] +
-            $validated['waste'];
+            $validated['food'];
 
         CarbonRecord::create($validated);
 

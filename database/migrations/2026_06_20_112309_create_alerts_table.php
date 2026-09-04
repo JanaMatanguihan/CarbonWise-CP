@@ -10,39 +10,39 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::create('alerts', function (Blueprint $table) {
-        $table->id();
+    {
+        Schema::connection('neon')->create('alerts', function (Blueprint $table) {
+            $table->id();
 
-        // Alert can optionally belong to a user
-        $table->foreignId('user_id')
-              ->nullable()
-              ->constrained()
-              ->nullOnDelete();
+            // Alert can optionally belong to a user
+            $table->foreignId('user_id')
+                  ->nullable()
+                  ->constrained()
+                  ->nullOnDelete();
 
-        // Alert content
-        $table->string('title');
-        $table->text('message');
+            // Alert content
+            $table->string('title');
+            $table->text('message');
 
-        // Severity level
-        $table->enum('severity', [
-            'info',
-            'warning',
-            'critical'
-        ])->default('info');
+            // Severity level
+            $table->enum('severity', [
+                'info',
+                'warning',
+                'critical'
+            ])->default('info');
 
-        // Read status
-        $table->boolean('is_read')->default(false);
+            // Read status
+            $table->boolean('is_read')->default(false);
 
-        $table->timestamps();
-    });
-}
+            $table->timestamps();
+        });
+    }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('alerts');
+        Schema::connection('neon')->dropIfExists('alerts');
     }
 };

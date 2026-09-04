@@ -9,39 +9,39 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
-{
-    Schema::create('mitigation_actions', function (Blueprint $table) {
-        $table->id();
+    public function up(): void
+    {
+        Schema::connection('neon')->create('mitigation_actions', function (Blueprint $table) {
+            $table->id();
 
-        // User who performed or received the mitigation action
-        $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            // User who performed or received the mitigation action
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
 
-        // Name of the mitigation strategy
-        $table->string('title');
+            // Name of the mitigation strategy
+            $table->string('title');
 
-        // Optional description
-        $table->text('description')->nullable();
+            // Optional description
+            $table->text('description')->nullable();
 
-        // Carbon reduction achieved (kg CO₂e)
-        $table->decimal('carbon_reduced', 10, 2)->default(0);
+            // Carbon reduction achieved (kg CO₂e)
+            $table->decimal('carbon_reduced', 10, 2)->default(0);
 
-        // Status of the action
-        $table->enum('status', ['pending', 'in_progress', 'completed'])
-              ->default('pending');
+            // Status of the action
+            $table->enum('status', ['pending', 'in_progress', 'completed'])
+                  ->default('pending');
 
-        // Date completed (optional)
-        $table->date('completed_at')->nullable();
+            // Date completed (optional)
+            $table->date('completed_at')->nullable();
 
-        $table->timestamps();
-    });
-}
+            $table->timestamps();
+        });
+    }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('mitigation_actions');
+        Schema::connection('neon')->dropIfExists('mitigation_actions');
     }
 };

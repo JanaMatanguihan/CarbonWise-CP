@@ -11,8 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            //
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->string('sr_code')->nullable()->unique();
+            $table->string('campus')->nullable();
+            $table->string('year_level')->nullable();
+            $table->string('profile_photo')->nullable();
         });
     }
 
@@ -21,12 +24,13 @@ return new class extends Migration
      */
     public function down(): void
     {
-       Schema::table('users', function (Blueprint $table) {
-    $table->string('sr_code')->nullable()->unique();
-    $table->string('campus')->nullable();
-    $table->string('year_level')->nullable();
-    $table->string('status')->default('Active');
-    $table->string('profile_photo')->nullable();
-});
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->dropColumn([
+                'sr_code',
+                'campus',
+                'year_level',
+                'profile_photo',
+            ]);
+        });
     }
 };

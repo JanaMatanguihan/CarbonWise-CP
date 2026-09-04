@@ -10,18 +10,18 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->enum('role', ['admin', 'student', 'faculty', 'staff'])
-              ->default('student')
-              ->after('email');
-    });
-}
+    {
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->enum('role', ['admin', 'student', 'faculty', 'staff'])
+                  ->default('student')
+                  ->after('email');
+        });
+    }
 
-public function down(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->dropColumn('role');
-    });
+    public function down(): void
+    {
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->dropColumn('role');
+        });
     }
 };

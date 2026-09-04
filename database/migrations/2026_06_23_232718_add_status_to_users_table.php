@@ -10,16 +10,16 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->string('status')->default('Active');
-    });
-}
+    {
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->string('status')->default('Active');
+        });
+    }
 
-public function down(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->dropColumn('status');
-    });
-}
+    public function down(): void
+    {
+        Schema::connection('neon')->table('users', function (Blueprint $table) {
+            $table->dropColumn('status');
+        });
+    }
 };
