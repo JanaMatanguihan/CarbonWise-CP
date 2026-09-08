@@ -1,14 +1,14 @@
 FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libpq-dev \
     libpng-dev \
-    libjpeg-dev \
+    libjpeg62-turbo-dev \
     libfreetype6-dev \
+    libzip-dev \
+    unzip \
+    git \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo_pgsql
+    && docker-php-ext-install gd pdo_pgsql zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -18,8 +18,6 @@ COPY . .
 
 RUN composer install --optimize-autoloader --no-interaction
 
-RUN php artisan config:clear
+EXPOSE 8000
 
-EXPOSE 8080
-
-CMD php artisan serve --host=0.0.0.0 --port=8080
+CMD php artisan serve --host=0.0.0.0 --port=8000
