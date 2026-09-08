@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:carbonwise_app/services/location_service.dart';
 import 'package:carbonwise_app/utils/strategy_notifier.dart';
 import 'package:flutter/services.dart';
 import 'package:carbonwise_app/utils/carbon_score_refresh_notifier.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 const primaryGreen = Color(0xFF3AA76D);
 const darkGreen = Color(0xFF1E5631);
@@ -25,7 +28,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   String? _selectedOfficeResourceCategory;
   String? _selectedFoodType;
   String? _selectedFoodCategory;
-  String _userCampus = "";
+  String? _selectedCampus;
+  String? _selectedMealPeriod;
+  String? _lastFoodMealPeriod;
+  DateTime? _lastFoodConsumedAt;
+  DateTime _selectedFoodDate = DateTime.now();
+  TimeOfDay _selectedFoodTime = TimeOfDay.now();
 
   double _transportationTotalEmission = 0.0;
   double _officeResourceTotalEmission = 0.0;
@@ -37,7 +45,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final List<String> _foodEmissions = [];
   final LocationService _locationService = LocationService();
   double? _distanceKm;
+  List<LatLng> _routePoints = const [];
   bool _isCalculatingDistance = false;
+  bool _isSavingCarbonRecord = false;
+  bool _isCheckingCampus = false;
+  bool _isOnCampus = false;
 
   final TextEditingController _homeAddressController = TextEditingController();
   final TextEditingController _officeUsageController = TextEditingController();
@@ -203,13 +215,14 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   void initState() {
     super.initState();
     _loadSavedCarbonRecords();
-    _loadUserCampus();
+    _verifyCampusPresence(showFeedback: false);
   }
 
   @override
   void dispose() {
     _homeAddressController.dispose();
     _officeUsageController.dispose();
+    _officeHoursController.dispose();
     _servingSizeController.dispose();
     super.dispose();
   }
@@ -230,6 +243,95 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   double _calculateFoodEmission(String foodCategory) {
     return foodEmissionFactors[foodCategory] ?? 0.0;
   }
+
+  Future<bool> _verifyCampusPresence({required bool showFeedback}) async {
+    if (_isCheckingCampus) return _isOnCampus;
+
+    setState(() => _isCheckingCampus = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw const _CampusCheckException('Turn on location services to add activities.');
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw const _CampusCheckException('Location permission is required to add activities on campus.');
+      }
+
+      final campus = await _apiService.getUserCampus('');
+      final campusAddress = campus == null ? null : campusAddresses[campus];
+      if (campusAddress == null) {
+        throw const _CampusCheckException('Your profile campus is not available for location checking.');
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      final campusPoint = await _locationService.geocodeAddress(campusAddress);
+      final metersAway = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        campusPoint.latitude,
+        campusPoint.longitude,
+      );
+      final onCampus = metersAway <= 600;
+      if (!mounted) return onCampus;
+      setState(() => _isOnCampus = onCampus);
+      if (!onCampus && showFeedback) {
+        DialogHelper.showWarning(
+          context: context,
+          title: 'Campus location required',
+          message: 'You are about ${metersAway.round()} m from your registered campus. Activities can only be added within 600 m of campus.',
+        );
+      }
+      return onCampus;
+    } on _CampusCheckException catch (error) {
+      if (mounted && showFeedback) {
+        DialogHelper.showWarning(context: context, title: 'Location required', message: error.message);
+      }
+      return false;
+    } catch (_) {
+      if (mounted && showFeedback) {
+        DialogHelper.showWarning(context: context, title: 'Location check failed', message: 'We could not verify that you are on campus. Please try again with location services enabled.');
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _isCheckingCampus = false);
+    }
+  }
+
+  Future<void> _pickFoodDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedFoodDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+    );
+    if (date != null && mounted) setState(() => _selectedFoodDate = date);
+  }
+
+  Future<void> _pickFoodTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _selectedFoodTime,
+    );
+    if (time != null && mounted) setState(() => _selectedFoodTime = time);
+  }
+
+  DateTime get _selectedFoodDateTime => DateTime(
+    _selectedFoodDate.year,
+    _selectedFoodDate.month,
+    _selectedFoodDate.day,
+    _selectedFoodTime.hour,
+    _selectedFoodTime.minute,
+  );
+
+  String get _selectedFoodDateLabel =>
+      '${_selectedFoodDate.year}-${_selectedFoodDate.month.toString().padLeft(2, '0')}-${_selectedFoodDate.day.toString().padLeft(2, '0')}';
 
   List<String> _getFoodCategories(String? foodType) {
     switch (foodType) {
@@ -339,217 +441,176 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Future<void> _loadSavedCarbonRecords() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    if (ApiService.token == null) return;
 
-    if (user == null || user.email == null) return;
+    try {
+      final records = await _apiService.getCarbonRecords('');
+      if (!mounted) return;
 
-    final records = await _apiService.getCarbonRecords(user.email!);
+      setState(() {
+        _transportEmissions.clear();
+        _officeEmissions.clear();
+        _foodEmissions.clear();
 
-    setState(() {
-      _transportEmissions.clear();
-      _officeEmissions.clear();
-      _foodEmissions.clear();
+        for (final record in records) {
+          final transportation = record['transportation'];
+          final electricity = record['electricity'];
+          final food = record['food'];
 
-      for (final record in records) {
-        final transportation = record['transportation'];
-        final electricity = record['electricity'];
-        final food = record['food'];
+          if (transportation != null &&
+              (double.tryParse(transportation.toString()) ?? 0) > 0) {
+            final transportItem = record["transport_item"] ?? "Transportation";
 
-        if (transportation != null &&
-            transportation.toString() != "0" &&
-            transportation.toString() != "0.0") {
-          final transportItem = record["transport_item"] ?? "";
+            _transportEmissions.add(
+              "$transportItem\n${transportation.toString()} kg CO₂e",
+            );
+          }
 
-          _transportEmissions.add(
-            "$transportItem\n${transportation.toString()} kg CO₂e",
-          );
+          if (electricity != null &&
+              (double.tryParse(electricity.toString()) ?? 0) > 0) {
+            final officeItem = record["office_item"] ?? "Office resource";
+
+            _officeEmissions.add(
+              "$officeItem\n${electricity.toString()} kg CO₂e",
+            );
+          }
+
+          if (food != null && (double.tryParse(food.toString()) ?? 0) > 0) {
+            final foodItem = record["food_item"] ?? "Food";
+
+            _foodEmissions.add("$foodItem\n${food.toString()} kg CO₂e");
+          }
         }
-
-        if (electricity != null &&
-            electricity.toString() != "0" &&
-            electricity.toString() != "0.0") {
-          final officeItem = record["office_item"] ?? "";
-
-          _officeEmissions.add(
-            "$officeItem\n${electricity.toString()} kg CO₂e",
-          );
-        }
-
-        if (food != null &&
-            food.toString() != "0" &&
-            food.toString() != "0.0") {
-          final foodItem = record["food_item"] ?? "";
-
-          _foodEmissions.add("$foodItem\n${food.toString()} kg CO₂e");
-        }
-      }
-    });
+      });
+    } catch (_) {
+      // The screen remains usable when history cannot be loaded.
+    }
   }
 
   Future<void> _saveCarbonRecords() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    if (ApiService.token == null) {
+      DialogHelper.showError(
+        context: context,
+        title: "Sign in required",
+        message: "Please sign in again before saving your carbon record.",
+      );
+      return;
+    }
 
-    if (user == null) return;
+    if (!await _verifyCampusPresence(showFeedback: true)) return;
+
+    setState(() {
+      _isSavingCarbonRecord = true;
+    });
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async => false,
+        child: const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(color: primaryGreen),
+              SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  'Saving your carbon emissions...',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
     final now = DateTime.now();
-
-    final totalEmission =
-        _transportationTotalEmission +
-        _officeResourceTotalEmission +
-        _foodTotalEmission;
-
-    final transportItem = _transportEmissions.isNotEmpty
-        ? _transportEmissions.last.split(" - ").first
-        : "";
-
-    final officeItem = _officeEmissions.isNotEmpty
-        ? _officeEmissions.last.split("\n").first
-        : "";
-
-    final foodItem = _foodEmissions.isNotEmpty
-        ? _foodEmissions.last.split("(").first.trim()
-        : "";
-
+    var saved = false;
     try {
       await _apiService.addCarbonRecord(
-        email: user.email!,
         transportation: _transportationTotalEmission,
         electricity: _officeResourceTotalEmission,
         food: _foodTotalEmission,
-        totalEmission: totalEmission,
         recordDate: now.toIso8601String().split('T').first,
-        createdAt: now.toIso8601String(),
-        transportItem: transportItem,
-        officeItem: officeItem,
-        foodItem: foodItem,
+        transportItem: _transportEmissions.isNotEmpty
+            ? _transportEmissions.last
+            : null,
+        officeItem: _officeEmissions.isNotEmpty ? _officeEmissions.last : null,
+        foodItem: _foodEmissions.isNotEmpty ? _foodEmissions.last : null,
+        foodMealPeriod: _lastFoodMealPeriod,
+        foodConsumedAt: _lastFoodConsumedAt?.toIso8601String(),
       );
 
       carbonScoreRefreshNotifier.value++;
-
-      await _apiService.addNotification(
-        email: user.email!,
-        title: "Carbon Record Saved",
-        message: "Your carbon emission record has been saved successfully.",
-        type: "success",
-      );
-
-      // Refresh AI Sustainability Coach immediately
       strategyRefreshNotifier.value++;
+      saved = true;
+    } catch (_) {
+      saved = false;
+    } finally {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() {
+        _isSavingCarbonRecord = false;
+      });
+    }
 
-      DialogHelper.showSuccess(
+    if (!mounted) return;
+    if (saved) {
+      DialogHelper.showCalculationSummary(
         context: context,
-        title: "Calculation Complete",
-        message: "Your carbon emission record has been saved successfully.",
-        onOk: () {
-          DialogHelper.showCalculationSummary(
-            context: context,
-            transportEmissions: _transportEmissions,
-            officeEmissions: _officeEmissions,
-            foodEmissions: _foodEmissions,
-          );
-        },
+        transportEmissions: _transportEmissions,
+        officeEmissions: _officeEmissions,
+        foodEmissions: _foodEmissions,
       );
-    } catch (e) {
+    } else {
       DialogHelper.showError(
         context: context,
         title: "Unable to Save",
-        message:
-            "Something went wrong while saving your carbon emission record. Please try again.",
+        message: "Could not save your carbon record. Please try again.",
       );
     }
   }
 
   Future<void> _calculateDistance() async {
-    if (_homeAddressController.text.trim().isEmpty) {
+    if (_homeAddressController.text.trim().isEmpty || _selectedCampus == null) {
       DialogHelper.showWarning(
         context: context,
-        title: "Missing Address",
-        message: "Please enter your starting address first.",
+        title: "Incomplete Information",
+        message:
+            "Please enter your starting address and select a destination campus.",
       );
       return;
     }
 
-    // If we've already calculated the distance, don't call the API again.
-    if (_distanceKm != null) {
-      return;
-    }
+    if (_distanceKm != null) return;
 
     setState(() {
       _isCalculatingDistance = true;
     });
 
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null) return;
-
-    final campus = await _apiService.getUserCampus(user.email!);
-
-    if (campus == null) {
-      DialogHelper.showError(
-        context: context,
-        title: "Campus not found",
-        message: "Unable to retrieve your campus.",
-      );
-      return;
-    }
-
-    setState(() {
-      _userCampus = campus;
-    });
-
-    final campusAddress = campusAddresses[campus];
-
-    if (campusAddress == null) {
-      DialogHelper.showError(
-        context: context,
-        title: "Unknown campus",
-        message: "Campus address is not available.",
-      );
-      return;
-    }
+    final campusAddress = campusAddresses[_selectedCampus];
 
     try {
-      final distanceKm = await _locationService.calculateDistance(
+      final route = await _locationService.calculateRoute(
         homeAddress: _homeAddressController.text,
-        campusAddress: campusAddress,
+        campusAddress: campusAddress!,
       );
 
       setState(() {
-        _distanceKm = distanceKm;
+        _distanceKm = route.distanceKm;
+        _routePoints = route.points;
         _isCalculatingDistance = false;
       });
     } catch (e) {
       setState(() {
         _isCalculatingDistance = false;
       });
-
       DialogHelper.showWarning(
         context: context,
         title: "Invalid Address",
-        message:
-            "Please enter a valid starting address. We couldn't locate the address you entered.",
+        message: "Could not map the route. Please check your starting address.",
       );
-
-      return;
-    }
-
-    setState(() {
-      _distanceKm = _distanceKm;
-      _isCalculatingDistance = false;
-    });
-  }
-
-  Future<void> _loadUserCampus() async {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null) return;
-
-    final campus = await _apiService.getUserCampus(user.email!);
-
-    if (campus != null) {
-      setState(() {
-        _userCampus = campus;
-      });
     }
   }
 
@@ -595,6 +656,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   onChanged: (_) {
                     setState(() {
                       _distanceKm = null;
+                      _routePoints = const [];
                     });
                   },
                 ),
@@ -770,7 +832,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         return;
                       }
 
-                      final hours = double.parse(_officeHoursController.text);
+                      final hours = double.tryParse(
+                        _officeHoursController.text.trim(),
+                      );
+                      if (hours == null || hours <= 0) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Invalid Hours",
+                          message: "Enter a number greater than zero.",
+                        );
+                        return;
+                      }
 
                       final emission = _calculateOfficeResourceEmission(
                         _selectedOfficeResourceCategory!,
@@ -841,6 +913,40 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                 const SizedBox(height: 14),
 
+                _buildDropdownField(
+                  label: 'Meal Period',
+                  hint: 'Select meal period',
+                  value: _selectedMealPeriod,
+                  items: const ['Breakfast', 'Lunch', 'Dinner', 'Snack'],
+                  onChanged: (value) {
+                    setState(() => _selectedMealPeriod = value);
+                  },
+                ),
+
+                const SizedBox(height: 14),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickFoodDate,
+                        icon: const Icon(Icons.calendar_today_outlined),
+                        label: Text(_selectedFoodDateLabel),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickFoodTime,
+                        icon: const Icon(Icons.access_time_outlined),
+                        label: Text(_selectedFoodTime.format(context)),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
                 // Servings
                 _buildTextField(
                   label: "Servings",
@@ -858,12 +964,13 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   child: _buildAddButton(
                     onPressed: () {
                       if (_selectedFoodType == null ||
-                          _selectedFoodCategory == null) {
+                          _selectedFoodCategory == null ||
+                          _selectedMealPeriod == null) {
                         DialogHelper.showWarning(
                           context: context,
                           title: "Incomplete Information",
                           message:
-                              "Please select a food type and food category before adding an emission.",
+                              "Please select a food type, category, and meal period before adding an emission.",
                         );
                         return;
                       }
@@ -877,7 +984,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         return;
                       }
 
-                      final serving = double.parse(_servingSizeController.text);
+                      final serving = double.tryParse(
+                        _servingSizeController.text.trim(),
+                      );
+                      if (serving == null || serving <= 0) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Invalid Servings",
+                          message: "Enter a number greater than zero.",
+                        );
+                        return;
+                      }
 
                       // Emission factors are in kg CO₂e per kilogram of food.
                       // Approximate 1 serving = 100 g (0.1 kg).
@@ -891,14 +1008,18 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                       setState(() {
                         _foodEmissions.add(
                           '${_selectedFoodCategory!}\n'
+                          '$_selectedMealPeriod • $_selectedFoodDateLabel ${_selectedFoodTime.format(context)}\n'
                           '$serving serving(s)\n'
                           '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
 
                         _foodTotalEmission += emission;
+                        _lastFoodMealPeriod = _selectedMealPeriod;
+                        _lastFoodConsumedAt = _selectedFoodDateTime;
 
                         _selectedFoodType = null;
                         _selectedFoodCategory = null;
+                        _selectedMealPeriod = null;
                         _servingSizeController.clear();
                       });
                     },
@@ -937,20 +1058,23 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
             // 🟢 POP-UP LOGIC
             GestureDetector(
-              onTap: () async {
-                if (_transportEmissions.isEmpty &&
-                    _officeEmissions.isEmpty &&
-                    _foodEmissions.isEmpty) {
-                  DialogHelper.showWarning(
-                    context: context,
-                    title: "Incomplete Information",
-                    message: "Please add at least one emission to calculate.",
-                  );
-                  return;
-                }
+              onTap: _isSavingCarbonRecord
+                  ? null
+                  : () async {
+                      if (_transportEmissions.isEmpty &&
+                          _officeEmissions.isEmpty &&
+                          _foodEmissions.isEmpty) {
+                        DialogHelper.showWarning(
+                          context: context,
+                          title: "Incomplete Information",
+                          message:
+                              "Please add at least one emission to calculate.",
+                        );
+                        return;
+                      }
 
-                await _saveCarbonRecords();
-              },
+                      await _saveCarbonRecords();
+                    },
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -965,16 +1089,25 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Text(
-                    'Calculate my Carbon Emissions',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                child: Center(
+                  child: _isSavingCarbonRecord
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Calculate my Carbon Emissions',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -1166,12 +1299,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     );
   }
 
-  Widget _buildAddButton({required VoidCallback onPressed}) {
+  Widget _buildAddButton({required FutureOr<void> Function() onPressed}) {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
+        onPressed: _isCheckingCampus
+            ? null
+            : () async {
+                if (!await _verifyCampusPresence(showFeedback: true)) return;
+                await onPressed();
+              },
         icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
         label: const Text(
           'Add Activity',
@@ -1288,45 +1426,51 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Destination",
+          "Destination Campus",
           style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: darkGreen,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF3AA76D),
           ),
         ),
-
-        const SizedBox(height: 7),
-
+        const SizedBox(height: 6),
         Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF4F8F5),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFD9E8DE)),
+            border: Border.all(color: Colors.black38, width: 1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                color: primaryGreen,
-                size: 20,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedCampus,
+              hint: const Text(
+                'Select BatStateU Campus Destination',
+                style: TextStyle(fontSize: 13, color: Colors.black38),
               ),
-
-              const SizedBox(width: 10),
-
-              Expanded(
-                child: Text(
-                  _userCampus.isEmpty ? "Loading your campus..." : _userCampus,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1F2933),
-                  ),
-                ),
+              isExpanded: true,
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.black,
+                size: 18,
               ),
-            ],
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedCampus = newValue;
+                  _distanceKm = null;
+                  _routePoints = const [];
+                });
+              },
+              items: campusAddresses.keys.map<DropdownMenuItem<String>>((
+                String campus,
+              ) {
+                return DropdownMenuItem<String>(
+                  value: campus,
+                  child: Text(campus),
+                );
+              }).toList(),
+            ),
           ),
         ),
       ],
@@ -1348,42 +1492,120 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               : primaryGreen.withValues(alpha: 0.4),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: primaryGreen.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.route_rounded, color: primaryGreen),
-          ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Estimated Distance",
-                  style: TextStyle(fontSize: 13, color: Colors.black54),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: primaryGreen.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
                 ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  _distanceKm == null
-                      ? "Calculate your route first"
-                      : "${_distanceKm!.toStringAsFixed(2)} km",
-                  style: const TextStyle(
-                    fontSize: 20,
+                child: const Icon(
+                  Icons.map_outlined,
+                  color: primaryGreen,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  "Map Distance Window",
+                  style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: darkGreen,
                   ),
                 ),
-              ],
+              ),
+              if (_distanceKm != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: primaryGreen,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    "Route Computed",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (_routePoints.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 180,
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: _routePoints[_routePoints.length ~/ 2],
+                    initialZoom: 13,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.carbonwise_app',
+                    ),
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _routePoints,
+                          strokeWidth: 4,
+                          color: primaryGreen,
+                        ),
+                      ],
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _routePoints.first,
+                          width: 36,
+                          height: 36,
+                          child: const Icon(Icons.home, color: darkGreen),
+                        ),
+                        Marker(
+                          point: _routePoints.last,
+                          width: 36,
+                          height: 36,
+                          child: const Icon(Icons.school, color: primaryGreen),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
+          ],
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Calculated Road Distance:",
+                style: TextStyle(fontSize: 13, color: Colors.black54),
+              ),
+              Text(
+                _distanceKm == null
+                    ? "0.00 km"
+                    : "${_distanceKm!.toStringAsFixed(2)} km",
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: darkGreen,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1582,4 +1804,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       ),
     );
   }
+}
+
+class _CampusCheckException implements Exception {
+  const _CampusCheckException(this.message);
+
+  final String message;
 }

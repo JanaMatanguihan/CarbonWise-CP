@@ -1,299 +1,617 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../utils/api_constants.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
+
+import '../utils/api_constants.dart';
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
-  static const String apiKey = ApiConstants.apiKey;
 
-  // GET: Carbon Records
+  // LARAVEL AUTHENTICATION TOKEN
 
-  Future<List<dynamic>> getCarbonRecords(String email) async {
-    final today = DateTime.now().toIso8601String().split('T')[0];
+  static String? _token;
+  static String? _currentUserEmail;
 
-    final response = await Supabase.instance.client
-        .from('carbon_records')
-        .select()
-        .eq('g_suite', email)
-        .eq('record_date', today);
+  static String? get token => _token;
 
-    return response;
+  static Future<String?> getCurrentUserEmail() async {
+    return _currentUserEmail;
   }
 
-  // POST: Carbon Record
+  static void setToken(String token) {
+    _token = token;
+  }
+
+  static void clearToken() {
+    _token = null;
+    _currentUserEmail = null;
+  }
+
+  // HEADERS
+
+  static Map<String, String> get _headers {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (_token != null) 'Authorization': 'Bearer $_token',
+    };
+  }
+
+  static Map<String, String> authHeaders(String token) {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  // LOGIN
+
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/login'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final token = data['token'];
+
+        if (token != null) {
+          setToken(token.toString());
+        }
+
+        _currentUserEmail = email;
+
+        return data;
+      }
+
+      throw Exception(data['message'] ?? 'Login failed.');
+    } on SocketException {
+      throw Exception(
+        'Unable to connect to the server. '
+        'Make sure Laravel is running and your phone is connected '
+        'to the same Wi-Fi network.',
+      );
+    } on HttpException {
+      throw Exception('Could not communicate with the Laravel server.');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // REGISTER
+
+  static Future<Map<String, dynamic>> register({
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    required String role,
+    String? srCode,
+    required String fullName,
+    required String campus,
+    int? yearLevel,
+    String? department,
+    String? facultyType,
+    String? office,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/register'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        // IMPORTANT:
+        // Laravel expects "name", NOT "full_name"
+        'name': fullName,
+
+        'email': email,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+
+        'role': role,
+
+        'sr_code': srCode,
+        'campus': campus,
+        'year_level': yearLevel,
+        'department': department,
+        'faculty_type': facultyType,
+        'office': office,
+      }),
+    );
+
+    // Debug output
+    print('REGISTER STATUS: ${response.statusCode}');
+    print('REGISTER RESPONSE: ${response.body}');
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return data;
+    }
+
+    // Laravel validation errors
+    if (response.statusCode == 422) {
+      final errors = data['errors'];
+
+      if (errors != null) {
+        throw Exception(errors.toString());
+      }
+
+      throw Exception(
+        data['message'] ?? 'Please check the information you entered.',
+      );
+    }
+
+    throw Exception(
+      'Registration failed.\n'
+      'Status: ${response.statusCode}\n'
+      'Response: ${response.body}',
+    );
+  }
+
+  // GET: CARBON RECORDS
+
+  Future<List<dynamic>> getCarbonRecords(String email) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return data['records'] ?? data['data'] ?? [];
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load carbon records.');
+  }
+
+  // POST: CARBON RECORD
 
   Future<void> addCarbonRecord({
-    required String email,
     required double transportation,
     required double electricity,
     required double food,
-    required double totalEmission,
     required String recordDate,
-    required String createdAt,
-    required String transportItem,
-    required String officeItem,
-    required String foodItem,
+    String? transportItem,
+    String? officeItem,
+    String? foodItem,
+    String? foodMealPeriod,
+    String? foodConsumedAt,
   }) async {
-    // STEP 1: Check if today's record already exists
-    final checkResponse = await http.get(
-      Uri.parse(
-        "$baseUrl/carbon_records?g_suite=eq.$email&record_date=eq.$recordDate",
-      ),
-      headers: {"apikey": apiKey, "Authorization": "Bearer $apiKey"},
-    );
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/carbon-records'),
+          headers: _headers,
+          body: jsonEncode({
+            'transportation': transportation,
+            'electricity': electricity,
+            'food': food,
+            'record_date': recordDate,
+            if (transportItem != null) 'transport_item': transportItem,
+            if (officeItem != null) 'office_item': officeItem,
+            if (foodItem != null) 'food_item': foodItem,
+            if (foodMealPeriod != null) 'food_meal_period': foodMealPeriod,
+            if (foodConsumedAt != null) 'food_consumed_at': foodConsumedAt,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
 
-    if (checkResponse.statusCode != 200) {
-      throw Exception(checkResponse.body);
-    }
+    final data = _decodeResponse(response);
 
-    final List records = jsonDecode(checkResponse.body);
-
-    // STEP 2: If a record already exists today, UPDATE it
-    if (records.isNotEmpty) {
-      final existing = records.first;
-
-      final updatedTransportation =
-          (existing["transportation"] ?? 0).toDouble() + transportation;
-
-      final updatedElectricity =
-          (existing["electricity"] ?? 0).toDouble() + electricity;
-
-      final updatedFood = (existing["food"] ?? 0).toDouble() + food;
-
-      final updatedTotal =
-          (existing["total_emission"] ?? 0).toDouble() + totalEmission;
-
-      final updateResponse = await http.patch(
-        Uri.parse(
-          "$baseUrl/carbon_records?g_suite=eq.$email&record_date=eq.$recordDate",
-        ),
-        headers: {
-          "apikey": apiKey,
-          "Authorization": "Bearer $apiKey",
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "transportation": updatedTransportation,
-          "electricity": updatedElectricity,
-          "food": updatedFood,
-          "total_emission": updatedTotal,
-          "transport_item": transportItem,
-          "office_item": officeItem,
-          "food_item": foodItem,
-        }),
-      );
-
-      if (updateResponse.statusCode != 204 &&
-          updateResponse.statusCode != 200) {
-        throw Exception(updateResponse.body);
-      }
-    }
-    // STEP 3: Otherwise create a new row
-    else {
-      final response = await http.post(
-        Uri.parse("$baseUrl/carbon_records"),
-        headers: {
-          "apikey": apiKey,
-          "Authorization": "Bearer $apiKey",
-          "Content-Type": "application/json",
-          "Prefer": "return=representation",
-        },
-        body: jsonEncode({
-          "g_suite": email,
-          "transportation": transportation,
-          "electricity": electricity,
-          "food": food,
-          "total_emission": totalEmission,
-          "record_date": recordDate,
-          "created_at": createdAt,
-        }),
-      );
-
-      if (response.statusCode != 201 && response.statusCode != 200) {
-        throw Exception(response.body);
-      }
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(data['message'] ?? 'Failed to add carbon record.');
     }
   }
 
-  // GET: User Info
+  // GET: ONE CARBON RECORD
 
-  Future<Map<String, dynamic>> getUserInfo(String email) async {
-    final response = await http.get(
-      Uri.parse(
-        "${ApiConstants.baseUrl}/user_info?g_suite=eq.$email&select=sr_code,g_suite,full_name,campus,department,profile_picture",
-      ),
-      headers: {
-        "apikey": ApiConstants.apiKey,
-        "Authorization": "Bearer ${ApiConstants.apiKey}",
-      },
-    );
+  Future<List<dynamic>> getCarbonRecord(String email) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
+
+    final data = _decodeResponse(response);
 
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.isNotEmpty ? data.first : {};
+      return data['records'] ?? data['data'] ?? [];
     }
 
-    throw Exception("Failed to load user info");
+    throw Exception(data['message'] ?? 'Failed to load carbon records.');
   }
 
-  // GET: User Carbon Score
+  // PUT: UPDATE CARBON RECORD
 
+  Future<void> updateCarbonRecord({
+    required int id,
+    required double transportation,
+    required double electricity,
+    required double food,
+    required String recordDate,
+  }) async {
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl/carbon-records/$id'),
+          headers: _headers,
+          body: jsonEncode({
+            'transportation': transportation,
+            'electricity': electricity,
+            'food': food,
+            'record_date': recordDate,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode != 200) {
+      throw Exception(data['message'] ?? 'Failed to update carbon record.');
+    }
+  }
+
+  // DELETE: CARBON RECORD
+
+  Future<void> deleteCarbonRecord(int id) async {
+    final response = await http
+        .delete(Uri.parse('$baseUrl/carbon-records/$id'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode != 200) {
+      throw Exception(data['message'] ?? 'Failed to delete carbon record.');
+    }
+  }
+
+  // GET: USER INFO
+
+  Future<Map<String, dynamic>> getUserInfo([String? email]) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/profile'), headers: _headers)
+          .timeout(const Duration(seconds: 15));
+
+      print('PROFILE STATUS: ${response.statusCode}');
+      print('PROFILE RESPONSE: ${response.body}');
+      print('PROFILE TOKEN: $_token');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return data['user'] ?? data['data'] ?? data;
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load user information.');
+    } catch (e) {
+      print('PROFILE API ERROR: $e');
+      rethrow;
+    }
+  }
+
+  // GET: USER CAMPUS
+
+  Future<String?> getUserCampus(String email) async {
+    final data = await getUserInfo(email);
+
+    if (data.isEmpty) {
+      return null;
+    }
+
+    return data['campus']?.toString();
+  }
+
+  // GET: LATEST CARBON SCORE
   Future<Map<String, dynamic>?> getLatestCarbonScore(String email) async {
-    final response = await http.get(
-      Uri.parse(
-        "${ApiConstants.baseUrl}/carbon_records"
-        "?g_suite=eq.$email"
-        "&select=total_emission,transportation,electricity,food,transport_item,office_item,food_item"
-        "&order=created_at.desc"
-        "&limit=1",
-      ),
-      headers: {
-        "apikey": ApiConstants.apiKey,
-        "Authorization": "Bearer ${ApiConstants.apiKey}",
-      },
-    );
+    final records = await getCarbonRecords(email);
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-
-      if (data.isEmpty) return null;
-
-      return data.first;
+    if (records.isEmpty) {
+      return null;
     }
 
-    throw Exception("Failed to load carbon score");
+    return records.first;
   }
 
-  // GET: User Recent Activities
-
+  // GET: RECENT ACTIVITIES
   Future<List<dynamic>> getRecentActivities(String email) async {
-    final response = await http.get(
-      Uri.parse(
-        "${ApiConstants.baseUrl}/carbon_records?g_suite=eq.$email&select=*&order=created_at.desc",
-      ),
-      headers: {
-        "apikey": ApiConstants.apiKey,
-        "Authorization": "Bearer ${ApiConstants.apiKey}",
-      },
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-
-    throw Exception("Failed to load activities");
+    final records = await getCarbonRecords(email);
+    return records;
   }
 
-  // GET: Report Data
-
+  // GET: EMISSION DATA FOR REPORTS
   Future<List<dynamic>> getEmissionData(String email) async {
-    final response = await http.get(
-      Uri.parse(
-        "${ApiConstants.baseUrl}/carbon_records?g_suite=eq.$email&select=total_emission,record_date",
-      ),
-      headers: {
-        "apikey": ApiConstants.apiKey,
-        "Authorization": "Bearer ${ApiConstants.apiKey}",
-      },
-    );
+    final records = await getCarbonRecords(email);
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-
-    throw Exception("Failed to load emission data");
+    return records.map((record) {
+      return {
+        'total_emission': record['total_emission'],
+        'record_date': record['record_date'],
+      };
+    }).toList();
   }
 
-  // PATCH: Update User Info
+  // GET: LAST 4 WEEKS / RECORDS
+  Future<List<dynamic>> getLast4WeeksRecords(String email) async {
+    final records = await getCarbonRecords(email);
 
+    if (records.length <= 4) {
+      return records;
+    }
+
+    return records.take(4).toList();
+  }
+
+  // GET: CARBON PATTERNS
+  Future<Map<String, dynamic>> getCarbonPatterns() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/carbon-patterns'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load carbon patterns.');
+  }
+
+  // PUT: UPDATE USER PROFILE
   Future<void> updateUserProfile({
     required String email,
     required String fullName,
     String? profilePicture,
   }) async {
-    final response = await http.patch(
-      Uri.parse("${ApiConstants.baseUrl}/user_info?g_suite=eq.$email"),
-      headers: {
-        "apikey": ApiConstants.apiKey,
-        "Authorization": "Bearer ${ApiConstants.apiKey}",
-        "Content-Type": "application/json",
-        "Prefer": "return=representation",
-      },
-      body: jsonEncode({
-        "full_name": fullName,
-        "profile_picture": profilePicture,
-      }),
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl/profile'),
+          headers: _headers,
+          body: jsonEncode({
+            'full_name': fullName,
+            if (profilePicture != null) 'profile_picture': profilePicture,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode != 200) {
+      throw Exception(data['message'] ?? 'Failed to update profile.');
+    }
+  }
+
+  // POST: UPLOAD PROFILE PICTURE
+  Future<String> uploadProfilePicture(File imageFile) async {
+    if (_token == null) {
+      throw Exception('User not logged in.');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/profile-picture'),
     );
 
-    if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception(response.body);
-    }
-  }
+    request.headers.addAll({
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $_token',
+    });
 
-  // GET: User Campus
-  Future<String?> getUserCampus(String email) async {
-    final data = await getUserInfo(email);
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'profile_picture',
+        imageFile.path,
+        filename: path.basename(imageFile.path),
+      ),
+    );
 
-    if (data.isEmpty) return null;
+    final streamedResponse = await request.send();
 
-    return data["campus"];
-  }
+    final response = await http.Response.fromStream(streamedResponse);
 
-  // GET: last 4 weeks record
-  Future<List<dynamic>> getLast4WeeksRecords(String email) async {
-    final response = await Supabase.instance.client
-        .from('carbon_records')
-        .select()
-        .eq('g_suite', email)
-        .order('record_date', ascending: false)
-        .limit(4);
+    final data = _decodeResponse(response);
 
-    return response;
-  }
-
-  // POST: Upload Profile Picture
-  Future<String> uploadProfilePicture(File imageFile) async {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null) {
-      throw Exception("User not logged in.");
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return data['profile_picture'] ??
+          data['url'] ??
+          data['profilePicture'] ??
+          '';
     }
 
-    final filePath = "${user.id}/profile${path.extension(imageFile.path)}";
-
-    await Supabase.instance.client.storage
-        .from('profile-pictures')
-        .upload(
-          filePath,
-          imageFile,
-          fileOptions: const FileOptions(upsert: true),
-        );
-
-    return Supabase.instance.client.storage
-        .from('profile-pictures')
-        .getPublicUrl(filePath);
+    throw Exception(data['message'] ?? 'Failed to upload profile picture.');
   }
 
-  // GET: User Notification
+  // POST: ADD NOTIFICATION
   Future<void> addNotification({
     required String email,
     required String title,
     required String message,
     required String type,
   }) async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/notifications'),
+          headers: _headers,
+          body: jsonEncode({'title': title, 'message': message, 'type': type}),
+        )
+        .timeout(const Duration(seconds: 15));
 
-    if (user == null) return;
+    final data = _decodeResponse(response);
 
-    await Supabase.instance.client.from('notifications').insert({
-      'user_id': user.id,
-      'g_suite': email,
-      'title': title,
-      'message': message,
-      'type': type,
-    });
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(data['message'] ?? 'Failed to add notification.');
+    }
+  }
+
+  // TEST LARAVEL CONNECTION
+  Future<String> testLaravel() async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/../up'),
+          headers: {'Accept': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return response.body;
+    }
+
+    throw Exception('Laravel connection failed: ${response.statusCode}');
+  }
+
+  // LOGOUT
+  static Future<void> logout() async {
+    if (_token != null) {
+      try {
+        await http
+            .post(Uri.parse('$baseUrl/logout'), headers: _headers)
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {
+        // Even if the server request fails,
+        // clear the local token.
+      }
+    }
+
+    clearToken();
+    _currentUserEmail = null;
+  }
+
+  // RESPONSE HELPER
+  static Map<String, dynamic> _decodeResponse(http.Response response) {
+    if (response.body.isEmpty) {
+      return {};
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {'data': decoded};
+    } catch (_) {
+      return {'message': response.body};
+    }
+  }
+
+  // GET: NOTIFICATIONS
+  Future<List<dynamic>> getNotifications() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/notifications'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return data['notifications'] ?? data['data'] ?? [];
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load notifications.');
+  }
+
+  // PUT: CHANGE PASSWORD
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl/change-password'),
+          headers: _headers,
+          body: jsonEncode({
+            'current_password': currentPassword,
+            'new_password': newPassword,
+            'new_password_confirmation': newPassword,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 422) {
+      throw Exception(
+        data['message'] ??
+            data['errors']?.toString() ??
+            'Invalid password information.',
+      );
+    }
+
+    throw Exception(data['message'] ?? 'Failed to change password.');
+  }
+
+  // GET USER PROFILE
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/profile'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    print('PROFILE STATUS: ${response.statusCode}');
+    print('PROFILE RESPONSE: ${response.body}');
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return data['user'] ?? data['data'] ?? data;
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load profile.');
+  }
+
+  // GET DEPARTMENT RANKINGS
+  Future<List<dynamic>> getDepartmentRankings() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/profile/department-rankings'),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Failed to load department rankings');
+  }
+
+  // GET USER CARBON RECORDS
+  Future<List<dynamic>> getUserCarbonRecords(String email) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/profile/$email/carbon-records'),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Failed to load carbon records');
+  }
+
+  // GET CURRENT USER
+  static Future<Map<String, dynamic>> getCurrentUser() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/profile'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return data['user'] ?? data['data'] ?? data;
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load current user.');
   }
 }

@@ -37,12 +37,14 @@ dependencies:
   supabase_flutter: ^2.15.0
   crypto: ^3.0.3
   fl_chart: ^1.2.0
-  http: ^1.2.2
+  http: ^1.6.0
   awesome_dialog: ^3.2.1
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
   flutter_markdown: ^0.7.3
   image_picker: ^1.1.2
+  shared_preferences: ^2.5.5
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

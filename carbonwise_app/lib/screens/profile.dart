@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
@@ -259,11 +258,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadRecentActivities() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final email = await ApiService.getCurrentUserEmail();
 
-      if (user == null || user.email == null) return;
+      if (email == null) return;
 
-      final records = await _apiService.getRecentActivities(user.email!);
+      final records = await _apiService.getRecentActivities(email);
 
       List<Map<String, dynamic>> activities = [];
 
@@ -326,57 +325,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadCarbonScore() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    try {
+      final email = await ApiService.getCurrentUserEmail();
 
-    print("Current user email: ${user?.email}");
+      print("Current user email: $email");
 
-    if (user == null || user.email == null) {
-      print("No logged in user.");
-      return;
+      if (email == null) {
+        print("No logged in user.");
+        return;
+      }
+
+      final record = await _apiService.getLatestCarbonScore(email);
+
+      print("Database record: $record");
+
+      setState(() {
+        carbonScore = (record?['total_emission'] ?? 0).toDouble();
+
+        transportationEmission = (record?['transportation'] ?? 0).toDouble();
+
+        officeEmission = (record?['electricity'] ?? 0).toDouble();
+
+        foodEmission = (record?['food'] ?? 0).toDouble();
+
+        _transportItem = record?["transport_item"] ?? "";
+        _officeItem = record?["office_item"] ?? "";
+        _foodItem = record?["food_item"] ?? "";
+
+        isLoadingScore = false;
+      });
+
+      print("Carbon Score: $carbonScore");
+      print("Transportation: $transportationEmission");
+      print("Office Resource: $officeEmission");
+      print("Food: $foodEmission");
+    } catch (e) {
+      print("Carbon Score Error: $e");
+
+      setState(() {
+        isLoadingScore = false;
+      });
     }
-
-    final record = await _apiService.getLatestCarbonScore(user.email!);
-
-    print("Database record: $record");
-
-    setState(() {
-      carbonScore = (record?['total_emission'] ?? 0).toDouble();
-
-      transportationEmission = (record?['transportation'] ?? 0).toDouble();
-      officeEmission = (record?['electricity'] ?? 0).toDouble();
-      foodEmission = (record?['food'] ?? 0).toDouble();
-
-      _transportItem = record?["transport_item"] ?? "";
-      _officeItem = record?["office_item"] ?? "";
-      _foodItem = record?["food_item"] ?? "";
-
-      isLoadingScore = false;
-    });
-
-    print("Carbon Score: $carbonScore");
-    print("Transportation: $transportationEmission");
-    print("Office Resource: $officeEmission");
-    print("Food: $foodEmission");
-
-    print(record);
   }
 
   Future<void> _loadUserInfo() async {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null || user.email == null) {
-      setState(() {
-        isLoadingProfile = false;
-      });
-      return;
-    }
-
     try {
-      final response = await Supabase.instance.client
-          .from('user_info')
-          .select()
-          .eq('g_suite', user.email!)
-          .single();
+      final email = await ApiService.getCurrentUserEmail();
+
+      if (email == null) {
+        setState(() {
+          isLoadingProfile = false;
+        });
+        return;
+      }
+
+      final response = await _apiService.getUserProfile();
 
       setState(() {
         userInfo = response;
@@ -392,95 +395,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadDepartmentRankings() async {
-    final supabase = Supabase.instance.client;
-
     try {
-      final users = await supabase
-          .from('user_info')
-          .select('g_suite, department');
+      final email = await ApiService.getCurrentUserEmail();
 
-      final now = DateTime.now();
+      if (email == null) return;
 
-      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      final rankingsData = await _apiService.getDepartmentRankings();
 
-      final records = await supabase
-          .from('carbon_records')
-          .select('g_suite, total_emission, record_date')
-          .gte(
-            'record_date',
-            firstDayOfMonth.toIso8601String().split('T').first,
-          );
-
-      Map<String, String> userDepartments = {};
-
-      for (var user in users) {
-        userDepartments[user['g_suite']] = user['department'];
-      }
-
-      Map<String, List<double>> departmentTotals = {};
-
-      for (var record in records) {
-        final email = record['g_suite'];
-        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
-
-        final department = userDepartments[email];
-
-        if (department == null) continue;
-
-        departmentTotals.putIfAbsent(department, () => []);
-        departmentTotals[department]!.add(emission);
-      }
-
-      List<DepartmentRanking> rankings = [];
-
-      departmentTotals.forEach((department, emissions) {
-        final average = emissions.reduce((a, b) => a + b) / emissions.length;
-
-        rankings.add(
-          DepartmentRanking(
-            department: department,
-            averageEmission: average,
-            totalRecords: emissions.length,
-          ),
+      final rankings = rankingsData.map<DepartmentRanking>((item) {
+        return DepartmentRanking(
+          department: item['department']?.toString() ?? '',
+          averageEmission:
+              double.tryParse(item['average_emission']?.toString() ?? '0') ?? 0,
+          totalRecords:
+              int.tryParse(item['total_records']?.toString() ?? '0') ?? 0,
         );
-      });
+      }).toList();
 
       rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
 
-      final user = supabase.auth.currentUser;
+      final currentUser = await _apiService.getUserProfile();
 
-      if (user != null) {
-        final userInfo = await supabase
-            .from('user_info')
-            .select('department')
-            .eq('g_suite', user.email!)
-            .single();
+      final department = currentUser?['department']?.toString();
 
-        _userDepartment = userInfo['department'];
+      final index = rankings.indexWhere((d) => d.department == department);
 
-        final index = rankings.indexWhere(
-          (d) => d.department == _userDepartment,
-        );
+      setState(() {
+        _departmentRankings = rankings;
+        _userDepartment = department;
 
         if (index != -1) {
           _departmentRank = _getOrdinal(index + 1);
         }
-      }
-
-      setState(() {
-        _departmentRankings = rankings;
       });
     } catch (e) {
-      print(e);
+      print("Department Ranking Error: $e");
     }
   }
 
   Future<void> _loadLast4Weeks() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final email = await ApiService.getCurrentUserEmail();
 
-    if (user == null) return;
+    if (email == null) return;
 
-    final data = await _apiService.getLast4WeeksRecords(user.email!);
+    final data = await _apiService.getLast4WeeksRecords(email);
 
     setState(() {
       last4Weeks = data.reversed
@@ -490,95 +448,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadPatterns() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    try {
+      final data = await ApiService().getCarbonPatterns();
 
-    if (user == null) return;
+      if (!mounted) return;
 
-    final records = await Supabase.instance.client
-        .from('carbon_records')
-        .select()
-        .eq('email', user.email!);
-
-    if (records.isEmpty) {
       setState(() {
-        _weekdayPattern = "No emission records yet.";
-        _highestImpactPattern = "No emission records yet.";
-        _insightPattern = "Start tracking your emissions!";
+        _weekdayPattern =
+            data['weekday_pattern']?.toString() ?? 'No emission records yet.';
+
+        _highestImpactPattern =
+            data['highest_impact_pattern']?.toString() ??
+            'No emission records yet.';
+
+        _insightPattern =
+            data['insight_pattern']?.toString() ??
+            'Start tracking your emissions!';
       });
-      return;
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _weekdayPattern = 'Unable to load emission patterns.';
+        _highestImpactPattern = 'Unable to load emission patterns.';
+        _insightPattern = 'Please try again later.';
+      });
+
+      print('Error loading carbon patterns: $e');
     }
-
-    double weekdayTotal = 0;
-    double weekendTotal = 0;
-
-    double transportTotal = 0;
-    double electricityTotal = 0;
-    double foodTotal = 0;
-
-    for (final record in records) {
-      final date = DateTime.parse(record['record_date']);
-
-      final transport = (record['transportation'] ?? 0).toDouble();
-
-      final electricity = (record['electricity'] ?? 0).toDouble();
-
-      final food = (record['food'] ?? 0).toDouble();
-
-      transportTotal += transport;
-      electricityTotal += electricity;
-      foodTotal += food;
-
-      if (date.weekday <= 5) {
-        weekdayTotal += transport + electricity + food;
-      } else {
-        weekendTotal += transport + electricity + food;
-      }
-    }
-
-    // Highest impact activity
-    String highestActivity = "Transportation";
-    double highestValue = transportTotal;
-
-    if (electricityTotal > highestValue) {
-      highestActivity = "Electricity usage";
-      highestValue = electricityTotal;
-    }
-
-    if (foodTotal > highestValue) {
-      highestActivity = "Food consumption";
-      highestValue = foodTotal;
-    }
-
-    final totalEmission = transportTotal + electricityTotal + foodTotal;
-
-    final percentage = totalEmission == 0
-        ? 0
-        : (highestValue / totalEmission * 100);
-
-    setState(() {
-      if (weekdayTotal > weekendTotal && weekendTotal > 0) {
-        final diff = ((weekdayTotal - weekendTotal) / weekendTotal * 100)
-            .round();
-
-        _weekdayPattern =
-            "You emit about $diff% more CO₂ on weekdays than weekends.";
-      } else if (weekendTotal > weekdayTotal && weekdayTotal > 0) {
-        final diff = ((weekendTotal - weekdayTotal) / weekdayTotal * 100)
-            .round();
-
-        _weekdayPattern =
-            "You emit about $diff% more CO₂ on weekends than weekdays.";
-      } else {
-        _weekdayPattern =
-            "Your weekday and weekend emissions are nearly the same.";
-      }
-
-      _highestImpactPattern =
-          "Your highest impact activity is $highestActivity.";
-
-      _insightPattern =
-          "$highestActivity contributes ${percentage.toStringAsFixed(0)}% of your total emissions.";
-    });
   }
 
   static const Color primaryGreen = Color(0xFF3AA76D);
