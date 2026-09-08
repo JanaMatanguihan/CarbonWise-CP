@@ -250,7 +250,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     setState(() => _isCheckingCampus = true);
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        throw const _CampusCheckException('Turn on location services to add activities.');
+        throw const _CampusCheckException(
+          'Turn on location services to add activities.',
+        );
       }
 
       var permission = await Geolocator.checkPermission();
@@ -259,17 +261,23 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        throw const _CampusCheckException('Location permission is required to add activities on campus.');
+        throw const _CampusCheckException(
+          'Location permission is required to add activities on campus.',
+        );
       }
 
       final campus = await _apiService.getUserCampus('');
       final campusAddress = campus == null ? null : campusAddresses[campus];
       if (campusAddress == null) {
-        throw const _CampusCheckException('Your profile campus is not available for location checking.');
+        throw const _CampusCheckException(
+          'Your profile campus is not available for location checking.',
+        );
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       final campusPoint = await _locationService.geocodeAddress(campusAddress);
       final metersAway = Geolocator.distanceBetween(
@@ -285,18 +293,28 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         DialogHelper.showWarning(
           context: context,
           title: 'Campus location required',
-          message: 'You are about ${metersAway.round()} m from your registered campus. Activities can only be added within 600 m of campus.',
+          message:
+              'You are about ${metersAway.round()} m from your registered campus. Activities can only be added within 600 m of campus.',
         );
       }
       return onCampus;
     } on _CampusCheckException catch (error) {
       if (mounted && showFeedback) {
-        DialogHelper.showWarning(context: context, title: 'Location required', message: error.message);
+        DialogHelper.showWarning(
+          context: context,
+          title: 'Location required',
+          message: error.message,
+        );
       }
       return false;
     } catch (_) {
       if (mounted && showFeedback) {
-        DialogHelper.showWarning(context: context, title: 'Location check failed', message: 'We could not verify that you are on campus. Please try again with location services enabled.');
+        DialogHelper.showWarning(
+          context: context,
+          title: 'Location check failed',
+          message:
+              'We could not verify that you are on campus. Please try again with location services enabled.',
+        );
       }
       return false;
     } finally {
@@ -1554,7 +1572,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.carbonwise_app',
                     ),
                     PolylineLayer(

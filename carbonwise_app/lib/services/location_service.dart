@@ -43,8 +43,8 @@ class LocationService {
     }
 
     final route = features[0];
-    final distanceMeters = (route['properties']?['summary']?['distance'] as num?)
-        ?.toDouble();
+    final distanceMeters =
+        (route['properties']?['summary']?['distance'] as num?)?.toDouble();
     if (distanceMeters == null) {
       throw Exception('The route response did not include a distance.');
     }
@@ -83,9 +83,7 @@ class LocationService {
       "&text=${Uri.encodeComponent(address)}",
     );
 
-    final response = await http
-        .get(url)
-        .timeout(const Duration(seconds: 15));
+    final response = await http.get(url).timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
       throw Exception(response.body);
