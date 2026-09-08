@@ -1,7 +1,8 @@
 import 'secrets.dart';
 
 class ApiConstants {
-  static const String baseUrl = 'http://192.168.254.108:8000/api';
+  static const String baseUrl =
+      'https://carbonwise-cp-production.up.railway.app/api';
 
   // Base URL and API Key for Open Route Service
   static const String orsApiKey =
