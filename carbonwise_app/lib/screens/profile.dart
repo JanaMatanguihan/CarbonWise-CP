@@ -26,6 +26,10 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
 
+  double _toDouble(dynamic value) {
+    return double.tryParse(value?.toString() ?? '0') ?? 0.0;
+  }
+
   double getAverageEmission() {
     if (last4Weeks.isEmpty) return 0;
 
@@ -42,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     double total = 0;
 
     for (final record in monthlyRecords) {
-      total += (record["total_emission"] ?? 0).toDouble();
+      total += _toDouble(record["total_emission"]);
     }
 
     return total / monthlyRecords.length;
@@ -340,13 +344,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print("Database record: $record");
 
       setState(() {
-        carbonScore = (record?['total_emission'] ?? 0).toDouble();
+        carbonScore = _toDouble(record?['total_emission']);
 
-        transportationEmission = (record?['transportation'] ?? 0).toDouble();
+        transportationEmission = _toDouble(record?['transportation']);
 
-        officeEmission = (record?['electricity'] ?? 0).toDouble();
+        officeEmission = _toDouble(record?['electricity']);
 
-        foodEmission = (record?['food'] ?? 0).toDouble();
+        foodEmission = _toDouble(record?['food']);
 
         _transportItem = record?["transport_item"] ?? "";
         _officeItem = record?["office_item"] ?? "";
@@ -902,19 +906,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       switch (_selectedBreakdown) {
         case "Transportation":
-          value = (item["transportation"] ?? 0).toDouble();
+          value = _toDouble(item["transportation"]);
           break;
 
         case "Office Resource":
-          value = (item["electricity"] ?? 0).toDouble();
+          value = _toDouble(item["electricity"]);
           break;
 
         case "Food Consumption":
-          value = (item["food"] ?? 0).toDouble();
+          value = _toDouble(item["food"]);
           break;
 
         default:
-          value = (item["total_emission"] ?? 0).toDouble();
+          value = _toDouble(item["total_emission"]);
       }
 
       if (value > maxEmission) {
@@ -1137,19 +1141,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   switch (_selectedBreakdown) {
                     case "Transportation":
-                      emission = (record["transportation"] ?? 0).toDouble();
+                      emission = _toDouble(record["transportation"]);
                       break;
 
                     case "Office Resource":
-                      emission = (record["electricity"] ?? 0).toDouble();
+                      emission = _toDouble(record["electricity"]);
                       break;
 
                     case "Food Consumption":
-                      emission = (record["food"] ?? 0).toDouble();
+                      emission = _toDouble(record["food"]);
                       break;
 
                     default:
-                      emission = (record["total_emission"] ?? 0).toDouble();
+                      emission = _toDouble(record["total_emission"]);
                   }
 
                   return _buildGraphBar(
