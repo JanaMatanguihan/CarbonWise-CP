@@ -344,12 +344,9 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                             // Only send notification if we actually have an email
                             if (currentEmail != null &&
                                 currentEmail.isNotEmpty) {
-                              await _apiService.addNotification(
+                              await _apiService.updateUserProfile(
                                 email: currentEmail,
-                                title: "Profile Updated",
-                                message:
-                                    "Your profile information has been updated.",
-                                type: "info",
+                                name: _nameController.text.trim(),
                               );
                             }
 

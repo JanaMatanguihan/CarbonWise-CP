@@ -464,7 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. Profile Header
   Widget _buildProfileHeader() {
-    final String fullName = userInfo?['full_name'] ?? 'Loading...';
+    final String fullName = userInfo?['name'] ?? 'Loading...';
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
     final String? profilePicture = userInfo?['profile_picture'];
