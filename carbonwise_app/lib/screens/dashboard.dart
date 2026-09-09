@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:carbonwise_app/services/api_service.dart';
 
 class DepartmentRanking {
   final String department;
@@ -33,6 +33,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final ApiService _apiService = ApiService();
   List<DepartmentRanking> _departmentRankings = [];
   final ScrollController _departmentScrollController = ScrollController();
   double transportEmission = 0;
@@ -46,6 +47,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _userCampus = "";
 
   List<CampusRanking> _campusRankings = [];
+
+  double _toDouble(dynamic value) =>
+      double.tryParse(value?.toString() ?? '0') ?? 0.0;
 
   @override
   void initState() {
@@ -63,301 +67,121 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDepartmentRankings() async {
-    final supabase = Supabase.instance.client;
-
     try {
-      final users = await supabase
-          .from('user_info')
-          .select('g_suite, department');
-
-      final now = DateTime.now();
-
-      final firstDayOfMonth = DateTime(now.year, now.month, 1);
-
-      final records = await supabase
-          .from('carbon_records')
-          .select('g_suite, total_emission, record_date')
-          .gte(
-            'record_date',
-            firstDayOfMonth.toIso8601String().split('T').first,
-          );
-
-      Map<String, String> userDepartments = {};
-
-      for (var user in users) {
-        userDepartments[user['g_suite']] = user['department'];
-      }
-
-      Map<String, List<double>> departmentTotals = {};
-
-      for (var record in records) {
-        final email = record['g_suite'];
-        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
-
-        final department = userDepartments[email];
-
-        if (department == null) continue;
-
-        departmentTotals.putIfAbsent(department, () => []);
-        departmentTotals[department]!.add(emission);
-      }
-
-      List<DepartmentRanking> rankings = [];
-
-      departmentTotals.forEach((department, emissions) {
-        final average = emissions.reduce((a, b) => a + b) / emissions.length;
-
-        rankings.add(
-          DepartmentRanking(
-            department: department,
-            averageEmission: average,
-            totalRecords: emissions.length,
-          ),
-        );
-      });
+      final rankingsData = await _apiService.getDepartmentRankings();
+      final rankings = rankingsData
+          .map<DepartmentRanking>((item) {
+            final map = Map<String, dynamic>.from(item as Map);
+            return DepartmentRanking(
+              department: map['department']?.toString() ?? '',
+              averageEmission: _toDouble(map['average_emission']),
+              totalRecords:
+                  int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
+            );
+          })
+          .where((r) => r.department.isNotEmpty)
+          .toList();
 
       rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+      final user = await _apiService.getUserProfile();
+      final myDepartment = user['department']?.toString() ?? '';
+      final index = rankings.indexWhere((r) => r.department == myDepartment);
 
-      final user = supabase.auth.currentUser;
-
-      if (user != null) {
-        final userInfo = await supabase
-            .from('user_info')
-            .select('department')
-            .eq('g_suite', user.email!)
-            .single();
-
-        final myDepartment = userInfo['department'];
-
-        final index = rankings.indexWhere((d) => d.department == myDepartment);
-
-        setState(() {
-          _departmentRankings = rankings;
-          _userDepartment = myDepartment;
-
-          if (index != -1) {
-            _departmentRank = "${index + 1}${_getOrdinal(index + 1)}";
-          } else {
-            _departmentRank = "-";
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _departmentRankings = rankings;
+        _userDepartment = myDepartment;
+        _departmentRank = index >= 0
+            ? '${index + 1}${_getOrdinal(index + 1)}'
+            : '-';
+      });
     } catch (e) {
-      print(e);
+      print('Department Ranking Error: $e');
     }
   }
 
   Future<void> _loadCurrentRanking() async {
-    print("Loading Current Ranking...");
-
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-
-      print("Current user: ${user?.email}");
-
-      if (user == null) return;
-
-      final now = DateTime.now();
-
-      final firstDayOfMonth = DateTime(now.year, now.month, 1);
-
-      final records = await supabase
-          .from('carbon_records')
-          .select('g_suite, total_emission, record_date')
-          .gte(
-            'record_date',
-            firstDayOfMonth.toIso8601String().split('T').first,
-          );
-
-      print("Records:");
-      print(records);
+      final summary = await _apiService.getDashboardSummary();
+      if (!mounted) return;
+      setState(() {
+        _currentRanking = summary['current_ranking']?.toString() ?? '—';
+        _currentRankingDescription =
+            summary['current_ranking_description']?.toString() ?? '';
+      });
     } catch (e) {
-      print("Current Ranking Error:");
-      print(e);
+      print('Current Ranking Error: $e');
     }
   }
 
   Future<void> _loadIndividualStatus() async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
+    try {
+      final records = await _apiService.getCarbonRecords('');
+      final now = DateTime.now();
+      final startOfWeek = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
 
-    if (user == null) return;
+      double transport = 0;
+      double office = 0;
+      double food = 0;
+      for (final raw in records) {
+        final record = Map<String, dynamic>.from(raw as Map);
+        final date = DateTime.tryParse(record['record_date']?.toString() ?? '');
+        if (date == null || date.isBefore(startOfWeek)) continue;
+        transport += _toDouble(record['transportation']);
+        office += _toDouble(record['electricity']);
+        food += _toDouble(record['food']);
+      }
 
-    print("Current user: ${user.email}");
-
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-
-    print("Start of week: ${startOfWeek.toIso8601String().split('T').first}");
-
-    final records = await supabase
-        .from('carbon_records')
-        .select('transportation, electricity, food, record_date, g_suite')
-        .eq('g_suite', user.email!)
-        .gte('record_date', startOfWeek.toIso8601String().split('T').first);
-
-    print("Records found: ${records.length}");
-    Map<String, double> userTotals = {};
-
-    for (final record in records) {
-      final email = record['g_suite'];
-
-      if (email == null) continue;
-
-      final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
-
-      userTotals[email] = (userTotals[email] ?? 0) + emission;
+      if (!mounted) return;
+      setState(() {
+        transportEmission = transport;
+        officeEmission = office;
+        foodEmission = food;
+      });
+    } catch (e) {
+      print('Individual Status Error: $e');
     }
-
-    print(userTotals);
-
-    final rankings = userTotals.entries.toList();
-
-    rankings.sort((a, b) => a.value.compareTo(b.value));
-
-    print(rankings);
-
-    final userIndex = rankings.indexWhere((entry) => entry.key == user.email);
-
-    print("User Rank Index: $userIndex");
-
-    final totalUsers = rankings.length;
-
-    final topPercent = (((userIndex + 1) / totalUsers) * 100).ceil();
-
-    String description;
-
-    if (topPercent <= 5) {
-      description = "Outstanding! You're among the greenest users this month.";
-    } else if (topPercent <= 10) {
-      description =
-          "Excellent! You're among the lowest carbon emitters this month.";
-    } else if (topPercent <= 25) {
-      description = "Great job! You're doing better than most users.";
-    } else if (topPercent <= 50) {
-      description = "You're on the right track. Keep reducing your emissions!";
-    } else {
-      description =
-          "Every small action counts. Keep improving your sustainability habits!";
-    }
-
-    setState(() {
-      _currentRanking = "Top $topPercent%";
-      _currentRankingDescription = description;
-    });
-
-    double transport = 0;
-    double office = 0;
-    double food = 0;
-
-    for (final record in records) {
-      transport += (record['transportation'] as num?)?.toDouble() ?? 0;
-      office += (record['electricity'] as num?)?.toDouble() ?? 0;
-      food += (record['food'] as num?)?.toDouble() ?? 0;
-    }
-
-    print("Transport: $transport");
-    print("Office: $office");
-    print("Food: $food");
-
-    setState(() {
-      transportEmission = transport;
-      officeEmission = office;
-      foodEmission = food;
-    });
   }
 
   Future<void> _loadCampusRankings() async {
-    final supabase = Supabase.instance.client;
-
     try {
-      final users = await supabase.from('user_info').select('g_suite, campus');
-
-      final now = DateTime.now();
-
-      final firstDayOfMonth = DateTime(now.year, now.month, 1);
-
-      final records = await supabase
-          .from('carbon_records')
-          .select('g_suite, total_emission, record_date')
-          .gte(
-            'record_date',
-            firstDayOfMonth.toIso8601String().split('T').first,
-          );
-
-      Map<String, String> userCampuses = {};
-
-      for (var user in users) {
-        userCampuses[user['g_suite']] = user['campus'];
-      }
-
-      Map<String, List<double>> campusTotals = {};
-
-      for (var record in records) {
-        final email = record['g_suite'];
-
-        if (email == null) continue;
-
-        final emission = (record['total_emission'] as num?)?.toDouble() ?? 0;
-
-        final campus = userCampuses[email];
-
-        if (campus == null) continue;
-
-        campusTotals.putIfAbsent(campus, () => []);
-        campusTotals[campus]!.add(emission);
-      }
-
-      List<CampusRanking> rankings = [];
-
-      campusTotals.forEach((campus, emissions) {
-        final average = emissions.reduce((a, b) => a + b) / emissions.length;
-
-        rankings.add(
-          CampusRanking(
-            campus: campus,
-            averageEmission: average,
-            totalRecords: emissions.length,
-          ),
-        );
-      });
+      final summary = await _apiService.getDashboardSummary();
+      final rawRankings = summary['campus_rankings'];
+      final rankings = rawRankings is List
+          ? rawRankings
+                .map<CampusRanking>((item) {
+                  final map = Map<String, dynamic>.from(item as Map);
+                  return CampusRanking(
+                    campus: map['campus']?.toString() ?? '',
+                    averageEmission: _toDouble(map['average_emission']),
+                    totalRecords:
+                        int.tryParse(map['total_records']?.toString() ?? '0') ??
+                        0,
+                  );
+                })
+                .where((r) => r.campus.isNotEmpty)
+                .toList()
+          : <CampusRanking>[];
 
       rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+      final user = await _apiService.getUserProfile();
+      final myCampus = user['campus']?.toString() ?? '';
+      final index = rankings.indexWhere((r) => r.campus == myCampus);
 
-      print("Campus Totals:");
-      print(campusTotals);
-
-      print("Campus Rankings:");
-      print(rankings.length);
-
-      final currentUser = supabase.auth.currentUser;
-
-      if (currentUser != null) {
-        final userInfo = await supabase
-            .from('user_info')
-            .select('campus')
-            .eq('g_suite', currentUser.email!)
-            .single();
-
-        final myCampus = userInfo['campus'];
-
-        final campusIndex = rankings.indexWhere((c) => c.campus == myCampus);
-
-        setState(() {
-          _campusRankings = rankings;
-          _userCampus = myCampus;
-
-          if (campusIndex != -1) {
-            _campusRank = "${campusIndex + 1}${_getOrdinal(campusIndex + 1)}";
-          } else {
-            _campusRank = "-";
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _campusRankings = rankings;
+        _userCampus = myCampus;
+        _campusRank = index >= 0
+            ? '${index + 1}${_getOrdinal(index + 1)}'
+            : '-';
+      });
     } catch (e) {
-      print("Campus Ranking Error:");
-      print(e);
+      print('Campus Ranking Error: $e');
     }
   }
 

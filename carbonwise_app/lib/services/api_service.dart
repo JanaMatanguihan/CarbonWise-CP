@@ -345,11 +345,13 @@ class ApiService {
 
   // GET: LAST 4 WEEKS / RECORDS
   Future<List<dynamic>> getLast4WeeksRecords(String email) async {
-    final records = await getCarbonRecords(email);
+    final records = List<dynamic>.from(await getCarbonRecords(email));
 
-    if (records.length <= 4) {
-      return records;
-    }
+    records.sort(
+      (a, b) => (b['record_date']?.toString() ?? '').compareTo(
+        a['record_date']?.toString() ?? '',
+      ),
+    );
 
     return records.take(4).toList();
   }
@@ -370,27 +372,36 @@ class ApiService {
   }
 
   // PUT: UPDATE USER PROFILE
-  Future<void> updateUserProfile({
-    required String email,
-    required String fullName,
-    String? profilePicture,
+  Future<Map<String, dynamic>> updateUserProfile({
+    String? name,
+    String? email,
+    String? department,
+    String? campus,
+    String? yearLevel,
   }) async {
+    final body = <String, dynamic>{};
+
+    if (name != null) body['name'] = name;
+    if (email != null) body['email'] = email;
+    if (department != null) body['department'] = department;
+    if (campus != null) body['campus'] = campus;
+    if (yearLevel != null) body['year_level'] = yearLevel;
+
     final response = await http
         .put(
           Uri.parse('$baseUrl/profile'),
           headers: _headers,
-          body: jsonEncode({
-            'full_name': fullName,
-            if (profilePicture != null) 'profile_picture': profilePicture,
-          }),
+          body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 15));
 
     final data = _decodeResponse(response);
 
-    if (response.statusCode != 200) {
-      throw Exception(data['message'] ?? 'Failed to update profile.');
+    if (response.statusCode == 200) {
+      return data['user'] ?? data['data'] ?? data;
     }
+
+    throw Exception(data['message'] ?? 'Failed to update profile.');
   }
 
   // POST: UPLOAD PROFILE PICTURE
@@ -576,28 +587,76 @@ class ApiService {
 
   // GET DEPARTMENT RANKINGS
   Future<List<dynamic>> getDepartmentRankings() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/profile/department-rankings'),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/profile/department-rankings'),
+          headers: _headers,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final value = data['rankings'] ?? data['data'] ?? data;
+      return value is List ? value : [];
     }
 
-    throw Exception('Failed to load department rankings');
+    throw Exception(data['message'] ?? 'Failed to load department rankings');
   }
 
   // GET USER CARBON RECORDS
   Future<List<dynamic>> getUserCarbonRecords(String email) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/profile/$email/carbon-records'),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/profile/$email/carbon-records'),
+          headers: _headers,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final value = data['records'] ?? data['data'] ?? data;
+      return value is List ? value : [];
     }
 
-    throw Exception('Failed to load carbon records');
+    throw Exception(data['message'] ?? 'Failed to load carbon records');
+  }
+
+  // GET: DASHBOARD SUMMARY / RANKINGS
+  // Laravel should return the authenticated user's dashboard data.
+  Future<Map<String, dynamic>> getDashboardSummary() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/dashboard'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      final value = data['data'];
+      return value is Map<String, dynamic>
+          ? Map<String, dynamic>.from(value)
+          : data;
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load dashboard data.');
+  }
+
+  // GET: ALL INDIVIDUAL ACTIVITIES RECORDED TODAY
+  Future<List<dynamic>> getTodayActivities() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/carbon-records/today'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      final value =
+          data['activities'] ?? data['records'] ?? data['data'] ?? data;
+      return value is List ? value : [];
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load today\'s activities.');
   }
 
   // GET CURRENT USER

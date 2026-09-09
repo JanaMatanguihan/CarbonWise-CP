@@ -4,18 +4,6 @@ import 'package:carbonwise_app/screens/edit_profile.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 import 'package:intl/intl.dart';
 
-class DepartmentRanking {
-  final String department;
-  final double averageEmission;
-  final int totalRecords;
-
-  DepartmentRanking({
-    required this.department,
-    required this.averageEmission,
-    required this.totalRecords,
-  });
-}
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -26,9 +14,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
 
-  double _toDouble(dynamic value) {
-    return double.tryParse(value?.toString() ?? '0') ?? 0.0;
-  }
+  double _toDouble(dynamic value) =>
+      double.tryParse(value?.toString() ?? '0') ?? 0.0;
 
   double getAverageEmission() {
     if (last4Weeks.isEmpty) return 0;
@@ -46,7 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     double total = 0;
 
     for (final record in monthlyRecords) {
-      total += _toDouble(record["total_emission"]);
+      total += _toDouble(record["total_emission"] ?? 0);
     }
 
     return total / monthlyRecords.length;
@@ -124,10 +111,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double transportationEmission = 0;
   double officeEmission = 0;
   double foodEmission = 0;
-
-  List<DepartmentRanking> _departmentRankings = [];
-  String _departmentRank = "";
-  String? _userDepartment;
 
   String _selectedBreakdown = "Transportation";
 
@@ -242,7 +225,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserInfo();
     _loadCarbonScore();
     _loadRecentActivities();
-    _loadDepartmentRankings();
     _loadLast4Weeks();
     _loadPatterns();
     profileRefreshNotifier.addListener(_refreshProfileData);
@@ -344,13 +326,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print("Database record: $record");
 
       setState(() {
-        carbonScore = _toDouble(record?['total_emission']);
+        carbonScore = _toDouble(record?['total_emission'] ?? 0);
 
-        transportationEmission = _toDouble(record?['transportation']);
+        transportationEmission = _toDouble(record?['transportation'] ?? 0);
 
-        officeEmission = _toDouble(record?['electricity']);
+        officeEmission = _toDouble(record?['electricity'] ?? 0);
 
-        foodEmission = _toDouble(record?['food']);
+        foodEmission = _toDouble(record?['food'] ?? 0);
 
         _transportItem = record?["transport_item"] ?? "";
         _officeItem = record?["office_item"] ?? "";
@@ -395,45 +377,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         isLoadingProfile = false;
       });
-    }
-  }
-
-  Future<void> _loadDepartmentRankings() async {
-    try {
-      final email = await ApiService.getCurrentUserEmail();
-
-      if (email == null) return;
-
-      final rankingsData = await _apiService.getDepartmentRankings();
-
-      final rankings = rankingsData.map<DepartmentRanking>((item) {
-        return DepartmentRanking(
-          department: item['department']?.toString() ?? '',
-          averageEmission:
-              double.tryParse(item['average_emission']?.toString() ?? '0') ?? 0,
-          totalRecords:
-              int.tryParse(item['total_records']?.toString() ?? '0') ?? 0,
-        );
-      }).toList();
-
-      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
-
-      final currentUser = await _apiService.getUserProfile();
-
-      final department = currentUser?['department']?.toString();
-
-      final index = rankings.indexWhere((d) => d.department == department);
-
-      setState(() {
-        _departmentRankings = rankings;
-        _userDepartment = department;
-
-        if (index != -1) {
-          _departmentRank = _getOrdinal(index + 1);
-        }
-      });
-    } catch (e) {
-      print("Department Ranking Error: $e");
     }
   }
 
@@ -507,8 +450,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildCarbonBreakdownCard(),
                   const SizedBox(height: 12),
                   _buildAchievementsCard(),
-                  const SizedBox(height: 12),
-                  _buildDepartmentComparisonCard(),
                   const SizedBox(height: 12),
                   _buildPatternsAndTimelineRow(),
                   const SizedBox(height: 12), // Bottom breathing room
@@ -906,19 +847,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       switch (_selectedBreakdown) {
         case "Transportation":
-          value = _toDouble(item["transportation"]);
+          value = _toDouble(item["transportation"] ?? 0);
           break;
 
         case "Office Resource":
-          value = _toDouble(item["electricity"]);
+          value = _toDouble(item["electricity"] ?? 0);
           break;
 
         case "Food Consumption":
-          value = _toDouble(item["food"]);
+          value = _toDouble(item["food"] ?? 0);
           break;
 
         default:
-          value = _toDouble(item["total_emission"]);
+          value = _toDouble(item["total_emission"] ?? 0);
       }
 
       if (value > maxEmission) {
@@ -1141,19 +1082,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   switch (_selectedBreakdown) {
                     case "Transportation":
-                      emission = _toDouble(record["transportation"]);
+                      emission = _toDouble(record["transportation"] ?? 0);
                       break;
 
                     case "Office Resource":
-                      emission = _toDouble(record["electricity"]);
+                      emission = _toDouble(record["electricity"] ?? 0);
                       break;
 
                     case "Food Consumption":
-                      emission = _toDouble(record["food"]);
+                      emission = _toDouble(record["food"] ?? 0);
                       break;
 
                     default:
-                      emission = _toDouble(record["total_emission"]);
+                      emission = _toDouble(record["total_emission"] ?? 0);
                   }
 
                   return _buildGraphBar(
@@ -1264,138 +1205,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // 5. Department Comparison Section
-  Widget _buildDepartmentComparisonCard() {
-    final int displayCount = _departmentRankings.length > 5
-        ? 5
-        : _departmentRankings.length;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5EEE8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'DEPARTMENT RANKING',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: textMuted,
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          // YOUR RANK SUMMARY
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F5EE),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.workspace_premium_rounded,
-                    color: primaryGreen,
-                    size: 28,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-                  _departmentRank.isEmpty ? '-' : _departmentRank,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: darkGreen,
-                  ),
-                ),
-
-                const SizedBox(height: 2),
-
-                Text(
-                  'out of ${_departmentRankings.length} departments',
-                  style: const TextStyle(fontSize: 11, color: textMuted),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          const Divider(height: 1, color: Color(0xFFE5EEE8)),
-
-          const SizedBox(height: 16),
-
-          const Text(
-            'DEPARTMENT STANDINGS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-              color: textMuted,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // TOP DEPARTMENTS
-          ..._departmentRankings
-              .take(displayCount)
-              .toList()
-              .asMap()
-              .entries
-              .map((entry) {
-                final index = entry.key;
-                final dept = entry.value;
-
-                final isUserDept = dept.department == _userDepartment;
-
-                return _buildDeptBar(
-                  '${index + 1}',
-                  dept.department,
-                  dept.averageEmission,
-                  isUserDept ? primaryGreen : Colors.grey.shade400,
-                  isUserDept: isUserDept,
-                );
-              }),
-
-          if (_departmentRankings.length > displayCount) ...[
-            const SizedBox(height: 4),
-
-            Center(
-              child: TextButton.icon(
-                onPressed: () {
-                  _showAllDepartmentRankings();
-                },
-                icon: const Icon(Icons.leaderboard_outlined, size: 16),
-                label: const Text('View all departments'),
-                style: TextButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -2016,178 +1825,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMobileDepartmentRankItem({
-    required int rank,
-    required String department,
-    required double averageEmission,
-    required bool isUserDept,
-  }) {
-    IconData rankIcon;
-    Color rankColor;
-
-    switch (rank) {
-      case 1:
-        rankIcon = Icons.workspace_premium_rounded;
-        rankColor = Colors.amber;
-        break;
-
-      case 2:
-        rankIcon = Icons.workspace_premium_rounded;
-        rankColor = Colors.grey;
-        break;
-
-      case 3:
-        rankIcon = Icons.workspace_premium_rounded;
-        rankColor = const Color(0xFFCD7F32);
-        break;
-
-      default:
-        rankIcon = Icons.eco_rounded;
-        rankColor = Colors.grey;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: isUserDept ? const Color(0xFFEAF7EF) : const Color(0xFFF8FAF9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isUserDept
-              ? primaryGreen.withValues(alpha: 0.35)
-              : const Color(0xFFE5EEE8),
-        ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 32,
-            child: rank <= 3
-                ? Icon(rankIcon, color: rankColor, size: 22)
-                : Text(
-                    '$rank',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: textMuted,
-                    ),
-                  ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  department,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isUserDept ? darkGreen : const Color(0xFF1F2933),
-                  ),
-                ),
-
-                if (isUserDept)
-                  const Text(
-                    'Your department',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: primaryGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Text(
-            '${averageEmission.toStringAsFixed(2)} kg',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: darkGreen,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAllDepartmentRankings() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
-          maxChildSize: 0.9,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-
-                  Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.black12,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'Department Rankings',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2933),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _departmentRankings.length,
-                      itemBuilder: (context, index) {
-                        final dept = _departmentRankings[index];
-
-                        return _buildMobileDepartmentRankItem(
-                          rank: index + 1,
-                          department: dept.department,
-                          averageEmission: dept.averageEmission,
-                          isUserDept: dept.department == _userDepartment,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 

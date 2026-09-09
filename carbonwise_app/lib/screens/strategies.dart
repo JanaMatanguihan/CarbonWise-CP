@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:carbonwise_app/services/api_service.dart';
+import 'package:carbonwise_app/utils/strategy_notifier.dart';
 import 'package:carbonwise_app/services/gemini_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
@@ -11,6 +12,8 @@ class StrategiesScreen extends StatefulWidget {
 }
 
 class _StrategiesScreenState extends State<StrategiesScreen> {
+  final ApiService _apiService = ApiService();
+
   String _aiRecommendation =
       "Loading your personalized sustainability recommendation...";
 
@@ -299,34 +302,58 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   }
 
   Future<void> _loadRecommendation() async {
-    setState(() {
-      _aiRecommendation =
-          "🤖 Analyzing your emissions and preparing personalized recommendations...";
-      _recommendedStrategies = [];
-    });
+    if (mounted) {
+      setState(() {
+        _aiRecommendation =
+            "🤖 Analyzing your recorded activities and preparing personalized recommendations...";
+        _recommendedStrategies = [];
+      });
+    }
 
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
+      final email = await ApiService.getCurrentUserEmail();
 
-      if (user == null) return;
+      if (email == null || email.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _aiRecommendation =
+                "Please log in and record an activity first so your AI coach can personalize your recommendations.";
+            _recommendedStrategies = [];
+            _highestCategory = "";
+          });
+        }
+        return;
+      }
 
-      final latest = await supabase
-          .from('carbon_records')
-          .select()
-          .eq('g_suite', user.email!)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .single();
+      // Get the user's recorded activities through Laravel.
+      // Flutter never connects directly to Neon.
+      final records = await _apiService.getCarbonRecords(email);
 
-      final transportation =
-          (latest['transportation'] as num?)?.toDouble() ?? 0;
+      if (records.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _aiRecommendation =
+                "Record an activity first and I'll give you personalized sustainability advice based on your emissions.";
+            _recommendedStrategies = [];
+            _highestCategory = "";
+          });
+        }
+        return;
+      }
 
-      final electricity = (latest['electricity'] as num?)?.toDouble() ?? 0;
+      // Use all available user records so the coach is based on the user's
+      // actual activity history instead of only the most recent record.
+      double transportation = 0;
+      double electricity = 0;
+      double food = 0;
 
-      final food = (latest['food'] as num?)?.toDouble() ?? 0;
-
-      final savedRecommendation = latest['ai_recommendation'];
+      for (final record in records) {
+        transportation +=
+            double.tryParse(record['transportation']?.toString() ?? '0') ?? 0.0;
+        electricity +=
+            double.tryParse(record['electricity']?.toString() ?? '0') ?? 0.0;
+        food += double.tryParse(record['food']?.toString() ?? '0') ?? 0.0;
+      }
 
       if (transportation >= electricity && transportation >= food) {
         _highestCategory = "Transport";
@@ -336,45 +363,29 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         _highestCategory = "Food Consumption";
       }
 
-      if (savedRecommendation != null &&
-          savedRecommendation.toString().trim().isNotEmpty) {
-        print("Using saved AI recommendation.");
+      // Generate the recommendation from the user's actual recorded data.
+      // Gemini is used for the AI text; Laravel/Neon remains the source of data.
+      final gemini = GeminiService();
+      final recommendation = await gemini.generateStrategies(
+        transportation: transportation,
+        electricity: electricity,
+        food: food,
+      );
 
-        _parseRecommendation(savedRecommendation.toString());
-      } else {
-        print("Generating new AI recommendation...");
-
-        final gemini = GeminiService();
-
-        final recommendation = await gemini.generateStrategies(
-          transportation: transportation,
-          electricity: electricity,
-          food: food,
-        );
-
-        // Save the COMPLETE AI response to Supabase
-        await supabase
-            .from('carbon_records')
-            .update({'ai_recommendation': recommendation})
-            .eq('id', latest['id']);
-
-        // Separate recommendation and strategies
-        _parseRecommendation(recommendation);
-      }
+      if (!mounted) return;
+      _parseRecommendation(recommendation);
     } catch (e) {
-      print("Recommendation Error:");
-      print(e);
+      print("Recommendation Error: $e");
+
+      if (!mounted) return;
 
       setState(() {
         _aiRecommendation =
-            "Unable to generate recommendations. Please record your activities first.";
-
+            "Unable to generate recommendations right now. Please make sure you have recorded activities and try again.";
         _recommendedStrategies = [];
       });
     }
   }
-
-  final ValueNotifier<void> strategyRefreshNotifier = ValueNotifier(null);
 
   void _parseRecommendation(String recommendation) {
     final parts = recommendation.split("STRATEGIES:");

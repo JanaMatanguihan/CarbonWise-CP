@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
@@ -268,8 +267,6 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
 
                 readOnlyField("SR Code", widget.studentNumber, Icons.badge),
 
-                readOnlyField("G-Suite", widget.email, Icons.email),
-
                 readOnlyField("Department", widget.department, Icons.school),
 
                 readOnlyField("Campus", widget.campus, Icons.location_city),
@@ -324,36 +321,37 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                           });
 
                           try {
-                            final user =
-                                Supabase.instance.client.auth.currentUser;
+                            final currentEmail =
+                                await ApiService.getCurrentUserEmail();
 
-                            if (user == null) return;
+                            // Update profile information
+                            await _apiService.updateUserProfile(
+                              name: _nameController.text.trim(),
+                            );
 
-                            String? profileUrl = widget.profilePicture;
-
+                            // Upload profile picture separately
                             if (_selectedImage != null) {
-                              profileUrl = await _apiService
+                              final profileUrl = await _apiService
                                   .uploadProfilePicture(_selectedImage!);
 
-                              setState(() {
-                                _profilePicture = profileUrl;
-                              });
+                              if (mounted) {
+                                setState(() {
+                                  _profilePicture = profileUrl;
+                                });
+                              }
                             }
 
-                            await _apiService.updateUserProfile(
-                              email: user.email!,
-                              fullName: _nameController.text.trim(),
-                              profilePicture: profileUrl,
-                            );
-
-                            await _apiService.addNotification(
-                              // notification
-                              email: user.email!,
-                              title: "Profile Updated",
-                              message:
-                                  "Your profile information has been updated.",
-                              type: "info",
-                            );
+                            // Only send notification if we actually have an email
+                            if (currentEmail != null &&
+                                currentEmail.isNotEmpty) {
+                              await _apiService.addNotification(
+                                email: currentEmail,
+                                title: "Profile Updated",
+                                message:
+                                    "Your profile information has been updated.",
+                                type: "info",
+                              );
+                            }
 
                             profileRefreshNotifier.value++;
 

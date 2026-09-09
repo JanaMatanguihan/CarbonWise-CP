@@ -31,6 +31,9 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
   final ApiService _apiService = ApiService();
 
+  double _toDouble(dynamic value) =>
+      double.tryParse(value?.toString() ?? '0') ?? 0.0;
+
   // ============================================================
   // PAGE TITLES
   // ============================================================
@@ -159,11 +162,11 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
         final recordDate = record['record_date']?.toString();
 
         if (recordDate == todayString) {
-          transportation += (record['transportation'] as num?)?.toDouble() ?? 0;
+          transportation += _toDouble(record['transportation']);
 
-          electricity += (record['electricity'] as num?)?.toDouble() ?? 0;
+          electricity += _toDouble(record['electricity']);
 
-          food += (record['food'] as num?)?.toDouble() ?? 0;
+          food += _toDouble(record['food']);
         }
       }
 

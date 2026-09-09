@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:carbonwise_app/services/gemini_service.dart';
@@ -131,53 +130,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.dispose();
   }
 
+  double _toDouble(dynamic value) =>
+      double.tryParse(value?.toString() ?? '0') ?? 0.0;
+
+  DateTime? _recordDate(dynamic value) =>
+      DateTime.tryParse(value?.toString() ?? '');
+
+  bool _between(DateTime date, DateTime start, DateTime end) {
+    final d = DateTime(date.year, date.month, date.day);
+    final s = DateTime(start.year, start.month, start.day);
+    final e = DateTime(end.year, end.month, end.day);
+    return !d.isBefore(s) && !d.isAfter(e);
+  }
+
+  Future<List<dynamic>> _records() => _apiService.getCarbonRecords('');
+
   Future<void> _loadEmissionData() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-
-      print("Current user: ${user?.email}");
-
-      if (user == null || user.email == null) {
-        print("No logged in user.");
-        return;
-      }
-
-      final records = await _apiService.getEmissionData(user.email!);
-
-      print("Records: $records");
+      final records = await _records();
+      final now = DateTime.now();
+      final startOfWeek = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
+      final startOfMonth = DateTime(now.year, now.month, 1);
 
       double total = 0;
       double week = 0;
       double month = 0;
 
-      final now = DateTime.now();
-
-      for (final record in records) {
-        final emission =
-            double.tryParse(record['total_emission'].toString()) ?? 0.0;
-
-        final date = DateTime.parse(record['record_date'].toString());
-
-        print("Emission: $emission");
-        print("Date: $date");
-
+      for (final raw in records) {
+        final record = Map<String, dynamic>.from(raw as Map);
+        final date = _recordDate(record['record_date']);
+        if (date == null) continue;
+        final emission = _toDouble(record['total_emission']);
         total += emission;
-
-        if (date.year == now.year && date.month == now.month) {
-          month += emission;
-        }
-
-        final difference = now.difference(date).inDays;
-
-        if (difference >= 0 && difference < 7) {
-          week += emission;
-        }
+        if (_between(date, startOfWeek, now)) week += emission;
+        if (_between(date, startOfMonth, now)) month += emission;
       }
 
-      print("Total: $total");
-      print("Week: $week");
-      print("Month: $month");
-
+      if (!mounted) return;
       setState(() {
         totalEmission = total;
         weekEmission = week;
@@ -185,260 +178,171 @@ class _ReportsScreenState extends State<ReportsScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print("Reports Error: $e");
-
-      setState(() {
-        isLoading = false;
-      });
+      print('Reports Error: $e');
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _loadChartData(ReportTimeframe timeframe) async {
-    final user = Supabase.instance.client.auth.currentUser;
+    try {
+      final records = await _records();
+      final now = DateTime.now();
+      late DateTime start;
+      late DateTime end;
 
-    if (user == null) return;
+      switch (timeframe) {
+        case ReportTimeframe.thisWeek:
+          start = DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(Duration(days: now.weekday - 1));
+          end = DateTime(now.year, now.month, now.day);
+          break;
+        case ReportTimeframe.thisMonth:
+          start = DateTime(now.year, now.month, 1);
+          end = DateTime(now.year, now.month, now.day);
+          break;
+        case ReportTimeframe.lastMonth:
+          start = DateTime(now.year, now.month - 1, 1);
+          end = DateTime(now.year, now.month, 0);
+          break;
+      }
 
-    DateTime now = DateTime.now();
+      final filtered = records
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .where((row) {
+            final date = _recordDate(row['record_date']);
+            return date != null && _between(date, start, end);
+          })
+          .toList();
 
-    DateTime start;
-    DateTime end;
-
-    switch (timeframe) {
-      case ReportTimeframe.thisWeek:
-        start = now.subtract(Duration(days: now.weekday - 1));
-        end = now;
-        break;
-
-      case ReportTimeframe.thisMonth:
-        start = DateTime(now.year, now.month, 1);
-        end = now;
-        break;
-
-      case ReportTimeframe.lastMonth:
-        start = DateTime(now.year, now.month - 1, 1);
-        end = DateTime(now.year, now.month, 0);
-        break;
-    }
-
-    final records = await Supabase.instance.client
-        .from('carbon_records')
-        .select()
-        .eq('g_suite', user.email!)
-        .gte('record_date', start.toIso8601String().split('T')[0])
-        .lte('record_date', end.toIso8601String().split('T')[0])
-        .order('record_date');
-
-    emissionOverTime.clear();
-    labels.clear();
-
-    transportTotal = 0;
-    officeTotal = 0;
-    foodTotal = 0;
-
-    int x = 0;
-
-    for (final row in records) {
-      final recordDate = DateTime.parse(row['record_date'].toString());
-
-      emissionOverTime.add(
-        FlSpot(x.toDouble(), (row['total_emission'] as num).toDouble()),
+      filtered.sort(
+        (a, b) => (a['record_date'].toString()).compareTo(
+          b['record_date'].toString(),
+        ),
       );
 
-      labels.add("${recordDate.month}/${recordDate.day}");
+      emissionOverTime = [];
+      labels = [];
+      transportTotal = 0;
+      officeTotal = 0;
+      foodTotal = 0;
 
-      transportTotal += (row['transportation'] as num?)?.toDouble() ?? 0;
+      for (var i = 0; i < filtered.length; i++) {
+        final row = filtered[i];
+        final date = _recordDate(row['record_date'])!;
+        emissionOverTime.add(
+          FlSpot(i.toDouble(), _toDouble(row['total_emission'])),
+        );
+        labels.add('${date.month}/${date.day}');
+        transportTotal += _toDouble(row['transportation']);
+        officeTotal += _toDouble(row['electricity']);
+        foodTotal += _toDouble(row['food']);
+      }
 
-      officeTotal += (row['electricity'] as num?)?.toDouble() ?? 0;
-
-      foodTotal += (row['food'] as num?)?.toDouble() ?? 0;
-
-      x++;
+      if (mounted) setState(() {});
+      await _loadSmartSuggestions();
+    } catch (e) {
+      print('Chart Data Error: $e');
     }
-
-    setState(() {});
-
-    await _loadSmartSuggestions();
   }
 
   Future<void> _loadWeeklyComparison() async {
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-
-      if (user == null) return;
-
+      final records = await _records();
       final now = DateTime.now();
-
-      // Monday of this week
       final startOfThisWeek = DateTime(
         now.year,
         now.month,
         now.day,
       ).subtract(Duration(days: now.weekday - 1));
-
-      // Monday of last week
       final startOfLastWeek = startOfThisWeek.subtract(const Duration(days: 7));
-
-      // Monday of next week
-      final startOfNextWeek = startOfThisWeek.add(const Duration(days: 7));
-
-      final thisWeekRecords = await supabase
-          .from('carbon_records')
-          .select('total_emission')
-          .eq('g_suite', user.email!)
-          .gte('created_at', startOfThisWeek.toIso8601String())
-          .lt('created_at', startOfNextWeek.toIso8601String());
-
-      final lastWeekRecords = await supabase
-          .from('carbon_records')
-          .select('total_emission')
-          .eq('g_suite', user.email!)
-          .gte('created_at', startOfLastWeek.toIso8601String())
-          .lt('created_at', startOfThisWeek.toIso8601String());
+      final endOfLastWeek = startOfThisWeek.subtract(const Duration(days: 1));
+      final endOfThisWeek = startOfThisWeek.add(const Duration(days: 6));
 
       double thisWeekTotal = 0;
       double lastWeekTotal = 0;
-
-      for (final row in thisWeekRecords) {
-        thisWeekTotal += (row['total_emission'] as num?)?.toDouble() ?? 0;
+      for (final raw in records) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final date = _recordDate(row['record_date']);
+        if (date == null) continue;
+        final emission = _toDouble(row['total_emission']);
+        if (_between(date, startOfThisWeek, endOfThisWeek))
+          thisWeekTotal += emission;
+        if (_between(date, startOfLastWeek, endOfLastWeek))
+          lastWeekTotal += emission;
       }
 
-      for (final row in lastWeekRecords) {
-        lastWeekTotal += (row['total_emission'] as num?)?.toDouble() ?? 0;
-      }
-
-      if (lastWeekTotal == 0) {
-        setState(() {
-          _weeklyChange = null;
-        });
-        return;
-      }
-
-      final change = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
-
+      if (!mounted) return;
       setState(() {
-        _weeklyChange = change;
+        _weeklyChange = lastWeekTotal == 0
+            ? null
+            : ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
       });
     } catch (e) {
-      print("Weekly comparison error: $e");
+      print('Weekly comparison error: $e');
     }
   }
 
   Future<void> _loadCarbonReductionJourney() async {
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-
-      if (user == null) return;
-
+      final records = await _records();
       final now = DateTime.now();
-
-      // First day of this month
       final thisMonthStart = DateTime(now.year, now.month, 1);
-
-      // First day of next month
-      final nextMonthStart = DateTime(now.year, now.month + 1, 1);
-
-      // First day of last month
       final lastMonthStart = DateTime(now.year, now.month - 1, 1);
-
-      // ---------- THIS MONTH ----------
-      final thisMonthRecords = await supabase
-          .from('carbon_records')
-          .select('total_emission')
-          .eq('g_suite', user.email!)
-          .gte('record_date', thisMonthStart.toIso8601String().split('T').first)
-          .lt('record_date', nextMonthStart.toIso8601String().split('T').first);
-
-      // ---------- LAST MONTH ----------
-      final lastMonthRecords = await supabase
-          .from('carbon_records')
-          .select('total_emission')
-          .eq('g_suite', user.email!)
-          .gte('record_date', lastMonthStart.toIso8601String().split('T').first)
-          .lt('record_date', thisMonthStart.toIso8601String().split('T').first);
+      final lastMonthEnd = thisMonthStart.subtract(const Duration(days: 1));
 
       double thisMonthTotal = 0;
       double lastMonthTotal = 0;
-
-      for (final record in thisMonthRecords) {
-        thisMonthTotal += (record['total_emission'] as num?)?.toDouble() ?? 0;
+      for (final raw in records) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final date = _recordDate(row['record_date']);
+        if (date == null) continue;
+        final emission = _toDouble(row['total_emission']);
+        if (_between(date, thisMonthStart, now)) thisMonthTotal += emission;
+        if (_between(date, lastMonthStart, lastMonthEnd))
+          lastMonthTotal += emission;
       }
 
-      for (final record in lastMonthRecords) {
-        lastMonthTotal += (record['total_emission'] as num?)?.toDouble() ?? 0;
-      }
-
-      double percent = 0;
+      double score;
       String message;
       String subtitle;
-
       if (lastMonthTotal == 0) {
-        message = "Start your sustainability journey!";
-        subtitle = "Record more activities to compare your monthly progress.";
+        score = 0;
+        message = 'Start your sustainability journey!';
+        subtitle = 'Record more activities to compare your monthly progress.';
       } else {
-        double score;
-        double change = 0;
-
-        if (lastMonthTotal == 0) {
-          score = 100;
-
-          message = "Welcome to your sustainability journey! 🌱";
+        final change =
+            ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
+        score = (100 - change).clamp(0, 100).toDouble();
+        if (change <= -20) {
+          message = 'Amazing work! 🎉';
           subtitle =
-              "Keep logging your activities to start tracking your progress.";
+              'You reduced your emissions by ${change.abs().toStringAsFixed(1)}% this month.';
+        } else if (change < 0) {
+          message = 'Nice progress! 💚';
+          subtitle =
+              'You\'re emitting ${change.abs().toStringAsFixed(1)}% less than last month.';
+        } else if (change == 0) {
+          message = 'Steady progress 👍';
+          subtitle = 'Your emissions stayed consistent this month.';
         } else {
-          change = ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
-
-          if (change <= -20) {
-            score = 100;
-
-            message = "Amazing work! 🎉";
-            subtitle =
-                "You reduced your emissions by ${change.abs().toStringAsFixed(1)}% this month.";
-          } else if (change < 0) {
-            score = 90;
-
-            message = "Nice progress! 💚";
-            subtitle =
-                "You're emitting ${change.abs().toStringAsFixed(1)}% less than last month.";
-          } else if (change == 0) {
-            score = 80;
-
-            message = "Steady progress 👍";
-            subtitle = "Your emissions stayed consistent this month.";
-          } else {
-            score = (100 - change).clamp(0, 100);
-
-            message = "Let's improve next month! 🌍";
-            subtitle =
-                "Your emissions increased by ${change.toStringAsFixed(1)}%.";
-          }
+          message = 'Let\'s improve next month! 🌍';
+          subtitle =
+              'Your emissions increased by ${change.toStringAsFixed(1)}%.';
         }
-
-        setState(() {
-          _journeyPercent = score;
-          _journeyProgress = score / 100;
-          _journeyMessage = message;
-          _journeySubtitle = subtitle;
-        });
-
-        print("===== Carbon Reduction Journey =====");
-        print("This Month: $thisMonthTotal");
-        print("Last Month: $lastMonthTotal");
-        print("Percent: $percent");
-        print("Message: $message");
-        print("Subtitle: $subtitle");
-
-        setState(() {
-          _journeyPercent = percent;
-          _journeyProgress = percent / 100;
-          _journeyMessage = message;
-          _journeySubtitle = subtitle;
-        });
       }
+
+      if (!mounted) return;
+      setState(() {
+        _journeyPercent = score;
+        _journeyProgress = score / 100;
+        _journeyMessage = message;
+        _journeySubtitle = subtitle;
+      });
     } catch (e) {
-      print("Carbon Journey Error:");
-      print(e);
+      print('Carbon Journey Error: $e');
     }
   }
 

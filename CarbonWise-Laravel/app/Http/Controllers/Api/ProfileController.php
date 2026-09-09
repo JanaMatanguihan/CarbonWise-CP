@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
@@ -58,4 +59,44 @@ class ProfileController extends Controller
             'message' => 'Password changed successfully.',
         ]);
     }
+
+    // Upload profile picture
+public function uploadProfilePicture(Request $request)
+{
+    $request->validate([
+        'profile_picture' => ['required', 'image', 'max:5120'],
+    ]);
+
+    $user = $request->user();
+
+    if ($request->hasFile('profile_picture')) {
+
+        // Delete old profile picture
+        if ($user->profile_picture) {
+            $oldPath = str_replace('/storage/', '', $user->profile_picture);
+
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        // Save new picture
+        $path = $request->file('profile_picture')
+            ->store('profile-pictures', 'public');
+
+        $url = asset('storage/' . $path);
+
+        $user->update([
+            'profile_picture' => $url,
+        ]);
+
+        return response()->json([
+            'message' => 'Profile picture uploaded successfully.',
+            'profile_picture' => $url,
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    return response()->json([
+        'message' => 'No profile picture was uploaded.',
+    ], 400);
+}
 }
