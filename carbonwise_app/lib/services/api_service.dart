@@ -627,6 +627,25 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to load campus rankings.');
   }
 
+  // GET: PEER COMPARISON
+  Future<Map<String, dynamic>> getMyPeerComparison({
+    String period = 'monthly',
+  }) async {
+    final query = '?period=$period';
+
+    final response = await http
+        .get(Uri.parse('$baseUrl/my-peer-comparison$query'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load peer comparison.');
+  }
+
   // GET USER CARBON RECORDS
   Future<List<dynamic>> getUserCarbonRecords(String email) async {
     final response = await http

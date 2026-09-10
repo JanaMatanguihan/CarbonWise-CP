@@ -45,6 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentRankingDescription = "";
   String _campusRank = "-";
   String _userCampus = "";
+  String _rankingPeriod = 'monthly';
 
   List<CampusRanking> _campusRankings = [];
 
@@ -109,54 +110,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCurrentRanking() async {
     try {
-      final now = DateTime.now();
-      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      print('Peer Comparison: START');
 
-      final departmentRankings = await _apiService.getDepartmentRankings(
-        month: month,
+      final data = await _apiService.getMyPeerComparison(
+        period: _rankingPeriod,
       );
 
-      final user = await _apiService.getUserProfile();
-      final myDepartment = user['department']?.toString() ?? '';
-
-      final rankings = departmentRankings
-          .map<Map<String, dynamic>>(
-            (item) => Map<String, dynamic>.from(item as Map),
-          )
-          .where((item) => item['department']?.toString().isNotEmpty ?? false)
-          .toList();
-
-      rankings.sort((a, b) {
-        final aEmission = _toDouble(a['total_emission']);
-        final bEmission = _toDouble(b['total_emission']);
-
-        return aEmission.compareTo(bEmission);
-      });
-
-      final index = rankings.indexWhere(
-        (item) => item['department']?.toString() == myDepartment,
-      );
+      print('Peer Comparison: DATA = $data');
 
       if (!mounted) return;
 
-      setState(() {
-        _currentRanking = index >= 0
-            ? '${index + 1}${_getOrdinal(index + 1)}'
-            : '—';
+      final topPercentage = data['top_percentage'];
 
-        _currentRankingDescription = index >= 0
-            ? 'Your department currently ranks $_currentRanking based on total carbon emissions.'
-            : 'Your department does not have a ranking for this month.';
+      final role = data['role']?.toString() ?? '';
+      final period = data['period']?.toString() ?? _rankingPeriod;
+
+      print('Peer Comparison: topPercentage = $topPercentage');
+      print('Peer Comparison: role = $role');
+      print('Peer Comparison: period = $period');
+
+      String description;
+
+      if (topPercentage != null) {
+        final percentage = int.tryParse(topPercentage.toString()) ?? 0;
+
+        final roleName = role.isNotEmpty ? role : 'users';
+
+        final periodName = period == 'weekly' ? 'this week' : 'this month';
+
+        description =
+            'You are in the top $percentage% of eco-friendly '
+            '$roleName in your campus $periodName.';
+      } else {
+        description =
+            data['message']?.toString() ??
+            'Record your emissions to see your peer comparison.';
+      }
+
+      setState(() {
+        _currentRanking = topPercentage != null ? 'Top ${topPercentage}%' : '—';
+
+        _currentRankingDescription = description;
       });
+
+      print('Peer Comparison: DONE');
     } catch (e) {
-      print('Current Ranking Error: $e');
-
-      if (!mounted) return;
-
-      setState(() {
-        _currentRanking = '—';
-        _currentRankingDescription = 'Unable to load your current ranking.';
-      });
+      print('Peer Comparison Error: $e');
     }
   }
 
@@ -195,10 +194,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCampusRankings() async {
     try {
+      print('Campus Ranking: START');
+
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
+      print('Campus Ranking: requesting $month');
+
       final rankingsData = await _apiService.getCampusRankings(month: month);
+
+      print('Campus Ranking: API RESULT: $rankingsData');
 
       final rankings = rankingsData
           .map<CampusRanking>((item) {
@@ -214,12 +219,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .where((r) => r.campus.isNotEmpty)
           .toList();
 
+      print('Campus Ranking: parsed rankings: $rankings');
+
       rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
 
+      print('Campus Ranking: requesting user profile');
+
       final user = await _apiService.getUserProfile();
+
+      print('Campus Ranking: USER PROFILE: $user');
+
       final myCampus = user['campus']?.toString() ?? '';
 
+      print('Campus Ranking: MY CAMPUS: $myCampus');
+
       final index = rankings.indexWhere((r) => r.campus == myCampus);
+
+      print('Campus Ranking: MY INDEX: $index');
 
       if (!mounted) return;
 
@@ -230,6 +246,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? '${index + 1}${_getOrdinal(index + 1)}'
             : '-';
       });
+
+      print('Campus Ranking: DONE');
     } catch (e) {
       print('Campus Ranking Error: $e');
     }
@@ -678,61 +696,151 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF265D3B),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.workspace_premium_outlined,
-              color: Colors.white,
-              size: 28,
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.workspace_premium_outlined,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Eco-Friendly Standing',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _currentRanking,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Text(
+            _currentRankingDescription,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 11,
+              height: 1.3,
             ),
           ),
 
-          const SizedBox(width: 16),
+          const SizedBox(height: 16),
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // WEEKLY / MONTHLY TOGGLE
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
               children: [
-                const Text(
-                  'Your Current Ranking',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_rankingPeriod == 'weekly') return;
 
-                const SizedBox(height: 4),
+                      setState(() {
+                        _rankingPeriod = 'weekly';
+                      });
 
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _currentRanking,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
+                      _loadCurrentRanking();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: _rankingPeriod == 'weekly'
+                            ? Colors.white
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text(
+                        'Weekly',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _rankingPeriod == 'weekly'
+                              ? const Color(0xFF265D3B)
+                              : Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(width: 4),
 
-                Text(
-                  _currentRankingDescription,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    fontSize: 11,
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_rankingPeriod == 'monthly') return;
+
+                      setState(() {
+                        _rankingPeriod = 'monthly';
+                      });
+
+                      _loadCurrentRanking();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: _rankingPeriod == 'monthly'
+                            ? Colors.white
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text(
+                        'Monthly',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _rankingPeriod == 'monthly'
+                              ? const Color(0xFF265D3B)
+                              : Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
