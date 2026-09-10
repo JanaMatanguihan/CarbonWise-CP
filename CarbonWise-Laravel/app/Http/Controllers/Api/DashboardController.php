@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -38,16 +37,12 @@ class DashboardController extends Controller
             'rankings' => $rankings,
         ]);
     } catch (\Throwable $e) {
-        Log::error('CAMPUS RANKING ERROR', [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-        ]);
-
-        return response()->json([
-            'message' => 'Campus ranking failed.',
-        ], 500);
-    }
+    return response()->json([
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+    ], 500);
+}
 }
 
     /**
@@ -79,15 +74,11 @@ class DashboardController extends Controller
             'rankings' => $rankings,
         ]);
     } catch (\Throwable $e) {
-        Log::error('DEPARTMENT RANKING ERROR', [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-        ]);
-
-        return response()->json([
-            'message' => 'Department ranking failed.',
-        ], 500);
-    }
+    return response()->json([
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+    ], 500);
+}
 }
 }
