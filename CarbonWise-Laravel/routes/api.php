@@ -37,4 +37,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/campus-rankings', [DashboardController::class, 'campusRankings']);
     Route::get('/department-rankings', [DashboardController::class, 'departmentRankings']);
+    Route::get('/my-peer-comparison', [DashboardController::class, 'myPeerComparison']);
 });

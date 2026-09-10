@@ -109,15 +109,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCurrentRanking() async {
     try {
-      final summary = await _apiService.getDashboardSummary();
+      final now = DateTime.now();
+      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      final departmentRankings = await _apiService.getDepartmentRankings(
+        month: month,
+      );
+
+      final user = await _apiService.getUserProfile();
+      final myDepartment = user['department']?.toString() ?? '';
+
+      final rankings = departmentRankings
+          .map<Map<String, dynamic>>(
+            (item) => Map<String, dynamic>.from(item as Map),
+          )
+          .where((item) => item['department']?.toString().isNotEmpty ?? false)
+          .toList();
+
+      rankings.sort((a, b) {
+        final aEmission = _toDouble(a['total_emission']);
+        final bEmission = _toDouble(b['total_emission']);
+
+        return aEmission.compareTo(bEmission);
+      });
+
+      final index = rankings.indexWhere(
+        (item) => item['department']?.toString() == myDepartment,
+      );
+
       if (!mounted) return;
+
       setState(() {
-        _currentRanking = summary['current_ranking']?.toString() ?? '—';
-        _currentRankingDescription =
-            summary['current_ranking_description']?.toString() ?? '';
+        _currentRanking = index >= 0
+            ? '${index + 1}${_getOrdinal(index + 1)}'
+            : '—';
+
+        _currentRankingDescription = index >= 0
+            ? 'Your department currently ranks $_currentRanking based on total carbon emissions.'
+            : 'Your department does not have a ranking for this month.';
       });
     } catch (e) {
       print('Current Ranking Error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentRanking = '—';
+        _currentRankingDescription = 'Unable to load your current ranking.';
+      });
     }
   }
 
@@ -224,9 +263,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const SizedBox(height: 10),
 
-            // =========================
             // TOP RANKING CARDS
-            // =========================
             const SizedBox(height: 12),
 
             const Text(
@@ -247,16 +284,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 16),
 
-            // =========================
             // YOUR CURRENT RANKING
-            // =========================
             _buildFeaturedRankingCard(),
 
             const SizedBox(height: 12),
 
-            // =========================
             // DEPARTMENT + CAMPUS
-            // =========================
             Row(
               children: [
                 Expanded(
