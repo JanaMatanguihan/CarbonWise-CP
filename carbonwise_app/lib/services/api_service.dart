@@ -597,9 +597,11 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final value = data['rankings'] ?? data['data'] ?? data;
-
       return value is List ? value : [];
     }
+
+    print('DEPARTMENT STATUS: ${response.statusCode}');
+    print('DEPARTMENT BODY: ${response.body}');
 
     throw Exception(data['message'] ?? 'Failed to load department rankings.');
   }
@@ -616,9 +618,11 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final value = data['rankings'] ?? data['data'] ?? data;
-
       return value is List ? value : [];
     }
+
+    print('CAMPUS STATUS: ${response.statusCode}');
+    print('CAMPUS BODY: ${response.body}');
 
     throw Exception(data['message'] ?? 'Failed to load campus rankings.');
   }
