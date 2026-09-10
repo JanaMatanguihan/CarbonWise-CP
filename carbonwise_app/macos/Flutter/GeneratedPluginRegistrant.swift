@@ -13,6 +13,7 @@ import package_info_plus
 import passkeys_darwin
 import rive_native
 import shared_preferences_foundation
+import sqflite_darwin
 import ua_client_hints
 import url_launcher_macos
 
@@ -25,6 +26,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   PasskeysPlugin.register(with: registry.registrar(forPlugin: "PasskeysPlugin"))
   RiveNativePlugin.register(with: registry.registrar(forPlugin: "RiveNativePlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
+  SqflitePlugin.register(with: registry.registrar(forPlugin: "SqflitePlugin"))
   UAClientHintsPlugin.register(with: registry.registrar(forPlugin: "UAClientHintsPlugin"))
   UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))
 }

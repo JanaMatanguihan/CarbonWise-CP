@@ -3,24 +3,24 @@ import 'package:carbonwise_app/services/api_service.dart';
 
 class DepartmentRanking {
   final String department;
-  final double averageEmission;
+  final double totalEmission;
   final int totalRecords;
 
   DepartmentRanking({
     required this.department,
-    required this.averageEmission,
+    required this.totalEmission,
     required this.totalRecords,
   });
 }
 
 class CampusRanking {
   final String campus;
-  final double averageEmission;
+  final double totalEmission;
   final int totalRecords;
 
   CampusRanking({
     required this.campus,
-    required this.averageEmission,
+    required this.totalEmission,
     required this.totalRecords,
   });
 }
@@ -68,13 +68,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDepartmentRankings() async {
     try {
-      final rankingsData = await _apiService.getDepartmentRankings();
+      final now = DateTime.now();
+      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      final rankingsData = await _apiService.getDepartmentRankings(
+        month: month,
+      );
+
       final rankings = rankingsData
           .map<DepartmentRanking>((item) {
             final map = Map<String, dynamic>.from(item as Map);
+
             return DepartmentRanking(
               department: map['department']?.toString() ?? '',
-              averageEmission: _toDouble(map['average_emission']),
+              totalEmission: _toDouble(map['total_emission']),
               totalRecords:
                   int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
             );
@@ -82,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .where((r) => r.department.isNotEmpty)
           .toList();
 
-      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+      rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
       final user = await _apiService.getUserProfile();
       final myDepartment = user['department']?.toString() ?? '';
       final index = rankings.indexWhere((r) => r.department == myDepartment);
@@ -149,30 +156,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCampusRankings() async {
     try {
-      final summary = await _apiService.getDashboardSummary();
-      final rawRankings = summary['campus_rankings'];
-      final rankings = rawRankings is List
-          ? rawRankings
-                .map<CampusRanking>((item) {
-                  final map = Map<String, dynamic>.from(item as Map);
-                  return CampusRanking(
-                    campus: map['campus']?.toString() ?? '',
-                    averageEmission: _toDouble(map['average_emission']),
-                    totalRecords:
-                        int.tryParse(map['total_records']?.toString() ?? '0') ??
-                        0,
-                  );
-                })
-                .where((r) => r.campus.isNotEmpty)
-                .toList()
-          : <CampusRanking>[];
+      final now = DateTime.now();
+      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      rankings.sort((a, b) => a.averageEmission.compareTo(b.averageEmission));
+      final rankingsData = await _apiService.getCampusRankings(month: month);
+
+      final rankings = rankingsData
+          .map<CampusRanking>((item) {
+            final map = Map<String, dynamic>.from(item as Map);
+
+            return CampusRanking(
+              campus: map['campus']?.toString() ?? '',
+              totalEmission: _toDouble(map['total_emission']),
+              totalRecords:
+                  int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
+            );
+          })
+          .where((r) => r.campus.isNotEmpty)
+          .toList();
+
+      rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
+
       final user = await _apiService.getUserProfile();
       final myCampus = user['campus']?.toString() ?? '';
+
       final index = rankings.indexWhere((r) => r.campus == myCampus);
 
       if (!mounted) return;
+
       setState(() {
         _campusRankings = rankings;
         _userCampus = myCampus;
@@ -362,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 4),
 
             Text(
-              "See which departments are making the biggest impact.",
+              "See how departments compare in total carbon emissions.",
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
 
@@ -414,7 +425,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: _buildDepartmentRankingItem(
                                   rank: index + 1,
                                   department: dept.department,
-                                  emission: dept.averageEmission,
+                                  emission: dept.totalEmission,
                                   records: dept.totalRecords,
                                 ),
                               );
@@ -873,7 +884,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const Text(
-              "kg CO₂e avg.",
+              "kg CO₂e",
               style: TextStyle(fontSize: 9, color: Colors.black54),
             ),
           ],

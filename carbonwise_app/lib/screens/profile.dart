@@ -3,6 +3,7 @@ import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -166,27 +167,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  String _getOrdinal(int number) {
-    if (number >= 11 && number <= 13) {
-      return "${number}th";
-    }
-
-    switch (number % 10) {
-      case 1:
-        return "${number}st";
-      case 2:
-        return "${number}nd";
-      case 3:
-        return "${number}rd";
-      default:
-        return "${number}th";
-    }
-  }
-
-  String _weekdayPattern = "Loading...";
-  String _highestImpactPattern = "Loading...";
-  String _insightPattern = "Loading...";
-
   List<Map<String, dynamic>> last4Weeks = [];
 
   bool hasStartedJourney() {
@@ -226,7 +206,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadCarbonScore();
     _loadRecentActivities();
     _loadLast4Weeks();
-    _loadPatterns();
     profileRefreshNotifier.addListener(_refreshProfileData);
   }
 
@@ -394,37 +373,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _loadPatterns() async {
-    try {
-      final data = await ApiService().getCarbonPatterns();
-
-      if (!mounted) return;
-
-      setState(() {
-        _weekdayPattern =
-            data['weekday_pattern']?.toString() ?? 'No emission records yet.';
-
-        _highestImpactPattern =
-            data['highest_impact_pattern']?.toString() ??
-            'No emission records yet.';
-
-        _insightPattern =
-            data['insight_pattern']?.toString() ??
-            'Start tracking your emissions!';
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _weekdayPattern = 'Unable to load emission patterns.';
-        _highestImpactPattern = 'Unable to load emission patterns.';
-        _insightPattern = 'Please try again later.';
-      });
-
-      print('Error loading carbon patterns: $e');
-    }
-  }
-
   static const Color primaryGreen = Color(0xFF3AA76D);
   static const Color darkGreen = Color(0xFF1E5631);
   static const Color lightBgGrey = Color(0xFFEFEFEF);
@@ -502,21 +450,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 // PROFILE PICTURE
                 CircleAvatar(
-                  radius: 44,
-                  backgroundColor: const Color(0xFFE8F5EE),
-                  backgroundImage:
-                      profilePicture != null && profilePicture.isNotEmpty
-                      ? NetworkImage(
-                          '$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}',
-                        )
-                      : null,
-                  child: profilePicture == null || profilePicture.isEmpty
-                      ? const Icon(
-                          Icons.person_rounded,
-                          size: 52,
-                          color: primaryGreen,
-                        )
-                      : null,
+                  radius: 50,
+                  backgroundColor: const Color(0xFFDDEBDD),
+                  child: ClipOval(
+                    child: profilePicture != null && profilePicture.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: profilePicture,
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+
+                            // Shows the person icon while the image loads
+                            placeholder: (context, url) => const Icon(
+                              Icons.person,
+                              size: 45,
+                              color: Color(0xFF3AA76D),
+                            ),
+
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.person,
+                              size: 45,
+                              color: Color(0xFF3AA76D),
+                            ),
+
+                            // Helps the image stay available after loading
+                            fadeInDuration: const Duration(milliseconds: 150),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 45,
+                            color: Color(0xFF3AA76D),
+                          ),
+                  ),
                 ),
 
                 const SizedBox(height: 14),
@@ -1210,33 +1175,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 6. Patterns & Activity Timeline
+  // 6. Activity Timeline
   Widget _buildPatternsAndTimelineRow() {
     return Column(
       children: [
-        // YOUR PATTERNS
-        _buildSectionCard(
-          title: 'Your Patterns',
-          child: Column(
-            children: [
-              _buildPatternItem(Icons.calendar_month_rounded, _weekdayPattern),
-
-              const Divider(height: 20),
-
-              _buildPatternItem(
-                Icons.directions_bus_rounded,
-                _highestImpactPattern,
-              ),
-
-              const Divider(height: 20),
-
-              _buildPatternItem(Icons.insights_rounded, _insightPattern),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 14),
-
         // ACTIVITY TIMELINE
         _buildSectionCard(
           title: 'Recent Activity',
@@ -1599,130 +1541,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDeptBar(
-    String rank,
-    String label,
-    double score,
-    Color color, {
-    bool isUserDept = false,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: isUserDept ? const Color(0xFFEAF7EF) : const Color(0xFFF8FAF9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isUserDept
-              ? primaryGreen.withValues(alpha: 0.35)
-              : const Color(0xFFE5EEE8),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Rank
-          SizedBox(
-            width: 32,
-            child: Center(
-              child: Text(
-                rank,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isUserDept ? primaryGreen : textMuted,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Department name
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isUserDept ? darkGreen : const Color(0xFF1F2933),
-                  ),
-                ),
-
-                if (isUserDept)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Text(
-                      'Your department',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: primaryGreen,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Emission score
-          SizedBox(
-            width: 70,
-            child: Text(
-              '${score.toStringAsFixed(2)} kg',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isUserDept ? primaryGreen : Colors.black54,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPatternItem(IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF7EF),
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: Icon(icon, color: primaryGreen, size: 21),
-        ),
-
-        const SizedBox(width: 12),
-
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              text.isEmpty ? 'No pattern data available yet.' : text,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 

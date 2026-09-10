@@ -5,10 +5,10 @@ use App\Http\Controllers\Api\CarbonRecordController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\DashboardController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-
 
 // EMAIL VERIFICATION
 Route::get(
@@ -34,4 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
     Route::post('/profile-picture', [ProfileController::class, 'uploadProfilePicture']);
+
+    Route::get('/campus-rankings', [DashboardController::class, 'campusRankings']);
+    Route::get('/department-rankings', [DashboardController::class, 'departmentRankings']);
 });

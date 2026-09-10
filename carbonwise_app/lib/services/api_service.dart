@@ -586,22 +586,41 @@ class ApiService {
   }
 
   // GET DEPARTMENT RANKINGS
-  Future<List<dynamic>> getDepartmentRankings() async {
+  Future<List<dynamic>> getDepartmentRankings({String? month}) async {
+    final query = month != null ? '?month=$month' : '';
+
     final response = await http
-        .get(
-          Uri.parse('$baseUrl/profile/department-rankings'),
-          headers: _headers,
-        )
+        .get(Uri.parse('$baseUrl/department-rankings$query'), headers: _headers)
         .timeout(const Duration(seconds: 15));
 
     final data = _decodeResponse(response);
 
     if (response.statusCode == 200) {
       final value = data['rankings'] ?? data['data'] ?? data;
+
       return value is List ? value : [];
     }
 
-    throw Exception(data['message'] ?? 'Failed to load department rankings');
+    throw Exception(data['message'] ?? 'Failed to load department rankings.');
+  }
+
+  // GET CAMPUS RANKINGS
+  Future<List<dynamic>> getCampusRankings({String? month}) async {
+    final query = month != null ? '?month=$month' : '';
+
+    final response = await http
+        .get(Uri.parse('$baseUrl/campus-rankings$query'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      final value = data['rankings'] ?? data['data'] ?? data;
+
+      return value is List ? value : [];
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load campus rankings.');
   }
 
   // GET USER CARBON RECORDS
