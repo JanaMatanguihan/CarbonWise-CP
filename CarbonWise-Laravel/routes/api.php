@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PasswordController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -33,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
+    Route::post('/change-password', [PasswordController::class, 'update']);
     Route::post('/profile-picture', [ProfileController::class, 'uploadProfilePicture']);
 
     Route::get('/campus-rankings', [DashboardController::class, 'campusRankings']);

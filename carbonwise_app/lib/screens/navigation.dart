@@ -163,9 +163,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
         if (recordDate == todayString) {
           transportation += _toDouble(record['transportation']);
-
           electricity += _toDouble(record['electricity']);
-
           food += _toDouble(record['food']);
         }
       }
@@ -519,8 +517,10 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     return InkWell(
       onTap: () {
         setState(() {
+          // If leaving activity screen or clicking home/reports, refresh score to capture recent inputs
           _currentIndex = index;
         });
+        _loadCarbonScore();
       },
 
       borderRadius: BorderRadius.circular(18),
@@ -559,7 +559,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     );
   }
 
-  // NOTIFICATION BUTTON]
+  // NOTIFICATION BUTTON
   Widget _buildNotificationButton() {
     return PopupMenuButton<String>(
       offset: const Offset(0, 48),
@@ -852,166 +852,295 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     }
   }
 
-  // CHANGE PASSWORD
+  // CHANGE PASSWORD (IMPROVED UI & FUNCTIONALITY)
   Future<void> _changePassword() async {
     final currentPasswordController = TextEditingController();
-
     final passwordController = TextEditingController();
-
     final confirmPasswordController = TextEditingController();
 
+    const primaryGreen = Color(0xFF3AA76D);
+    const darkGreen = Color(0xFF1E5631);
+
     try {
-      final newPassword = await showDialog<String>(
+      final bool? success = await showDialog<bool>(
         context: context,
-
+        barrierDismissible: false,
         builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Change Password'),
+          bool isLoading = false;
+          bool obscureCurrent = true;
+          bool obscureNew = true;
+          bool obscureConfirm = true;
 
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                TextField(
-                  controller: currentPasswordController,
-
-                  obscureText: true,
-
-                  decoration: const InputDecoration(
-                    labelText: 'Current Password',
-
-                    border: OutlineInputBorder(),
-                  ),
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-
-                const SizedBox(height: 12),
-
-                TextField(
-                  controller: passwordController,
-
-                  obscureText: true,
-
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                TextField(
-                  controller: confirmPasswordController,
-
-                  obscureText: true,
-
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
-
-                child: const Text('Cancel'),
-              ),
-
-              ElevatedButton(
-                onPressed: () {
-                  final password = passwordController.text.trim();
-
-                  final confirmPassword = confirmPasswordController.text.trim();
-
-                  if (password.isEmpty || confirmPassword.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please fill in both fields.'),
+                title: Row(
+                  children: const [
+                    Icon(Icons.lock_reset, color: primaryGreen),
+                    SizedBox(width: 10),
+                    Text(
+                      'Change Password',
+                      style: TextStyle(
+                        color: darkGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
                       ),
-                    );
-
-                    return;
-                  }
-
-                  if (password.length < 6) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Password must be at least 6 characters.',
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Please enter your current password and choose a secure new password.',
+                        style: TextStyle(fontSize: 13, color: Colors.black54),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: currentPasswordController,
+                        obscureText: obscureCurrent,
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: primaryGreen,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureCurrent
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureCurrent = !obscureCurrent;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryGreen,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
-                    );
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: obscureNew,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: primaryGreen,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureNew
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureNew = !obscureNew;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryGreen,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: confirmPasswordController,
+                        obscureText: obscureConfirm,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: primaryGreen,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureConfirm
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureConfirm = !obscureConfirm;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryGreen,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isLoading
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                    ),
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            final currentPass = currentPasswordController.text
+                                .trim();
+                            final newPass = passwordController.text.trim();
+                            final confirmPass = confirmPasswordController.text
+                                .trim();
 
-                    return;
-                  }
+                            if (currentPass.isEmpty ||
+                                newPass.isEmpty ||
+                                confirmPass.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Please fill in all password fields.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                  if (password != confirmPassword) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Passwords do not match.')),
-                    );
+                            if (newPass.length < 6) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'New password must be at least 6 characters.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                    return;
-                  }
+                            if (newPass != confirmPass) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('New passwords do not match.'),
+                                ),
+                              );
+                              return;
+                            }
 
-                  Navigator.of(dialogContext).pop(password);
-                },
+                            setDialogState(() {
+                              isLoading = true;
+                            });
 
-                child: const Text('Save'),
-              ),
-            ],
+                            try {
+                              await _apiService.changePassword(
+                                currentPassword: currentPass,
+                                newPassword: newPass,
+                              );
+
+                              if (!dialogContext.mounted) return;
+                              Navigator.of(dialogContext).pop(true);
+                            } catch (error) {
+                              setDialogState(() {
+                                isLoading = false;
+                              });
+                              if (!dialogContext.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $error')),
+                              );
+                            }
+                          },
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Update Password',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
 
-      if (newPassword == null) {
-        return;
-      }
-
-      final currentPassword = currentPasswordController.text.trim();
-
-      if (currentPassword.isEmpty) {
+      if (success == true) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter your current password.')),
+        DialogHelper.showSuccess(
+          context: context,
+          title: "Password Updated",
+          message:
+              "Your password has been changed successfully. Please log in again with your new password.",
+          onOk: () async {
+            await ApiService.logout();
+            if (!mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          },
         );
-
-        return;
       }
-
-      // Laravel handles password verification
-      // and password hashing.
-      await _apiService.changePassword(
-        currentPassword: currentPassword,
-        newPassword: newPassword,
-      );
-
-      // Log out after changing password
-      await ApiService.logout();
-
-      if (!mounted) return;
-
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).pushNamedAndRemoveUntil('/landing', (route) => false);
     } catch (error) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $error')));
     } finally {
       currentPasswordController.dispose();
-
       passwordController.dispose();
-
       confirmPasswordController.dispose();
     }
   }

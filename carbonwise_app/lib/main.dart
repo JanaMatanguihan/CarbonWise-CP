@@ -763,7 +763,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       DialogHelper.showError(
         context: context,
         title: "Invalid Password",
-        message: "Password must be at least 8 characters.",
+        message: "Password must be at least 6 characters.",
       );
       return;
     }

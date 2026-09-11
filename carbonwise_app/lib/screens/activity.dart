@@ -32,7 +32,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   String? _selectedMealPeriod;
   String? _lastFoodMealPeriod;
   DateTime? _lastFoodConsumedAt;
-  DateTime _selectedFoodDate = DateTime.now();
+  final DateTime _selectedFoodDate = DateTime.now();
   TimeOfDay _selectedFoodTime = TimeOfDay.now();
 
   double _transportationTotalEmission = 0.0;
@@ -322,16 +322,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     }
   }
 
-  Future<void> _pickFoodDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _selectedFoodDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now(),
-    );
-    if (date != null && mounted) setState(() => _selectedFoodDate = date);
-  }
-
   Future<void> _pickFoodTime() async {
     final time = await showTimePicker(
       context: context,
@@ -465,12 +455,24 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       final records = await _apiService.getCarbonRecords('');
       if (!mounted) return;
 
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
       setState(() {
         _transportEmissions.clear();
         _officeEmissions.clear();
         _foodEmissions.clear();
 
         for (final record in records) {
+          // Requirement: Only show user input for the current day
+          final recordDate =
+              record['record_date']?.toString() ??
+              record['date']?.toString() ??
+              record['created_at']?.toString();
+
+          if (recordDate != null && !recordDate.startsWith(todayStr)) {
+            continue;
+          }
+
           final transportation = record['transportation'];
           final electricity = record['electricity'];
           final food = record['food'];
@@ -524,8 +526,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => WillPopScope(
-        onWillPop: () async => false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
         child: const AlertDialog(
           content: Row(
             children: [
@@ -945,11 +947,15 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                 Row(
                   children: [
+                    // Requirement 2: Users should not be able to change the date
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickFoodDate,
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: Text(_selectedFoodDateLabel),
+                      child: Opacity(
+                        opacity: 0.7,
+                        child: OutlinedButton.icon(
+                          onPressed: null, // Disabled so date cannot be changed
+                          icon: const Icon(Icons.calendar_today_outlined),
+                          label: Text(_selectedFoodDateLabel),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1064,7 +1070,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             const SizedBox(height: 4),
 
             const Text(
-              'Review the activities you have recorded.',
+              'Review the activities you have recorded for today.',
               style: TextStyle(fontSize: 13, color: Colors.black54),
             ),
 
@@ -1594,7 +1600,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ),
             SizedBox(height: 10),
             Text(
-              'No activities added yet',
+              'No activities added for today yet',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -1603,7 +1609,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ),
             SizedBox(height: 4),
             Text(
-              'Your recorded activities will appear here.',
+              'Your recorded activities for today will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.black54),
             ),
@@ -1628,13 +1634,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     String emission = '';
 
     if (category == 'Transportation') {
-      // Transportation format:
-      // Traditional Jeepney - 2.98 kg CO₂e
-      // Transportation
-
       if (parts.isNotEmpty) {
         final firstLine = parts[0];
-
         final emissionIndex = firstLine.lastIndexOf(' - ');
 
         if (emissionIndex != -1) {
@@ -1647,11 +1648,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
       details = category;
     } else {
-      // Office Resource and Food Consumption format:
-      // Title
-      // Details
-      // Emission
-
       title = parts.isNotEmpty ? parts[0] : '';
       details = parts.length > 1 ? parts[1] : '';
       emission = parts.length > 2 ? parts[2] : '';
