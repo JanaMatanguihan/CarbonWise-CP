@@ -45,7 +45,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentRankingDescription = "";
   String _campusRank = "-";
   String _userCampus = "";
-  String _rankingPeriod = 'monthly';
+
+  // Requirement 1: Default to 'weekly' on start
+  String _rankingPeriod = 'weekly';
 
   List<CampusRanking> _campusRankings = [];
 
@@ -55,10 +57,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDepartmentRankings();
-    _loadIndividualStatus();
-    _loadCurrentRanking();
-    _loadCampusRankings();
+    // Requirement 2: Load concurrently for maximum speed
+    Future.wait([
+      _loadDepartmentRankings(),
+      _loadIndividualStatus(),
+      _loadCurrentRanking(),
+      _loadCampusRankings(),
+    ]);
   }
 
   @override
@@ -72,9 +77,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      final rankingsData = await _apiService.getDepartmentRankings(
-        month: month,
-      );
+      // Requirement 2: Fetch rankings and user profile concurrently
+      final results = await Future.wait([
+        _apiService.getDepartmentRankings(month: month),
+        _apiService.getUserProfile(),
+      ]);
+
+      final rankingsData = results[0] as List<dynamic>;
+      final user = results[1] as Map<String, dynamic>;
 
       final rankings = rankingsData
           .map<DepartmentRanking>((item) {
@@ -91,7 +101,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .toList();
 
       rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
-      final user = await _apiService.getUserProfile();
       final myDepartment = user['department']?.toString() ?? '';
       final index = rankings.indexWhere((r) => r.department == myDepartment);
 
@@ -110,32 +119,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCurrentRanking() async {
     try {
-      print('Peer Comparison: START');
-
       final data = await _apiService.getMyPeerComparison(
         period: _rankingPeriod,
       );
 
-      print('Peer Comparison: DATA = $data');
-
       if (!mounted) return;
 
       final topPercentage = data['top_percentage'];
-
       final role = data['role']?.toString() ?? '';
       final period = data['period']?.toString() ?? _rankingPeriod;
-
-      print('Peer Comparison: topPercentage = $topPercentage');
-      print('Peer Comparison: role = $role');
-      print('Peer Comparison: period = $period');
 
       String description;
 
       if (topPercentage != null) {
         final percentage = int.tryParse(topPercentage.toString()) ?? 0;
-
         final roleName = role.isNotEmpty ? role : 'users';
-
         final periodName = period == 'weekly' ? 'this week' : 'this month';
 
         description =
@@ -149,11 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       setState(() {
         _currentRanking = topPercentage != null ? 'Top ${topPercentage}%' : '—';
-
         _currentRankingDescription = description;
       });
-
-      print('Peer Comparison: DONE');
     } catch (e) {
       print('Peer Comparison Error: $e');
     }
@@ -163,19 +158,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final records = await _apiService.getCarbonRecords('');
       final now = DateTime.now();
-      final startOfWeek = DateTime(
-        now.year,
-        now.month,
-        now.day,
-      ).subtract(Duration(days: now.weekday - 1));
 
       double transport = 0;
       double office = 0;
       double food = 0;
+
       for (final raw in records) {
         final record = Map<String, dynamic>.from(raw as Map);
         final date = DateTime.tryParse(record['record_date']?.toString() ?? '');
-        if (date == null || date.isBefore(startOfWeek)) continue;
+
+        // Requirement 3: Strictly filter for today's inputs only
+        if (date == null ||
+            date.year != now.year ||
+            date.month != now.month ||
+            date.day != now.day) {
+          continue;
+        }
+
         transport += _toDouble(record['transportation']);
         office += _toDouble(record['electricity']);
         food += _toDouble(record['food']);
@@ -194,16 +193,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadCampusRankings() async {
     try {
-      print('Campus Ranking: START');
-
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      print('Campus Ranking: requesting $month');
+      // Requirement 2: Fetch campus rankings and user profile concurrently
+      final results = await Future.wait([
+        _apiService.getCampusRankings(month: month),
+        _apiService.getUserProfile(),
+      ]);
 
-      final rankingsData = await _apiService.getCampusRankings(month: month);
-
-      print('Campus Ranking: API RESULT: $rankingsData');
+      final rankingsData = results[0] as List<dynamic>;
+      final user = results[1] as Map<String, dynamic>;
 
       final rankings = rankingsData
           .map<CampusRanking>((item) {
@@ -219,23 +219,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .where((r) => r.campus.isNotEmpty)
           .toList();
 
-      print('Campus Ranking: parsed rankings: $rankings');
-
       rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
 
-      print('Campus Ranking: requesting user profile');
-
-      final user = await _apiService.getUserProfile();
-
-      print('Campus Ranking: USER PROFILE: $user');
-
       final myCampus = user['campus']?.toString() ?? '';
-
-      print('Campus Ranking: MY CAMPUS: $myCampus');
-
       final index = rankings.indexWhere((r) => r.campus == myCampus);
-
-      print('Campus Ranking: MY INDEX: $index');
 
       if (!mounted) return;
 
@@ -246,8 +233,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? '${index + 1}${_getOrdinal(index + 1)}'
             : '-';
       });
-
-      print('Campus Ranking: DONE');
     } catch (e) {
       print('Campus Ranking Error: $e');
     }
@@ -280,8 +265,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
-
-            // TOP RANKING CARDS
             const SizedBox(height: 12),
 
             const Text(
@@ -337,12 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             const SizedBox(height: 24),
-
             const SizedBox(height: 20),
-
-            // =========================
-            // CHART SECTION
-            // =========================
 
             // Individual Status Section
             const Text(
@@ -357,7 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 4),
 
             Text(
-              "Your carbon emissions by category.",
+              "Your carbon emissions by category today.",
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
 
@@ -405,13 +383,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             const SizedBox(height: 28),
-
             const SizedBox(height: 16),
 
             // Department Ranking Section
-            // =========================
-            // DEPARTMENT RANKING
-            // =========================
             const Text(
               "Department Rankings",
               style: TextStyle(
@@ -486,12 +460,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             const SizedBox(height: 28),
-
             const SizedBox(height: 28),
 
-            // =========================
             // GOING GREEN INITIATIVES
-            // =========================
             const Text(
               "Going Green",
               style: TextStyle(
@@ -520,7 +491,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top icon + label
                   Container(
                     width: 44,
                     height: 44,
@@ -627,7 +597,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icon circle
           Container(
             width: 42,
             height: 42,
@@ -640,7 +609,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 10),
 
-          // Ranking
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -655,7 +623,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 4),
 
-          // Title
           Text(
             title,
             textAlign: TextAlign.center,
@@ -671,7 +638,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 5),
 
-          // Description
           Text(
             description,
             textAlign: TextAlign.center,
@@ -960,7 +926,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Row(
       children: [
-        // Rank
         Container(
           width: 38,
           height: 38,
@@ -984,7 +949,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         const SizedBox(width: 12),
 
-        // Department information
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1012,7 +976,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         const SizedBox(width: 8),
 
-        // Emission
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -1038,9 +1001,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       children: [
         Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 18),
-
         const SizedBox(width: 10),
-
         Expanded(
           child: Text(
             text,

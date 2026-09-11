@@ -1138,10 +1138,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $error')));
-    } finally {
-      currentPasswordController.dispose();
-      passwordController.dispose();
-      confirmPasswordController.dispose();
     }
   }
 
