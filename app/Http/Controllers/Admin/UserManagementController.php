@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\UserInfo;
+use App\Models\User;
 use App\Models\CarbonRecord;
 use App\Models\MitigationStrategy;
 use App\Services\AlertService;
@@ -13,12 +13,14 @@ use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
 {
+    // User Management
+
     public function index()
     {
-        $query = UserInfo::query();
+        $query = User::query();
 
         // Get available roles
-        $roles = UserInfo::select('role')
+        $roles = User::select('role')
             ->whereNotNull('role')
             ->where('role', '!=', 'admin')
             ->distinct()
@@ -26,7 +28,7 @@ class UserManagementController extends Controller
             ->pluck('role');
 
         // Get available departments
-        $departments = UserInfo::select('department')
+        $departments = User::select('department')
             ->whereNotNull('department')
             ->distinct()
             ->orderBy('department')
@@ -34,10 +36,12 @@ class UserManagementController extends Controller
 
         // Search
         if (request('search')) {
-            $query->where(function ($q) {
-                $q->where('full_name', 'like', '%' . request('search') . '%')
-                  ->orWhere('g_suite', 'like', '%' . request('search') . '%')
-                  ->orWhere('sr_code', 'like', '%' . request('search') . '%');
+            $search = request('search');
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('email', 'like', '%' . $search . '%')
+                    ->orWhere('id', 'like', '%' . $search . '%');
             });
         }
 
@@ -51,193 +55,192 @@ class UserManagementController extends Controller
             $query->where('department', request('department'));
         }
 
-        // Filter by Campus
-        if (request('campus')) {
-            $query->where('campus', request('campus'));
-        }
-
         // Filter by Status
         if (request('status')) {
             $query->where('status', request('status'));
         }
 
         $users = $query
-        ->orderBy('created_at', 'desc')
-        ->paginate(8)
-        ->withQueryString();
+            ->orderBy('created_at', 'desc')
+            ->paginate(8)
+            ->withQueryString();
 
-        return view('admin.user-management', compact('users', 'roles', 'departments'));
+        return view(
+            'admin.user-management',
+            compact('users', 'roles', 'departments')
+        );
     }
 
-    // NEW METHOD
-                    public function show(string $g_suite)
-            {
-                
-                $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
+    // Show User
 
-                // Total emissions
-                $totalEmissions = CarbonRecord::where('g_suite', $g_suite)
-                    ->sum('total_emission');
+    public function show(string $g_suite)
+    {
+        $user = User::where('email', $g_suite)->firstOrFail();
 
-                // Total records
-                $totalRecords = CarbonRecord::where('g_suite', $g_suite)
-                    ->count();
+        // Total emissions
+        $totalEmissions = CarbonRecord::where('user_id', $user->id)
+            ->sum('total_emission');
 
-                // This month's emissions
-                $thisMonthEmission = CarbonRecord::where('g_suite', $g_suite)
-                    ->whereYear('record_date', now()->year)
-                    ->whereMonth('record_date', now()->month)
-                    ->sum('total_emission');
+        // Total records
+        $totalRecords = CarbonRecord::where('user_id', $user->id)
+            ->count();
 
-                // Average emission per day
-                $daysTracked = CarbonRecord::where('g_suite', $g_suite)
-                    ->distinct('record_date')
-                    ->count('record_date');
+        // This month's emissions
+        $thisMonthEmission = CarbonRecord::where('user_id', $user->id)
+            ->whereYear('record_date', now()->year)
+            ->whereMonth('record_date', now()->month)
+            ->sum('total_emission');
 
-                $averagePerDay = $daysTracked > 0
-                    ? round($totalEmissions / $daysTracked, 2)
-                    : 0;
+        // Average emission per day
+        $daysTracked = CarbonRecord::where('user_id', $user->id)
+            ->distinct('record_date')
+            ->count('record_date');
 
-                $mitigationActions = MitigationStrategy::where('g_suite', $g_suite)
-                    ->where('status', 'completed')
-                    ->count();
+        $averagePerDay = $daysTracked > 0
+            ? round($totalEmissions / $daysTracked, 2)
+            : 0;
 
-                // Line Chart (Emission History)
-                    $history = CarbonRecord::where('g_suite', $g_suite)
-                            ->orderBy('record_date')
-                            ->get();
+        // Completed mitigation actions
+        $mitigationActions = MitigationStrategy::where('user_id', $user->id)
+            ->where('status', 'completed')
+            ->count();
 
-                        $emissionHistory = [];
+        // Emission history
+        $history = CarbonRecord::where('user_id', $user->id)
+            ->orderBy('record_date')
+            ->get();
 
-                        if ($history->count() > 0) {
+        $emissionHistory = [];
 
-                            foreach ($history as $record) {
-
-                                $emissionHistory[] = [
-                                    'date' => \Carbon\Carbon::parse($record->record_date)->format('M j'),
-                                    'value' => $record->total_emission
-                                ];
-
-                            }
-
-                        } else {
-
-                            for ($i = 6; $i >= 0; $i--) {
-
-                                $emissionHistory[] = [
-                                    'date' => now()->subDays($i)->format('M j'),
-                                    'value' => 0
-                                ];
-
-                            }
-
-                        }
-
-                    // Donut Chart (Emission Categories)
-                    $transportation = CarbonRecord::where('g_suite', $g_suite)
-                        ->sum('transportation');
-
-                    $electricity = CarbonRecord::where('g_suite', $g_suite)
-                        ->sum('electricity');
-
-                    $food = CarbonRecord::where('g_suite', $g_suite)
-                        ->sum('food');
-
-
-                return view(
-                'admin.user-profile',
-                compact(
-                    'user',
-                    'totalEmissions',
-                    'totalRecords',
-                    'thisMonthEmission',
-                    'averagePerDay',
-                    'mitigationActions',
-                    'emissionHistory',
-                    'transportation',
-                    'electricity',
-                    'food'
-                )
-            );
+        if ($history->count() > 0) {
+            foreach ($history as $record) {
+                $emissionHistory[] = [
+                    'date' => \Carbon\Carbon::parse($record->record_date)
+                        ->format('M j'),
+                    'value' => $record->total_emission,
+                ];
             }
-
-            public function edit(string $g_suite)
-            {
-                $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
-
-                return view('admin.edit-user', compact('user'));
+        } else {
+            for ($i = 6; $i >= 0; $i--) {
+                $emissionHistory[] = [
+                    'date' => now()->subDays($i)->format('M j'),
+                    'value' => 0,
+                ];
             }
-
-            public function update(Request $request, string $g_suite)
-            {
-                $user = UserInfo::findOrFail($g_suite);
-
-                $request->validate([
-        'full_name' => 'required|string|max:255',
-        'g_suite' => 'required|email',
-        'sr_code' => 'required',
-        'campus' => 'required',
-        'department' => 'required',
-        'year_level' => 'required',
-        'role' => 'required',
-        'status' => 'required',
-    ]);
-
-    $user->update([
-        'full_name' => $request->full_name,
-        'g_suite' => $request->g_suite,
-        'sr_code' => $request->sr_code,
-        'campus' => $request->campus,
-        'department' => $request->department,
-        'year_level' => $request->year_level,
-        'role' => $request->role,
-        'status' => $request->status,
-    ]);
-
-        AlertService::create(
-        'User Updated',
-        $user->full_name . ' profile has been updated.',
-        'info'
-    );
-    
-
-    return redirect()
-        ->route('admin.users.show', $request->g_suite)
-        ->with('success', 'User updated successfully.');
-}
-
-    public function destroy(string $g_suite)
-        {
-            $user = UserInfo::findOrFail($g_suite);
-
-            $user->delete();
-
-            return redirect()
-                ->route('admin.users')
-                ->with('success', 'User deleted successfully.');
         }
 
-     public function carbonRecords(string$g_suite)
-    {
-        $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
+        // Emission Categories
+        $transportation = CarbonRecord::where('user_id', $user->id)
+            ->sum('transportation');
 
-        $records = CarbonRecord::where('g_suite', $g_suite)
-        ->orderBy('record_date', 'desc')
-        ->simplePaginate(5);
+        $electricity = CarbonRecord::where('user_id', $user->id)
+            ->sum('electricity');
 
-        return view('admin.user-carbon-records', compact(
-            'user',
-            'records'
-        ));
+        $food = CarbonRecord::where('user_id', $user->id)
+            ->sum('food');
+
+        return view(
+            'admin.user-profile',
+            compact(
+                'user',
+                'totalEmissions',
+                'totalRecords',
+                'thisMonthEmission',
+                'averagePerDay',
+                'mitigationActions',
+                'emissionHistory',
+                'transportation',
+                'electricity',
+                'food'
+            )
+        );
     }
 
-       public function badges(
+    // Edit User
+
+    public function edit(string $g_suite)
+    {
+        $user = User::where('email', $g_suite)->firstOrFail();
+
+        return view(
+            'admin.edit-user',
+            compact('user')
+        );
+    }
+
+    // Update User
+
+    public function update(Request $request, string $g_suite)
+    {
+        $user = User::where('email', $g_suite)->firstOrFail();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'department' => 'required|string|max:255',
+            'role' => 'required|string|max:255',
+            'status' => 'required|string|max:255',
+        ]);
+
+        $user->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'department' => $request->department,
+            'role' => $request->role,
+            'status' => $request->status,
+        ]);
+
+        AlertService::create(
+            'User Updated',
+            $user->name . ' profile has been updated.',
+            'info'
+        );
+
+        return redirect()
+            ->route('admin.users.show', $user->g_suite)
+            ->with('success', 'User updated successfully.');
+    }
+
+    // Delete User
+
+    public function destroy(string $g_suite)
+    {
+        $user = User::where('email', $g_suite)->firstOrFail();
+
+        $user->delete();
+
+        return redirect()
+            ->route('admin.users')
+            ->with('success', 'User deleted successfully.');
+    }
+
+    // Carbon Records
+
+    public function carbonRecords(string $g_suite)
+    {
+        $user = User::where('email', $g_suite)->firstOrFail();
+
+        $records = CarbonRecord::where('user_id', $user->id)
+            ->orderBy('record_date', 'desc')
+            ->simplePaginate(5);
+
+        return view(
+            'admin.user-carbon-records',
+            compact(
+                'user',
+                'records'
+            )
+        );
+    }
+
+    // User Badges
+
+    public function badges(
         GreenPointService $greenPointService,
         StreakService $streakService,
         string $g_suite
-    )
-    {
-        $user = UserInfo::where('g_suite', $g_suite)->firstOrFail();
+    ) {
+        $user = User::where('email', $g_suite)->firstOrFail();
 
         $greenPoints = $greenPointService->calculate($g_suite);
 

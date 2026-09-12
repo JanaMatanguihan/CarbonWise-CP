@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'department',
+        'status',
     ];
 
     /**
@@ -48,5 +49,13 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get the user's G-Suite email.
+     */
+    public function getGSuiteAttribute(): string
+    {
+        return $this->email;
     }
 }
