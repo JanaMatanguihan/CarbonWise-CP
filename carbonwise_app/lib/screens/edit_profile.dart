@@ -140,13 +140,21 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                   alignment: Alignment.bottomRight,
                   children: [
                     Container(
+                      width: 128,
+                      height: 128,
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: primaryGreen.withValues(alpha: 0.42),
+                          width: 2,
+                        ),
                         boxShadow: const [
                           BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 18,
-                            offset: Offset(0, 6),
+                            color: Color(0x25000000),
+                            blurRadius: 16,
+                            offset: Offset(0, 7),
                           ),
                         ],
                       ),
@@ -157,14 +165,16 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                             ? FileImage(_selectedImage!)
                             : (_profilePicture != null &&
                                   _profilePicture!.isNotEmpty)
-                            ? NetworkImage(_profilePicture!)
+                            ? NetworkImage(
+                                '$_profilePicture?t=${DateTime.now().millisecondsSinceEpoch}',
+                              )
                             : null,
                         child:
                             (_selectedImage == null &&
                                 (_profilePicture == null ||
                                     _profilePicture!.isEmpty))
                             ? const Icon(
-                                Icons.person,
+                                Icons.person_rounded,
                                 size: 48,
                                 color: primaryGreen,
                               )
@@ -267,6 +277,8 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
 
                 readOnlyField("SR Code", widget.studentNumber, Icons.badge),
 
+                readOnlyField("G-Suite", widget.email, Icons.email),
+
                 readOnlyField("Department", widget.department, Icons.school),
 
                 readOnlyField("Campus", widget.campus, Icons.location_city),
@@ -321,34 +333,30 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                           });
 
                           try {
-                            final currentEmail =
-                                await ApiService.getCurrentUserEmail();
+                            final email = widget.email;
+                            String? profileUrl = widget.profilePicture;
 
-                            // Update profile information
+                            if (_selectedImage != null) {
+                              profileUrl = await _apiService
+                                  .uploadProfilePicture(_selectedImage!);
+
+                              setState(() {
+                                _profilePicture = profileUrl;
+                              });
+                            }
+
                             await _apiService.updateUserProfile(
                               name: _nameController.text.trim(),
                             );
 
-                            // Upload profile picture separately
-                            if (_selectedImage != null) {
-                              final profileUrl = await _apiService
-                                  .uploadProfilePicture(_selectedImage!);
-
-                              if (mounted) {
-                                setState(() {
-                                  _profilePicture = profileUrl;
-                                });
-                              }
-                            }
-
-                            // Only send notification if we actually have an email
-                            if (currentEmail != null &&
-                                currentEmail.isNotEmpty) {
-                              await _apiService.updateUserProfile(
-                                email: currentEmail,
-                                name: _nameController.text.trim(),
-                              );
-                            }
+                            await _apiService.addNotification(
+                              // notification
+                              email: email,
+                              title: "Profile Updated",
+                              message:
+                                  "Your profile information has been updated.",
+                              type: "info",
+                            );
 
                             profileRefreshNotifier.value++;
 

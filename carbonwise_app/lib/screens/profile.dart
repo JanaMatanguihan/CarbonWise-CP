@@ -412,7 +412,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. Profile Header
   Widget _buildProfileHeader() {
-    final String fullName = userInfo?['name'] ?? 'Loading...';
+    final String fullName =
+        (userInfo?['name'] ?? userInfo?['full_name'] ?? 'Loading...')
+            .toString();
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
     final String? profilePicture = userInfo?['profile_picture'];
@@ -444,43 +446,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFE5EEE8)),
+              border: Border.all(color: const Color(0xFFDDE9E1)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x12000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ],
             ),
             child: Column(
               children: [
                 // PROFILE PICTURE
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: const Color(0xFFDDEBDD),
+                Container(
+                  width: 112,
+                  height: 112,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(
+                      color: primaryGreen.withValues(alpha: 0.42),
+                      width: 2,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x22000000),
+                        blurRadius: 14,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
                   child: ClipOval(
-                    child: profilePicture != null && profilePicture.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: profilePicture,
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-
-                            // Shows the person icon while the image loads
-                            placeholder: (context, url) => const Icon(
-                              Icons.person,
-                              size: 45,
-                              color: Color(0xFF3AA76D),
+                    child: Container(
+                      color: const Color(0xFFE8F5EE),
+                      child: profilePicture != null && profilePicture.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl:
+                                  '$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}',
+                              width: 104,
+                              height: 104,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: primaryGreen,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  const Center(
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      size: 48,
+                                      color: primaryGreen,
+                                    ),
+                                  ),
+                              fadeInDuration: const Duration(milliseconds: 250),
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.person_rounded,
+                                size: 48,
+                                color: primaryGreen,
+                              ),
                             ),
-
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.person,
-                              size: 45,
-                              color: Color(0xFF3AA76D),
-                            ),
-
-                            // Helps the image stay available after loading
-                            fadeInDuration: const Duration(milliseconds: 150),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 45,
-                            color: Color(0xFF3AA76D),
-                          ),
+                    ),
                   ),
                 ),
 
@@ -557,7 +591,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       final updated = await showDialog<bool>(
                         context: context,
                         builder: (_) => EditProfileDialog(
-                          fullName: userInfo!['full_name'] ?? '',
+                          fullName:
+                              (userInfo!['name'] ??
+                                      userInfo!['full_name'] ??
+                                      '')
+                                  .toString(),
                           studentNumber: userInfo!['sr_code'] ?? '',
                           email: userInfo!['g_suite'] ?? '',
                           department: userInfo!['department'] ?? '',
