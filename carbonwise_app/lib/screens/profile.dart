@@ -421,7 +421,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String role = userInfo?['role'] ?? '';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
       child: Column(
         children: [
           // PAGE TITLE
@@ -430,56 +430,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(
               'Profile',
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1F2933),
               ),
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           // PROFILE CARD
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFDDE9E1)),
-              boxShadow: const [
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x12000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Column(
               children: [
-                // PROFILE PICTURE
+                // PROFILE PICTURE CONTAINER WITH BORDER & SHADOW
                 Container(
                   width: 112,
                   height: 112,
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
                     border: Border.all(
-                      color: primaryGreen.withValues(alpha: 0.42),
-                      width: 2,
+                      color: primaryGreen.withValues(alpha: 0.5),
+                      width: 2.5,
                     ),
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
-                        color: Color(0x22000000),
-                        blurRadius: 14,
-                        offset: Offset(0, 6),
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: ClipOval(
                     child: Container(
-                      color: const Color(0xFFE8F5EE),
+                      color: Colors.grey.shade100,
                       child: profilePicture != null && profilePicture.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl:
@@ -489,8 +489,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fit: BoxFit.cover,
                               placeholder: (context, url) => const Center(
                                 child: SizedBox(
-                                  width: 28,
-                                  height: 28,
+                                  width: 26,
+                                  height: 26,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
                                     color: primaryGreen,
@@ -505,7 +505,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       color: primaryGreen,
                                     ),
                                   ),
-                              fadeInDuration: const Duration(milliseconds: 250),
+                              fadeInDuration: const Duration(milliseconds: 200),
                             )
                           : const Center(
                               child: Icon(
@@ -518,7 +518,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
                 // NAME
                 Text(
@@ -531,9 +531,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
 
-                // DEPARTMENT
+                // DEPARTMENT & CAMPUS SUB-INFO
                 if (!isLoadingProfile && (role.isNotEmpty || campus.isNotEmpty))
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -547,16 +547,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black54,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
-
                       if (role.isNotEmpty && campus.isNotEmpty)
                         const Text(
-                          '  |  ',
+                          '  •  ',
                           style: TextStyle(fontSize: 13, color: Colors.black38),
                         ),
-
                       if (campus.isNotEmpty)
                         Flexible(
                           child: Text(
@@ -566,20 +565,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black54,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                     ],
                   ),
 
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
 
                 if (!isLoadingProfile && department.isNotEmpty)
                   Text(
                     department,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12, color: Colors.black45),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
+
+                const SizedBox(height: 20),
 
                 // EDIT PROFILE BUTTON
                 SizedBox(
@@ -610,7 +612,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         await _loadRecentActivities();
                       }
                     },
-                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text(
                       'Edit Profile',
                       style: TextStyle(
@@ -620,7 +622,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: primaryGreen,
-                      side: const BorderSide(color: primaryGreen),
+                      side: const BorderSide(color: primaryGreen, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
