@@ -43,32 +43,12 @@ class ProfileController extends Controller
         ]);
     }
 
-    // Upload profile picture
-    public function uploadProfilePicture(Request $request)
-    {
-        $request->validate([
-            'profile_picture' => ['required', 'image', 'max:5120'],
-        ]);
-
-        $user = $request->user();
-
-        $path = $request->file('profile_picture')->store('profile-pictures', 'public');
-
-        $user->profile_picture = Storage::url($path);
-        $user->save();
-
-        return response()->json([
-            'message' => 'Profile picture updated successfully.',
-            'profile_picture' => url($user->profile_picture),
-        ], 200);
-    }
-
     // Change password
     public function changePassword(Request $request)
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
         ]);
 
         $request->user()->update([
@@ -79,4 +59,44 @@ class ProfileController extends Controller
             'message' => 'Password changed successfully.',
         ]);
     }
+
+    // Upload profile picture
+public function uploadProfilePicture(Request $request)
+{
+    $request->validate([
+        'profile_picture' => ['required', 'image', 'max:5120'],
+    ]);
+
+    $user = $request->user();
+
+    if ($request->hasFile('profile_picture')) {
+
+        // Delete old profile picture
+        if ($user->profile_picture) {
+            $oldPath = str_replace('/storage/', '', $user->profile_picture);
+
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        // Save new picture
+        $path = $request->file('profile_picture')
+            ->store('profile-pictures', 'public');
+
+        $url = asset('storage/' . $path);
+
+        $user->update([
+            'profile_picture' => $url,
+        ]);
+
+        return response()->json([
+            'message' => 'Profile picture uploaded successfully.',
+            'profile_picture' => $url,
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    return response()->json([
+        'message' => 'No profile picture was uploaded.',
+    ], 400);
+}
 }
