@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn==1.9.0
+torch
+pytorch-lightning==2.6.5
+pytorch-forecasting==1.8.0
