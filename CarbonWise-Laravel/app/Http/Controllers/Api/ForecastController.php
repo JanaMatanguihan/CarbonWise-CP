@@ -11,7 +11,7 @@ class ForecastController extends Controller
     public function tft30DayForecast()
     {
         try {
-            $records = CarbonRecord::where('user_id', auth()->id)
+            $records = CarbonRecord::where('user_id', request()->user()->id)
                 ->orderBy('record_date')
                 ->get([
                     'record_date',
