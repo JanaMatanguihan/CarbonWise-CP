@@ -17,30 +17,23 @@ class EmailVerificationController extends Controller
             sha1($user->getEmailForVerification()),
             $hash
         )) {
-            return response()->json([
-                'message' => 'Invalid verification link.'
-            ], 403);
+            return response()->view('auth.verified-success', ['message' => 'Invalid verification link.'], 403);
         }
 
         // Check the signed URL
         if (!$request->hasValidSignature()) {
-            return response()->json([
-                'message' => 'This verification link is invalid or has expired.'
-            ], 403);
+            return response()->view('auth.verified-success', ['message' => 'This verification link is invalid or has expired.'], 403);
         }
 
         // Already verified
         if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email is already verified.'
-            ]);
+            return view('auth.verified-success');
         }
 
-        // THIS is what updates email_verified_at
+        // updates email_verified_at
         $user->markEmailAsVerified();
 
-        return response()->json([
-            'message' => 'Email verified successfully!'
-        ]);
+        // Return web success view instead of JSON so the browser renders the card
+        return view('auth.verified-success');
     }
 }
