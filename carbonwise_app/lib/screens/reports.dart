@@ -114,6 +114,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return (labels.length / 4).ceilToDouble();
   }
 
+  List<FlSpot> tftForecastSpots = [];
+  List<String> tftForecastLabels = [];
+  bool isTftLoading = true;
+  String? tftForecastError;
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +127,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _loadWeeklyComparison();
     _loadCarbonReductionJourney();
     strategyRefreshNotifier.addListener(_refreshReports);
+    _loadTftForecast();
   }
 
   @override
@@ -144,6 +150,60 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<List<dynamic>> _records() => _apiService.getCarbonRecords('');
+
+  Future<void> _loadTftForecast() async {
+    try {
+      print('TFT: requesting forecast...');
+
+      final data = await _apiService.getTft30DayForecast();
+
+      print('TFT: response received');
+      print('TFT DATA: $data');
+
+      final forecast = data['forecast'];
+
+      if (forecast is! List) {
+        throw Exception('Invalid forecast data: $data');
+      }
+
+      final spots = <FlSpot>[];
+      final dateLabels = <String>[];
+
+      for (int i = 0; i < forecast.length; i++) {
+        final item = Map<String, dynamic>.from(forecast[i] as Map);
+
+        final date = DateTime.tryParse(item['record_date']?.toString() ?? '');
+
+        final prediction = double.tryParse(
+          item['predicted_total_emission']?.toString() ?? '',
+        );
+
+        if (date == null || prediction == null) continue;
+
+        spots.add(FlSpot(i.toDouble(), prediction));
+
+        dateLabels.add('${date.month}/${date.day}');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        tftForecastSpots = spots;
+        tftForecastLabels = dateLabels;
+        isTftLoading = false;
+        tftForecastError = null;
+      });
+    } catch (e) {
+      print('TFT FORECAST ERROR: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        isTftLoading = false;
+        tftForecastError = e.toString();
+      });
+    }
+  }
 
   Future<void> _loadEmissionData() async {
     try {
@@ -830,6 +890,189 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+
+              const SizedBox(height: 20),
+
+              // 6. 30-Day TFT Forecast
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _cardDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "30-Day Emissions Forecast",
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      "Predicted carbon emissions for the next 30 days",
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    SizedBox(
+                      height: 250,
+                      child: isTftLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: primaryGreen,
+                              ),
+                            )
+                          : tftForecastError != null
+                          ? Center(
+                              child: Text(
+                                tftForecastError ?? "Unable to load forecast.",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            )
+                          : tftForecastSpots.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "No forecast available.",
+                                style: TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            )
+                          : LineChart(
+                              LineChartData(
+                                minX: 0,
+                                maxX: tftForecastSpots.length > 1
+                                    ? (tftForecastSpots.length - 1).toDouble()
+                                    : 1,
+                                minY: 0,
+
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval: 100,
+                                ),
+
+                                titlesData: FlTitlesData(
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 48,
+                                      interval: 100,
+                                      getTitlesWidget: (value, meta) {
+                                        return Text(
+                                          value.toStringAsFixed(0),
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.black45,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 32,
+                                      interval: 5,
+                                      getTitlesWidget: (value, meta) {
+                                        final index = value.toInt();
+
+                                        if (index < 0 ||
+                                            index >= tftForecastLabels.length) {
+                                          return const SizedBox();
+                                        }
+
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 8,
+                                          ),
+                                          child: Text(
+                                            tftForecastLabels[index],
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.black45,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+
+                                borderData: FlBorderData(show: false),
+
+                                lineTouchData: LineTouchData(
+                                  enabled: true,
+                                  touchTooltipData: LineTouchTooltipData(
+                                    getTooltipItems: (touchedSpots) {
+                                      return touchedSpots.map((spot) {
+                                        final index = spot.x.toInt();
+
+                                        final date =
+                                            index >= 0 &&
+                                                index < tftForecastLabels.length
+                                            ? tftForecastLabels[index]
+                                            : "";
+
+                                        return LineTooltipItem(
+                                          "$date\n"
+                                          "${spot.y.toStringAsFixed(2)} kg CO₂e",
+                                          const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
+                                  ),
+                                ),
+
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: tftForecastSpots,
+                                    isCurved: true,
+                                    curveSmoothness: 0.3,
+                                    color: primaryGreen,
+                                    barWidth: 3,
+                                    isStrokeCapRound: true,
+
+                                    dotData: FlDotData(show: false),
+
+                                    belowBarData: BarAreaData(
+                                      show: true,
+                                      color: primaryGreen.withValues(
+                                        alpha: 0.10,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 20),
 
               // 6. Smart Suggestions Section

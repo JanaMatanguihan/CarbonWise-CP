@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\ForecastController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -30,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/carbon-records/{id}', [CarbonRecordController::class, 'show']);
     Route::put('/carbon-records/{id}', [CarbonRecordController::class, 'update']);
     Route::delete('/carbon-records/{id}', [CarbonRecordController::class, 'destroy']);
+    Route::get('/forecast/tft-30-days', [ForecastController::class, 'tft30DayForecast']);
 
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);

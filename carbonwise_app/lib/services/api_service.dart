@@ -715,4 +715,23 @@ class ApiService {
 
     throw Exception(data['message'] ?? 'Failed to load current user.');
   }
+
+  // GET: TFT 30-DAY FORECAST
+  Future<Map<String, dynamic>> getTft30DayForecast() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/forecast/tft-30-days'), headers: _headers)
+          .timeout(const Duration(seconds: 120));
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return data;
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load TFT forecast data.');
+    } catch (e) {
+      throw Exception('Error connecting to forecasting service: $e');
+    }
+  }
 }
