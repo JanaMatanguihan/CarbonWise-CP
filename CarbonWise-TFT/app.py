@@ -27,18 +27,32 @@ def get_forecast(request: ForecastRequest):
         # ---------------------------------------------------------
         df = pd.DataFrame(request.records)
 
-        if len(df) < 90:
-            raise HTTPException(
-                status_code=422,
-                detail="At least 90 carbon records are required."
-            )
-
         # ---------------------------------------------------------
         # Prepare data
         # ---------------------------------------------------------
         df["record_date"] = pd.to_datetime(df["record_date"])
 
         df = df.sort_values("record_date").reset_index(drop=True)
+
+        # The trained TFT uses a 90-day encoder window.
+        # If the user has fewer than 90 real records, pad the beginning
+        # with copies of the earliest record so the existing model can run.
+        if len(df) == 0:
+            raise HTTPException(
+                status_code=422,
+                detail="At least one carbon record is required for forecasting."
+            )
+
+        if len(df) < 90:
+            needed = 90 - len(df)
+            first_record = df.iloc[0].copy()
+            first_date = first_record["record_date"]
+            padded_rows = []
+            for i in range(needed, 0, -1):
+                row = first_record.copy()
+                row["record_date"] = first_date - pd.Timedelta(days=i)
+                padded_rows.append(row)
+            df = pd.concat([pd.DataFrame(padded_rows), df], ignore_index=True)
 
         numeric_columns = [
             "transportation",
@@ -140,17 +154,50 @@ def get_forecast(request: ForecastRequest):
 
         # ---------------------------------------------------------
         # Create future dates
-        # ---------------------------------------------------------
-        future_dates = pd.date_range(
-            start=history["record_date"].max()
-            + pd.Timedelta(days=1),
-            periods=prediction_length,
-            freq="D"
-        )
+        unknown_columns = [
+            "total_emission", "transportation", "electricity", "food",
+            "emission_lag_1", "emission_lag_7", "emission_lag_14",
+            "emission_rolling_7", "emission_rolling_30",
+        ]
 
-        future_df = pd.DataFrame({
-            "record_date": future_dates
-        })
+        # ---------------------------------------------------------
+        # Start from today if the latest saved record is older than today.
+        # If today's record already exists, start tomorrow.
+        today = pd.Timestamp.now().normalize()
+        last_record_date = history["record_date"].max().normalize()
+        forecast_start = max(today, last_record_date + pd.Timedelta(days=1))
+
+        # Fill missing daily timesteps between the latest record and today.
+        gap_days = (forecast_start - last_record_date).days - 1
+        if gap_days > 0:
+            gap_dates = pd.date_range(
+                start=last_record_date + pd.Timedelta(days=1),
+                periods=gap_days, freq="D"
+            )
+            last_values = history.iloc[-1]
+            gap_rows = []
+            for gap_date in gap_dates:
+                row = last_values.copy()
+                row["record_date"] = gap_date
+                gap_rows.append(row)
+            gap_df = pd.DataFrame(gap_rows)
+            gap_df["time_idx"] = range(
+                int(history["time_idx"].max()) + 1,
+                int(history["time_idx"].max()) + 1 + gap_days
+            )
+            gap_df["day_of_week"] = gap_df["record_date"].dt.dayofweek
+            gap_df["month"] = gap_df["record_date"].dt.month
+            gap_df["day_of_month"] = gap_df["record_date"].dt.day
+            gap_df["is_weekend"] = (gap_df["day_of_week"] >= 5).astype(int)
+            gap_df["series"] = "carbon_emissions"
+            for column in unknown_columns:
+                gap_df[column] = gap_df[column].astype(float)
+            history = pd.concat([history, gap_df], ignore_index=True)
+
+        future_dates = pd.date_range(
+            start=forecast_start, periods=prediction_length, freq="D"
+        )
+        future_df = pd.DataFrame({"record_date": future_dates})
 
         # Continue time index
         future_df["time_idx"] = range(
@@ -174,18 +221,6 @@ def get_forecast(request: ForecastRequest):
         # ---------------------------------------------------------
         # Fill required future columns
         # ---------------------------------------------------------
-        unknown_columns = [
-            "total_emission",
-            "transportation",
-            "electricity",
-            "food",
-            "emission_lag_1",
-            "emission_lag_7",
-            "emission_lag_14",
-            "emission_rolling_7",
-            "emission_rolling_30",
-        ]
-
         last_values = history.iloc[-1]
 
         for column in unknown_columns:

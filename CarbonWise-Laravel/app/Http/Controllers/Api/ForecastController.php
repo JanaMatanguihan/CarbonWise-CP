@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CarbonRecord;
 use Illuminate\Support\Facades\Http;
+use Carbon\Carbon;
 
 class ForecastController extends Controller
 {
@@ -21,10 +22,29 @@ class ForecastController extends Controller
                     'total_emission',
                 ]);
 
-            if ($records->count() < 90) {
+            $records = $records->map(function ($record) {
+                return $record->toArray();
+            })->values();
+
+            // The TFT model uses a 90-day history window.
+            // Pad shorter histories so the existing model can still run.
+            if ($records->count() === 0) {
                 return response()->json([
-                    'message' => 'At least 90 carbon records are required for forecasting.'
+                    'message' => 'At least one carbon record is required for forecasting.'
                 ], 422);
+            }
+
+            if ($records->count() < 90) {
+                $needed = 90 - $records->count();
+                $firstRecord = $records->first();
+                $firstDate = Carbon::parse($firstRecord['record_date']);
+                $paddedRecords = collect();
+                for ($i = $needed; $i >= 1; $i--) {
+                    $copy = $firstRecord;
+                    $copy['record_date'] = $firstDate->copy()->subDays($i)->toDateString();
+                    $paddedRecords->push($copy);
+                }
+                $records = $paddedRecords->concat($records)->values();
             }
 
             $response = Http::timeout(120)->post(
