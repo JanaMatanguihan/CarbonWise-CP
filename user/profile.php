@@ -3,18 +3,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 1. Generate CSRF Token for Secure form submissions[cite: 2]
+// 1. Generate CSRF Token for Secure form submissions[cite: 8]
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// 2. Guard check: If the user isn't logged in, send them back to login[cite: 2]
+// 2. Guard check: If the user isn't logged in, send them back to login[cite: 8]
 if (!isset($_SESSION['user_token'])) {
     header('Location: login.php');
     exit;
 }
 
-// --- NEON POSTGRESQL DATABASE CONFIGURATION ---[cite: 2]
+// --- NEON POSTGRESQL DATABASE CONFIGURATION ---[cite: 8]
 $neon_host     = getenv('NEON_DB_HOST')     ?: 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
 $neon_port     = getenv('NEON_DB_PORT')     ?: '5432';
 $neon_dbname   = getenv('NEON_DB_NAME')     ?: 'neondb';
@@ -36,12 +36,12 @@ try {
     $db_connection_error = $e->getMessage();
 }
 
-// 3. Extract user session data strictly using user_id[cite: 2]
+// 3. Extract user session data strictly using user_id[cite: 8]
 $user_data = $_SESSION['user_profile'] ?? ($_SESSION['user_data'] ?? []);
 $user_id   = $_SESSION['user_id'] ?? ($user_data['id'] ?? null); 
 $user_metadata = $user_data['user_metadata'] ?? [];
 
-// Redirect if user_id is missing from session[cite: 2]
+// Redirect if user_id is missing from session[cite: 8]
 if (empty($user_id)) {
     header('Location: login.php');
     exit;
@@ -50,7 +50,7 @@ if (empty($user_id)) {
 $user_email = $_SESSION['user_email'] ?? ($user_data['email'] ?? ($user_metadata['email'] ?? 'Unknown Email'));
 $user_name  = $_SESSION['user_name'] ?? ($user_data['full_name'] ?? ($user_metadata['full_name'] ?? ($user_metadata['name'] ?? '')));
 
-// 4. Extract Name & Role[cite: 2]
+// 4. Extract Name & Role[cite: 8]
 $raw_name = $user_name;
 if (isset($user_data['role']) && strtolower($user_data['role']) !== 'authenticated') {
     $raw_role = $user_data['role'];
@@ -58,7 +58,7 @@ if (isset($user_data['role']) && strtolower($user_data['role']) !== 'authenticat
     $raw_role = $user_metadata['role'] ?? '';
 }
 
-// 5. Extract Department & Campus from session user data[cite: 2]
+// 5. Extract Department & Campus from session user data[cite: 8]
 $raw_dept   = $user_data['department'] ?? ($user_metadata['department'] ?? '');
 $raw_campus = $user_data['campus'] ?? ($user_metadata['campus'] ?? '');
 
@@ -75,10 +75,10 @@ if (!empty($raw_dept) && !empty($raw_campus)) {
     $dept_and_campus = 'No Department / Campus Assigned';
 }
 
-// --- POST INTERCEPTOR PIPES & CONTROLLERS ---[cite: 2]
+// --- POST INTERCEPTOR PIPES & CONTROLLERS ---[cite: 8]
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // CSRF Guard verification[cite: 2]
+    // CSRF Guard verification[cite: 8]
     $provided_token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
     if (!hash_equals($_SESSION['csrf_token'], $provided_token)) {
         header('Content-Type: application/json');
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Process Avatar Upload strictly bound to user_id[cite: 2]
+    // Process Avatar Upload strictly bound to user_id[cite: 7, 8]
     if (isset($_FILES['profile_avatar'])) {
         $file = $_FILES['profile_avatar'];
 
@@ -114,26 +114,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $file_data = file_get_contents($file['tmp_name']);
-        $base64_image = 'data:' . $file_type . ';base64,' . base64_encode($file_data);
+        // --- LOCAL FILE STORAGE PIPELINE ---[cite: 7]
+        $upload_dir = 'uploads/avatars/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
 
-        try {
-            $stmt = $pdo->prepare("UPDATE users SET profile_picture = :profile_picture WHERE id = :user_id");
-            $stmt->execute([
-                ':profile_picture' => $base64_image,
-                ':user_id'         => $user_id
-            ]);
+        $extension   = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename    = 'avatar_' . $user_id . '_' . time() . '.' . $extension;
+        $target_path = $upload_dir . $filename;
 
-            $_SESSION['user_profile']['user_metadata']['profile_picture'] = $base64_image;
-            header("Location: profile.php?status=success&msg=" . urlencode("Profile picture updated!"));
-            exit;
-        } catch (PDOException $e) {
-            header("Location: profile.php?status=error&msg=" . urlencode("Database failure: " . $e->getMessage()));
+        if (move_uploaded_file($file['tmp_name'], $target_path)) {
+            try {
+                $stmt = $pdo->prepare("UPDATE users SET profile_picture = :profile_picture WHERE id = :user_id");
+                $stmt->execute([
+                    ':profile_picture' => $target_path,
+                    ':user_id'         => $user_id
+                ]);
+
+                $_SESSION['user_profile']['user_metadata']['profile_picture'] = $target_path;
+                header("Location: profile.php?status=success&msg=" . urlencode("Profile picture updated!"));
+                exit;
+            } catch (PDOException $e) {
+                header("Location: profile.php?status=error&msg=" . urlencode("Database failure: " . $e->getMessage()));
+                exit;
+            }
+        } else {
+            header("Location: profile.php?status=error&msg=" . urlencode("Failed to move uploaded file. Check folder permissions."));
             exit;
         }
     }
 
-    // Process Password Updates strictly bound to user_id[cite: 2]
+    // Process Password Updates strictly bound to user_id[cite: 8]
     if (isset($_POST['action']) && $_POST['action'] === 'update_password') {
         $new_password     = $_POST['new_password'] ?? '';
         $confirm_password = $_POST['confirm_password'] ?? '';
@@ -170,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 6. DYNAMICALLY CALCULATE CARBON SCORE FROM carbon_records STRICTLY BY user_id[cite: 2]
+// 6. DYNAMICALLY CALCULATE CARBON SCORE FROM carbon_records STRICTLY BY user_id[cite: 8]
 $current_week_score = 0;
 $last_week_score    = 0;
 $grand_total        = 0;
@@ -180,7 +192,7 @@ $info_response      = !empty($db_connection_error) ? $db_connection_error : "";
 
 if ($pdo) {
     try {
-        // Query profile_picture by user_id[cite: 2]
+        // Query profile_picture by user_id[cite: 8]
         $avatar_stmt = $pdo->prepare("SELECT profile_picture FROM users WHERE id = :user_id LIMIT 1");
         $avatar_stmt->execute([':user_id' => $user_id]);
         $user_row = $avatar_stmt->fetch();
@@ -188,7 +200,7 @@ if ($pdo) {
             $_SESSION['user_profile']['user_metadata']['profile_picture'] = $user_row['profile_picture'];
         }
 
-        // Aggregate emissions data matching strictly by user_id
+        // Aggregate emissions data matching strictly by user_id[cite: 8]
         $score_stmt = $pdo->prepare("
             SELECT 
                 COALESCE(SUM(CAST(REGEXP_REPLACE(COALESCE(total_emission::text, '0'), '[^0-9.]', '', 'g') AS NUMERIC)), 0) AS grand_total,
@@ -207,11 +219,11 @@ if ($pdo) {
             $grand_total = floatval($score_data['grand_total']);
             $weekly_sum  = floatval($score_data['current_week']);
             
-            // Fallback: If current 7-day total is 0, display cumulative lifetime carbon score
+            // Fallback: If current 7-day total is 0, display cumulative lifetime carbon score[cite: 8]
             $current_week_score = ($weekly_sum > 0) ? round($weekly_sum, 1) : round($grand_total, 1);
             $last_week_score    = floatval($score_data['last_week']);
 
-            // Sync calculated score to users table
+            // Sync calculated score to users table[cite: 8]
             $update_stmt = $pdo->prepare("UPDATE users SET carbon_score = :score WHERE id = :user_id");
             $update_stmt->execute([
                 ':score'   => $current_week_score,
@@ -219,7 +231,7 @@ if ($pdo) {
             ]);
         }
 
-        // Generate performance text
+        // Generate performance text[cite: 8]
         if ($current_week_score > 0) {
             if ($last_week_score > 0) {
                 if ($current_week_score < $last_week_score) {
@@ -243,7 +255,7 @@ if ($pdo) {
     }
 }
 
-// 7. DYNAMICALLY COMPUTE CATEGORY BREAKDOWNS (NO HARDCODED SCHEMA)
+// 7. DYNAMICALLY COMPUTE CATEGORY BREAKDOWNS (NO HARDCODED SCHEMA)[cite: 8]
 $categories_data = [
     'transportation'   => ['current_week' => 0, 'top_activity' => 'Commuting Daily', 'icon' => 'fa-bus'],
     'office_resource'  => ['current_week' => 0, 'top_activity' => 'Electricity & Office Usage', 'icon' => 'fa-bolt'],
@@ -252,7 +264,7 @@ $categories_data = [
 
 if ($pdo) {
     try {
-        // 1. Inspect table columns dynamically at runtime
+        // 1. Inspect table columns dynamically at runtime[cite: 8]
         $col_stmt = $pdo->prepare("
             SELECT column_name 
             FROM information_schema.columns 
@@ -261,20 +273,19 @@ if ($pdo) {
         $col_stmt->execute();
         $existing_columns = $col_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        // Define search patterns matching possible emission column names
+        // Define search patterns matching possible emission column names[cite: 8]
         $category_patterns = [
             'transportation'   => ['transport', 'commute', 'travel', 'vehicle'],
             'office_resource'  => ['office', 'elec', 'energy', 'resource', 'power', 'utility'],
             'food_consumption' => ['food', 'meal', 'diet', 'consumption', 'eat']
         ];
 
-        // 2. Identify relevant emission columns dynamically for each category
+        // 2. Identify relevant emission columns dynamically for each category[cite: 8]
         $dynamic_selects = [];
         
         foreach ($category_patterns as $category_key => $patterns) {
             $matching_cols = [];
             foreach ($existing_columns as $col) {
-                // Ignore metadata and explicit item description columns
                 if (in_array($col, ['id', 'user_id', 'created_at', 'record_date', 'total_emission', 'transport_item', 'office_item', 'food_item'])) {
                     continue;
                 }
@@ -286,7 +297,6 @@ if ($pdo) {
                 }
             }
 
-            // Build SQL expression to parse and sum valid numbers from string values
             if (!empty($matching_cols)) {
                 $col_expressions = array_map(function($col) {
                     return "CAST(NULLIF(REGEXP_REPLACE(COALESCE(\"{$col}\"::text, '0'), '[^0-9.]', '', 'g'), '') AS NUMERIC)";
@@ -299,7 +309,7 @@ if ($pdo) {
             }
         }
 
-        // 3. Execute dynamically assembled summation query
+        // 3. Execute dynamically assembled summation query[cite: 8]
         $dynamic_sql = "SELECT " . implode(', ', $dynamic_selects) . " FROM carbon_records WHERE user_id = :user_id";
         $breakdown_stmt = $pdo->prepare($dynamic_sql);
         $breakdown_stmt->execute([':user_id' => $user_id]);
@@ -311,7 +321,7 @@ if ($pdo) {
             $categories_data['food_consumption']['current_week'] = floatval($totals['food_consumption_sum'] ?? 0);
         }
 
-        // 4. Dynamically fetch latest activity description text without hardcoded expectations
+        // 4. Dynamically fetch latest activity description text without hardcoded expectations[cite: 8]
         $activity_fields = [
             'transportation'   => ['transport_item', 'transportation_item', 'travel_item', 'commute_type'],
             'office_resource'  => ['office_item', 'electricity_item', 'resource_item', 'appliance'],
@@ -340,7 +350,7 @@ if ($pdo) {
     }
 }
 
-// 8. FETCH RECENT ACTIVITY TIMELINE STRICTLY BY user_id[cite: 2]
+// 8. FETCH RECENT ACTIVITY TIMELINE STRICTLY BY user_id[cite: 8]
 $timeline_records = [];
 if ($pdo) {
     try {
@@ -357,7 +367,7 @@ if ($pdo) {
     }
 }
 
-// Avatar URL retrieval using profile_picture[cite: 2]
+// Avatar URL retrieval using profile_picture[cite: 8]
 $avatar_url = $_SESSION['user_profile']['user_metadata']['profile_picture'] ?? ($user_metadata['profile_picture'] ?? null); 
 
 $initials = '';

@@ -34,22 +34,8 @@ if (isset($user_data['role']) && strtolower($user_data['role']) !== 'authenticat
 $full_name = !empty($raw_name) ? ucwords(strtolower(trim($raw_name))) : 'Unknown User'; 
 $role      = (!empty($raw_role) && strtolower($raw_role) !== 'authenticated') ? ucwords(strtolower(trim($raw_role))) : '';
 
-// Profile Picture & Initial Fallbacks
+// Profile Picture Initial Fallback from session metadata
 $avatar_url = $user_metadata['avatar_url'] ?? null; 
-
-$initials = '';
-if (empty($avatar_url)) {
-    $clean_name = preg_replace('/^(dr\.|mr\.|ms\.|prof\.)\s+/i', '', trim($full_name));
-    $words = explode(' ', $clean_name);
-    if (count($words) >= 2) {
-        $initials = strtoupper(substr($words[0], 0, 1) . substr($words[count($words) - 1], 0, 1));
-    } elseif (count($words) == 1 && !empty($words[0])) {
-        $initials = strtoupper(substr($words[0], 0, 2));
-    }
-    if (empty($initials)) { 
-        $initials = 'UU'; 
-    }
-}
 
 // --- NEON POSTGRESQL DATABASE CONNECTION ---
 $host        = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
@@ -77,11 +63,40 @@ try {
     }
 }
 
+// FETCH AVATAR FROM THE users TABLE (profile_picture column)
+if (!empty($user_id) && isset($pdo)) {
+    try {
+        $avatarStmt = $pdo->prepare("SELECT profile_picture FROM users WHERE id = :user_id LIMIT 1");
+        $avatarStmt->execute([':user_id' => $user_id]);
+        $db_avatar = $avatarStmt->fetchColumn();
+        if (!empty($db_avatar)) {
+            $avatar_url = $db_avatar;
+        }
+    } catch (\PDOException $e) {
+        // Fallback silently to $avatar_url from session metadata on query error
+    }
+}
+
+// Initials generation if avatar_url is missing
+$initials = '';
+if (empty($avatar_url)) {
+    $clean_name = preg_replace('/^(dr\.|mr\.|ms\.|prof\.)\s+/i', '', trim($full_name));
+    $words = explode(' ', $clean_name);
+    if (count($words) >= 2) {
+        $initials = strtoupper(substr($words[0], 0, 1) . substr($words[count($words) - 1], 0, 1));
+    } elseif (count($words) == 1 && !empty($words[0])) {
+        $initials = strtoupper(substr($words[0], 0, 2));
+    }
+    if (empty($initials)) { 
+        $initials = 'UU'; 
+    }
+}
+
 // Fetch existing daily transportation submissions for today
 $today_date = date('Y-m-d');
 $today_transport_count = 0;
 
-if (!empty($user_id)) {
+if (!empty($user_id) && isset($pdo)) {
     try {
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM carbon_records WHERE user_id = :user_id AND record_date = :record_date AND transportation > 0");
         $countStmt->execute([':user_id' => $user_id, ':record_date' => $today_date]);
@@ -287,7 +302,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .content-container { padding: 25px 40px; display: flex; flex-direction: column; gap: 20px; }
         
-        /* Fixed z-index rules for input cards & form elements */
         .input-card { 
             background: var(--bg-card); 
             padding: 25px; 
@@ -339,7 +353,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .map-section-wrapper { width: 100%; display: block; clear: both; margin-top: 15px; position: relative; z-index: 1; }
         
-        /* Restrict Leaflet container z-index to stay below inputs */
         .leaflet-container { z-index: 1 !important; }
         #map { height: 350px; width: 100%; border-radius: 8px; border: 1px solid var(--border-color); z-index: 1; display: block; }
         .leaflet-routing-container { display: none !important; }
@@ -748,7 +761,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 titleEl.innerText = "Trip 1: Transport Calculator (Home to BSU Campus)";
                 campusLabelEl.innerText = "BSU Campus (Destination)";
                 campusSelect.disabled = false;
-                campusSelect.removeAttribute('disabled');
                 
                 startLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Starting Point (Home)';
                 endLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Destination Campus';
@@ -756,74 +768,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 document.getElementById('startLabel').innerText = "Click Map to Pin Home";
                 document.getElementById('endLabel').innerText = selectedCampusName || "Select Campus Dropdown";
             } else if (transportAttemptCount === 2) {
-                titleEl.innerText = "Trip 2: Transport Calculator (BSU Campus to New Destination)";
-                campusLabelEl.innerText = "BSU Campus (Starting Point - Fixed)";
-                campusSelect.disabled = true; 
+                titleEl.innerText = "Trip 2: Transport Calculator (BSU Campus to Home)";
+                campusLabelEl.innerText = "BSU Campus (Starting Point)";
+                
+                campusSelect.disabled = false; 
+                campusSelect.value = ""; 
 
                 startLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Starting Point (BSU Campus)';
-                endLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> New Destination (Pin on Map)';
-                mapInstEl.innerHTML = '<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 2 Setup:</strong> Starting point is automatically locked to your selected BSU Campus. Click your new destination on the map.';
+                endLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Destination (Pin Home on Map)';
+                mapInstEl.innerHTML = '<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 2 Setup:</strong> Select your starting BSU Campus from the dropdown, then click your Home location on the map.';
                 
-                document.getElementById('startLabel').innerText = selectedCampusName ? selectedCampusName : "BSU Campus";
-                document.getElementById('endLabel').innerText = "Click Map to Pin Destination";
+                document.getElementById('startLabel').innerText = "Select Campus Dropdown";
+                document.getElementById('endLabel').innerText = "Click Map to Pin Home";
 
                 if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
                 if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
                 mapMarkers = [];
-
-                if (selectedCampusCoords) {
-                    let bsuMarker = L.marker(selectedCampusCoords, {
-                        icon: L.icon({
-                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                            shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                            iconSize: [25, 41],
-                            iconAnchor: [12, 41],
-                            popupAnchor: [1, -34],
-                            shadowSize: [41, 41]
-                        })
-                    }).addTo(map);
-                    bsuMarker.bindPopup(`<b>Starting Point: ${selectedCampusName}</b>`).openPopup();
-                    mapMarkers[0] = bsuMarker;
-                    map.setView(selectedCampusCoords, 13);
-                }
+                selectedCampusCoords = null;
+                selectedCampusName = "";
             }
         }
 
         function handleCampusSelection() {
             const selectEl = document.getElementById('campusSelect');
-            if (!selectEl || !selectEl.value || transportAttemptCount !== 1) return;
+            if (!selectEl || !selectEl.value) return;
 
             const parts = selectEl.value.split(',');
             selectedCampusCoords = [parseFloat(parts[0]), parseFloat(parts[1])];
             selectedCampusName = selectEl.options[selectEl.selectedIndex].text;
 
-            if (mapMarkers[1]) {
-                map.removeLayer(mapMarkers[1]);
-            }
+            document.getElementById('transportDistance').value = '';
+
             if (routingControl) {
                 map.removeControl(routingControl);
                 routingControl = null;
             }
 
-            document.getElementById('transportDistance').value = '';
+            if (transportAttemptCount === 1) {
+                if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
 
-            let campusMarker = L.marker(selectedCampusCoords, {
-                icon: L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
-                })
-            }).addTo(map);
+                let campusMarker = L.marker(selectedCampusCoords, {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    })
+                }).addTo(map);
 
-            campusMarker.bindPopup(`<b>Destination Campus: ${selectedCampusName}</b>`).openPopup();
-            mapMarkers[1] = campusMarker; 
-            
-            document.getElementById('endLabel').innerText = selectedCampusName;
+                campusMarker.bindPopup(`<b>Destination Campus: ${selectedCampusName}</b>`).openPopup();
+                mapMarkers[1] = campusMarker; 
+                document.getElementById('endLabel').innerText = selectedCampusName;
+
+            } else if (transportAttemptCount === 2) {
+                if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
+
+                let campusMarker = L.marker(selectedCampusCoords, {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    })
+                }).addTo(map);
+
+                campusMarker.bindPopup(`<b>Starting Point: ${selectedCampusName}</b>`).openPopup();
+                mapMarkers[0] = campusMarker; 
+                document.getElementById('startLabel').innerText = selectedCampusName;
+            }
+
             map.setView(selectedCampusCoords, 13);
-
             calculateRouteIfPossible();
         }
 
@@ -865,9 +883,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         shadowSize: [41, 41]
                     })
                 }).addTo(map);
-                destMarker.bindPopup("<b>Pinned Destination</b>").openPopup();
+                destMarker.bindPopup("<b>Destination (Home)</b>").openPopup();
                 mapMarkers[1] = destMarker;
-                document.getElementById('endLabel').innerText = `New Destination (${latLngText})`;
+                document.getElementById('endLabel').innerText = `Home (${latLngText})`;
             }
 
             calculateRouteIfPossible();

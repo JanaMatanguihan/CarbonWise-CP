@@ -20,23 +20,6 @@ $raw_role = $_SESSION['user_role'] ?? ($user_data['role'] ?? '');
 $full_name = !empty($raw_name) ? ucwords(strtolower(trim($raw_name))) : 'Unknown User'; 
 $role      = (!empty($raw_role) && strtolower($raw_role) !== 'authenticated') ? ucwords(strtolower(trim($raw_role))) : 'User';
 
-// Dynamic Profile Picture Logic
-$avatar_url = $user_data['avatar_url'] ?? null; 
-
-$initials = '';
-if (empty($avatar_url)) {
-    $clean_name = preg_replace('/^(dr\.|mr\.|ms\.|prof\.)\s+/i', '', trim($full_name));
-    $words = explode(' ', $clean_name);
-    if (count($words) >= 2) {
-        $initials = strtoupper(substr($words[0], 0, 1) . substr($words[count($words) - 1], 0, 1));
-    } elseif (count($words) == 1 && !empty($words[0])) {
-        $initials = strtoupper(substr($words[0], 0, 2));
-    }
-    if (empty($initials)) { 
-        $initials = 'UU'; 
-    }
-}
-
 // --- NEON POSTGRESQL CONFIGURATION ---
 $db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
 $endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
@@ -60,15 +43,38 @@ try {
 // User department and campus context
 $user_department = $_SESSION['user_department'] ?? ($user_data['department'] ?? 'Unassigned');
 $user_campus     = $_SESSION['user_campus'] ?? ($user_data['campus'] ?? 'Unassigned');
+$avatar_url      = $user_data['avatar_url'] ?? ($user_data['profile_picture'] ?? null);
 
-// Fetch user profile info if missing
-if (($user_department === 'Unassigned' || $user_campus === 'Unassigned') && $user_id) {
-    $stmt_u = $pdo->prepare("SELECT department, campus FROM users WHERE id = :id LIMIT 1");
-    $stmt_u->execute([':id' => $user_id]);
-    $u_info = $stmt_u->fetch();
-    if ($u_info) {
-        $user_department = !empty($u_info['department']) ? $u_info['department'] : $user_department;
-        $user_campus     = !empty($u_info['campus']) ? $u_info['campus'] : $user_campus;
+// Fetch user profile info and profile_picture from database if needed/missing
+if ($user_id) {
+    try {
+        $stmt_u = $pdo->prepare("SELECT department, campus, profile_picture FROM users WHERE id = :id LIMIT 1");
+        $stmt_u->execute([':id' => $user_id]);
+        $u_info = $stmt_u->fetch();
+        if ($u_info) {
+            $user_department = !empty($u_info['department']) ? $u_info['department'] : $user_department;
+            $user_campus     = !empty($u_info['campus']) ? $u_info['campus'] : $user_campus;
+            if (!empty($u_info['profile_picture'])) {
+                $avatar_url = $u_info['profile_picture'];
+            }
+        }
+    } catch (PDOException $e) {
+        // Query error handling fallback
+    }
+}
+
+// Generate initials fallback if profile picture is empty
+$initials = '';
+if (empty($avatar_url)) {
+    $clean_name = preg_replace('/^(dr\.|mr\.|ms\.|prof\.)\s+/i', '', trim($full_name));
+    $words = explode(' ', $clean_name);
+    if (count($words) >= 2) {
+        $initials = strtoupper(substr($words[0], 0, 1) . substr($words[count($words) - 1], 0, 1));
+    } elseif (count($words) == 1 && !empty($words[0])) {
+        $initials = strtoupper(substr($words[0], 0, 2));
+    }
+    if (empty($initials)) { 
+        $initials = 'UU'; 
     }
 }
 

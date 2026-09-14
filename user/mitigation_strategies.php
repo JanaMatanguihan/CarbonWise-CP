@@ -22,8 +22,39 @@ $raw_role = $_SESSION['user_role'] ?? ((isset($user_data['role']) && strtolower(
 $full_name = !empty($raw_name) ? ucwords(strtolower(trim($raw_name))) : 'Unknown User'; 
 $role      = (!empty($raw_role) && strtolower($raw_role) !== 'authenticated') ? ucwords(strtolower(trim($raw_role))) : 'User';
 
-// Dynamic Profile Picture Initialization
-$avatar_url = $user_data['avatar_url'] ?? ($user_metadata['avatar_url'] ?? null); 
+// --- NEON POSTGRESQL CONFIGURATION ---
+$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
+$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
+$db_port     = '5432';
+$db_name     = 'neondb';
+$db_user     = 'neondb_owner'; 
+$db_pass     = 'npg_B7h4oEQbqJdG'; 
+
+$avatar_url = $user_data['avatar_url'] ?? ($user_metadata['avatar_url'] ?? null);
+
+// Connect to Neon Database and fetch profile_picture from the users table
+try {
+    $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require;options='endpoint={$endpoint_id}'";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false
+    ];
+    $pdo = new PDO($dsn, $db_user, $db_pass, $options);
+
+    if ($user_id) {
+        $stmt_u = $pdo->prepare("SELECT profile_picture FROM users WHERE id = :id LIMIT 1");
+        $stmt_u->execute([':id' => $user_id]);
+        $u_info = $stmt_u->fetch();
+        if ($u_info && !empty($u_info['profile_picture'])) {
+            $avatar_url = $u_info['profile_picture'];
+        }
+    }
+} catch (PDOException $e) {
+    // Database Connection Error Fallback
+}
+
+// Generate initials fallback if profile picture is empty
 $initials = '';
 if (empty($avatar_url)) {
     $clean_name = preg_replace('/^(dr\.|mr\.|ms\.|prof\.)\s+/i', '', trim($full_name));
@@ -38,7 +69,7 @@ if (empty($avatar_url)) {
     }
 }
 
-// --- STATIC/SESSION EMISSIONS DATA (DATABASE CONNECTION REMOVED) ---
+// --- STATIC/SESSION EMISSIONS DATA ---
 $total_transport = 0.0;
 $total_electricity = 0.0;
 $total_food = 0.0;
@@ -159,7 +190,7 @@ if (!$api_success) {
         }
     } else {
         $ai_insight_summary = "Welcome to CarbonWise! We couldn't find any historical activity records in your logs for the last 60 days. Start logging your daily activities to receive personalized carbon reduction pathways.";
-        $strategies = []; // Kept empty so no table row is generated when emissions are 0
+        $strategies = [];
     }
 }
 ?>
