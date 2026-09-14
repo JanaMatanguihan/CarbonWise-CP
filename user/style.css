@@ -172,3 +172,140 @@ body {
 }
 .alert-danger { background-color: #FED7D7; color: #C53030; }
 .alert-success { background-color: #C6F6D5; color: #22543D; }
+
+/* ==========================================================================
+   CarbonWise Floating AI Assistant View Components (Integrated Styles)
+   ========================================================================== */
+.chatbot-launcher { 
+    position: fixed; 
+    bottom: 30px; 
+    right: 30px; 
+    width: 60px; 
+    height: 60px; 
+    background-color: #359F6E; /* Matched your design's green */
+    color: white; 
+    border-radius: 50%; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 24px; 
+    cursor: pointer; 
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); 
+    z-index: 2000; 
+    transition: transform 0.2s ease, background-color 0.2s ease; 
+}
+
+.chatbot-launcher:hover { 
+    transform: scale(1.08); 
+    background-color: #2A8458; 
+}
+
+.chatbot-window { 
+    position: fixed; 
+    bottom: 105px; 
+    right: 30px; 
+    width: 360px; 
+    height: 480px; 
+    background: white; 
+    border: 1px solid #E0E2E2; 
+    border-radius: 24px 24px 0px 24px; /* Matches your auth-card corner aesthetics */
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12); 
+    display: flex; 
+    flex-direction: column; 
+    z-index: 2000; 
+    overflow: hidden; 
+    transform: translateY(20px); 
+    opacity: 0; 
+    pointer-events: none; 
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+}
+
+.chatbot-window.open { 
+    transform: translateY(0); 
+    opacity: 1; 
+    pointer-events: auto; 
+}
+
+.chatbot-header { 
+    background: #1E4D3A; /* Using your dark green for visual depth */
+    color: white; 
+    padding: 15px 20px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    font-weight: 600; 
+    font-size: 0.95rem; 
+}
+
+.chatbot-body { 
+    flex: 1; 
+    padding: 15px; 
+    overflow-y: auto; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    background: #F4F6F5; 
+}
+
+.chat-msg { 
+    max-width: 80%; 
+    padding: 10px 14px; 
+    border-radius: 14px; 
+    font-size: 0.85rem; 
+    line-height: 1.4; 
+    word-wrap: break-word; 
+}
+
+.chat-msg.user { 
+    background: #359F6E; 
+    color: white; 
+    align-self: flex-end; 
+    border-bottom-right-radius: 2px; 
+}
+
+.chat-msg.assistant { 
+    background: white; 
+    color: #2A3430; 
+    align-self: flex-start; 
+    border-bottom-left-radius: 2px; 
+    border: 1px solid #E0E2E2; 
+}
+
+.chatbot-footer { 
+    padding: 12px; 
+    background: white; 
+    border-top: 1px solid #E0E2E2; 
+    display: flex; 
+    gap: 8px; 
+}
+
+.chatbot-footer input { 
+    flex: 1; 
+    padding: 10px 14px; 
+    border: 1px solid #E0E2E2; 
+    background: #EAECEB; 
+    color: #333; 
+    border-radius: 8px; 
+    outline: none; 
+    font-size: 0.88rem; 
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.chatbot-footer input:focus {
+    background-color: white;
+    border-color: #359F6E;
+}
+
+.chatbot-footer button { 
+    background: #359F6E; 
+    color: white; 
+    border: none; 
+    padding: 0 16px; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    transition: background-color 0.2s; 
+}
+
+.chatbot-footer button:hover { 
+    background-color: #2A8458; 
+}

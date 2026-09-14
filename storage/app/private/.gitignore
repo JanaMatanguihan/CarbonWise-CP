@@ -1,2 +1,5 @@
 *
 !.gitignore
+user/widgets/secrets.dart
+user/mitigation_strategies.php
+user/get_bot_response.php
