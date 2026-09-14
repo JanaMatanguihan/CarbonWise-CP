@@ -3,115 +3,52 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\MitigationStrategy;
+use App\Models\MitigationAction;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\Auth;
 
 class MitigationStrategyController extends Controller
 {
-
     public function index(Request $request)
     {
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Strategy Filter Tabs
-        |--------------------------------------------------------------------------
-        */
-
-
-        $strategies = MitigationStrategy::query();
-
+        $strategies = MitigationAction::with('user');
 
         if ($request->status) {
-
-
-            $strategies->where(
-
-                'status',
-
-                $request->status
-
-            );
-
-
+            $strategies->where('status', $request->status);
         }
 
-
-
         $strategies = $strategies
-
             ->latest()
-
             ->get();
 
-
-
         return view(
-
             'admin.mitigation-strategies',
-
-            compact(
-
-                'strategies'
-
-            )
-
+            compact('strategies')
         );
-
-
     }
-
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Store New Strategy
-    |--------------------------------------------------------------------------
-    */
-
 
     public function store(Request $request)
     {
-
-
-        MitigationStrategy::create([
-
-
-            'title' => $request->title,
-
-
-            'description' => $request->description,
-
-
-            'category' => $request->category,
-
-
-            'target_areas' => $request->target_areas,
-
-
-            'participants' => $request->participants,
-
-
-            'progress' => $request->progress,
-
-
-            'carbon_reduced' => $request->carbon_reduced,
-
-
-            'status' => $request->status,
-
-
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'carbon_reduced' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'in:pending,in_progress,completed'],
+            'completed_at' => ['nullable', 'date'],
         ]);
 
+        MitigationAction::create([
+            'user_id' => Auth::id(),
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'carbon_reduced' => $validated['carbon_reduced'],
+            'status' => $validated['status'],
+            'completed_at' => $validated['completed_at'] ?? null,
+        ]);
 
-
-        return back();
-
-
+        return back()->with(
+            'success',
+            'Mitigation action added successfully.'
+        );
     }
-
 }

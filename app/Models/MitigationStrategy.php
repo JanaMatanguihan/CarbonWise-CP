@@ -6,31 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class MitigationStrategy extends Model
 {
-
-    protected $table = 'mitigation_strategies';
-
+    protected $table = 'mitigation_actions';
 
     protected $fillable = [
-
+        'user_id',
         'title',
-
         'description',
-
-        'category',
-
-        'target_areas',
-
-        'participants',
-
         'carbon_reduced',
-
-        'progress',
-
         'status',
-
         'completed_at',
+    ];
 
-        'g_suite',
-
+    protected $casts = [
+        'carbon_reduced' => 'decimal:2',
+        'completed_at' => 'date',
     ];
 }

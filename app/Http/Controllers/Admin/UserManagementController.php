@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\CarbonRecord;
-use App\Models\MitigationStrategy;
+use App\Models\MitigationAction;
 use App\Services\AlertService;
 use App\Services\GreenPointService;
 use App\Services\StreakService;
@@ -101,7 +101,7 @@ class UserManagementController extends Controller
             : 0;
 
         // Completed mitigation actions
-        $mitigationActions = MitigationStrategy::where('user_id', $user->id)
+        $mitigationActions = MitigationAction::where('user_id', $user->id)
             ->where('status', 'completed')
             ->count();
 
