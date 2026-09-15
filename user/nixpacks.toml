@@ -1,0 +1,5 @@
+[providers]
+providers = ['php']
+
+[apt]
+aptPkgs = ['php-pgsql', 'php-pdo-pgsql']
