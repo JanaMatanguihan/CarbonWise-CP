@@ -8,12 +8,15 @@ class ForecastService
 {
     public function getHistoricalData()
     {
-        $records = CarbonRecord::select(
-                'record_date',
-                'total_emission'
-            )
-            ->orderBy('record_date')
-            ->get();
+        
+        $records = CarbonRecord::select('record_date')
+        ->selectRaw('SUM(total_emission) AS total_emission')
+        ->groupBy('record_date')
+        ->orderByDesc('record_date')
+        ->limit(30)
+        ->get()
+        ->sortBy('record_date')
+        ->values();
 
         return [
 
