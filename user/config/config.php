@@ -8,13 +8,14 @@ if (session_status() === PHP_SESSION_NONE) {
  * Returns a PDO database connection to the Neon PostgreSQL database
  */
 function getDBConnection() {
-    // Fill in your credentials from the Neon "Connect" modal
-    $host     = 'ep-sparkling-math-a50wbxv4.us-east-2.aws.neon.tech'; // Example from your console URL
-    $port     = '5432';
-    $dbname   = 'neondb';
-    $username = 'YOUR_NEON_USERNAME'; // From Neon Connect Modal
-    $password = 'YOUR_NEON_PASSWORD'; // From Neon Connect Modal
+    // Read parameters from environment variables (Railway), with fallbacks
+    $host     = getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
+    $port     = getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? '5432';
+    $dbname   = getenv('DB_NAME') ?: $_ENV['DB_DATABASE'] ?? 'neondb';
+    $username = getenv('DB_USER') ?: $_ENV['DB_USERNAME'] ?? 'neondb_owner';
+    $password = getenv('DB_PASS') ?: $_ENV['DB_PASSWORD'] ?? 'npg_B7h4oEQbqJdG';
 
+    // Construct DSN string with mandatory sslmode=require for Neon
     $dsn = "pgsql:host={$host};port={$port};dbname={$dbname};sslmode=require";
 
     try {

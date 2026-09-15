@@ -9,12 +9,24 @@ $success = '';
 // ==========================================
 // --- NEON POSTGRESQL CONFIGURATION ---
 // ==========================================
-$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
-$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
-$db_port     = '5432';
-$db_name     = 'neondb';
-$db_user     = 'neondb_owner'; 
-$db_pass     = 'npg_B7h4oEQbqJdG'; 
+$db_host     = getenv('DB_HOST') ?: 'localhost';
+$endpoint_id = getenv('ENDPOINT_ID') ?: '';
+$db_port     = getenv('DB_PORT') ?: '5432';
+$db_name     = getenv('DB_NAME') ?: 'neondb';
+$db_user     = getenv('DB_USER') ?: 'neondb_owner';
+$db_pass     = getenv('DB_PASS') ?: '';
+
+$dsn = "pgsql:host=$db_host;port=$db_port;dbname=$db_name;sslmode=require";
+
+try {
+    $pdo = new PDO($dsn, $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+} catch (PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role          = $_POST['role'] ?? ''; 
