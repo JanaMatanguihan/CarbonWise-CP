@@ -1,5 +1,5 @@
 [providers]
 providers = ['php']
 
-[apt]
-aptPkgs = ['php-pgsql', 'php-pdo-pgsql']
+[phases.setup]
+nixPkgs = ['...', 'php82Extensions.pdo_pgsql', 'php82Extensions.pgsql']
