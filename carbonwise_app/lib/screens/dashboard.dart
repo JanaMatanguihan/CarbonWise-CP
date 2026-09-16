@@ -80,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Requirement 2: Fetch rankings and user profile concurrently
       final results = await Future.wait([
         _apiService.getDepartmentRankings(month: month),
-        _apiService.getUserProfile(),
+        ApiService.getUserProfile(),
       ]);
 
       final rankingsData = results[0] as List<dynamic>;
@@ -199,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Requirement 2: Fetch campus rankings and user profile concurrently
       final results = await Future.wait([
         _apiService.getCampusRankings(month: month),
-        _apiService.getUserProfile(),
+        ApiService.getUserProfile(),
       ]);
 
       final rankingsData = results[0] as List<dynamic>;

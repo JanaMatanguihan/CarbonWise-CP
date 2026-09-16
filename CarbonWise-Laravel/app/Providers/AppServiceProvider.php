@@ -7,6 +7,10 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Schema\Grammars\PostgresGrammar;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,5 +39,21 @@ class AppServiceProvider extends ServiceProvider
 
             return $connection;
         });
+
+        // Customize the email verification link generation
+    VerifyEmail::createUrlUsing(function ($notifiable) {
+        $expireMinutes = config('auth.verification.expire', 60);
+
+        // This generates a secure signed URL pointing to your web route
+        return URL::temporarySignedRoute(
+            'verification.verify',
+            Carbon::now()->addMinutes($expireMinutes),
+            [
+                'id' => $notifiable->getKey(),
+                'hash' => sha1($notifiable->getEmailForVerification()),
+            ]
+        );
+    });
+    
     }
 }

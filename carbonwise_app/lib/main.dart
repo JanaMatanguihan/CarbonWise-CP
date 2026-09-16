@@ -175,12 +175,152 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _isSendingReset = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Forgot Password',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF265D3B),
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Enter your G-Suite email and we'll send you a reset link.",
+                style: TextStyle(fontSize: 13, color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(color: Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'example@g.batstate-u.edu.ph',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFFB0B0B0),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.email_outlined,
+                    color: Color(0xFF3AA76D),
+                  ),
+                  fillColor: const Color(0xFFF5F5F5),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3AA76D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Send Reset Link',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      if (!mounted) return;
+      DialogHelper.showError(
+        context: context,
+        title: "Missing Information",
+        message: "Please enter your email address.",
+      );
+      return;
+    }
+
+    if (!email.endsWith('@g.batstate-u.edu.ph')) {
+      if (!mounted) return;
+      DialogHelper.showError(
+        context: context,
+        title: "Invalid Email",
+        message: "Please enter a valid BatStateU G-Suite email.",
+      );
+      return;
+    }
+
+    setState(() => _isSendingReset = true);
+
+    try {
+      await ApiService.forgotPassword(email);
+
+      if (!mounted) return;
+
+      DialogHelper.showSuccess(
+        context: context,
+        title: "Email Sent",
+        message:
+            "A password reset link has been sent to $email.\n\n"
+            "Please check your inbox (and spam folder).",
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      String message = error.toString();
+      if (message.startsWith("Exception: ")) {
+        message = message.substring(11);
+      }
+
+      DialogHelper.showError(
+        context: context,
+        title: "Request Failed",
+        message: message,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingReset = false);
+        emailController.dispose();
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -373,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 6),
                             TextFormField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.black87),
                               decoration: InputDecoration(
                                 hintText: 'Enter Password',
@@ -391,6 +531,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                   horizontal: 16,
                                   vertical: 14,
                                 ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: const Color(0xFFB0B0B0),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                               ),
                             ),
                             const SizedBox(height: 30),
@@ -398,7 +551,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleLogin,
+                                onPressed: (_isLoading || _isSendingReset)
+                                    ? null
+                                    : _handleLogin,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF3AA76D),
                                   elevation: 0,
@@ -427,6 +582,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 30),
                             const Divider(color: Colors.white38, thickness: 1),
+                            const SizedBox(height: 20),
+
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: _handleForgotPassword,
+                                child: const Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 20),
                             Center(
                               child: GestureDetector(
@@ -477,9 +650,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ==========================================
 // 3. SIGN UP SCREEN
-// ==========================================
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -847,7 +1018,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       String message = error.toString();
 
-      // Remove "Exception:" from the beginning if present
       if (message.startsWith("Exception: ")) {
         message = message.substring(11);
       }
@@ -990,9 +1160,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                               const SizedBox(height: 25),
 
-                              // ==================================================
                               // STUDENT
-                              // ==================================================
                               if (selectedRole == "Student") ...[
                                 _buildInputField(
                                   label: "SR-Code",
@@ -1071,9 +1239,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                               ],
 
-                              // ==================================================
                               // FACULTY
-                              // ==================================================
                               if (selectedRole == "Faculty") ...[
                                 _buildInputField(
                                   label: "Name",
@@ -1154,9 +1320,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                               ],
 
-                              // ==================================================
                               // NON-TEACHING STAFF
-                              // ==================================================
                               if (selectedRole == "Non-Teaching Staff") ...[
                                 _buildInputField(
                                   label: "Name",
@@ -1213,9 +1377,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                               const SizedBox(height: 16),
 
-                              // ==================================================
                               // SIGN UP BUTTON
-                              // ==================================================
                               SizedBox(
                                 width: double.infinity,
                                 height: 48,
@@ -1249,9 +1411,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                               const SizedBox(height: 24),
 
-                              // ==================================================
                               // LOGIN LINK
-                              // ==================================================
                               Center(
                                 child: GestureDetector(
                                   onTap: () {

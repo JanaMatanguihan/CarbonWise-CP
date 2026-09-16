@@ -100,6 +100,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String? getFullImageUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+
+    final rootUri = Uri.parse(ApiService.baseUrl);
+    final origin = '${rootUri.scheme}://${rootUri.authority}';
+    return '$origin$path';
+  }
+
   Map<String, dynamic>? userInfo;
   bool isLoadingProfile = true;
 
@@ -344,7 +355,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      final response = await _apiService.getUserProfile();
+      final response = await ApiService.getUserProfile();
 
       setState(() {
         userInfo = response;
@@ -417,7 +428,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .toString();
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
-    final String? profilePicture = userInfo?['profile_picture'];
+    final String? rawProfilePic = userInfo?['profile_picture'];
+    final String? profilePicture = getFullImageUrl(rawProfilePic);
     final String role = userInfo?['role'] ?? '';
 
     return Padding(

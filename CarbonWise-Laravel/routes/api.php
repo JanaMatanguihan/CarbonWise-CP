@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ForecastController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -25,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink']);
 
     Route::get('/carbon-records', [CarbonRecordController::class, 'index']);
     Route::post('/carbon-records', [CarbonRecordController::class, 'store']);

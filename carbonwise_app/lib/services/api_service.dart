@@ -30,7 +30,6 @@ class ApiService {
   }
 
   // HEADERS
-
   static Map<String, String> get _headers {
     return {
       'Content-Type': 'application/json',
@@ -48,7 +47,6 @@ class ApiService {
   }
 
   // LOGIN
-
   static Future<Map<String, dynamic>> login(
     String email,
     String password,
@@ -64,6 +62,13 @@ class ApiService {
             body: jsonEncode({'email': email, 'password': password}),
           )
           .timeout(const Duration(seconds: 15));
+
+      // Debug information
+      print('LOGIN URL: $baseUrl/login');
+      print('LOGIN EMAIL: [$email]');
+      print('LOGIN PASSWORD LENGTH: ${password.length}');
+      print('LOGIN STATUS: ${response.statusCode}');
+      print('LOGIN RESPONSE: ${response.body}');
 
       final data = _decodeResponse(response);
 
@@ -94,7 +99,6 @@ class ApiService {
   }
 
   // REGISTER
-
   static Future<Map<String, dynamic>> register({
     required String email,
     required String password,
@@ -115,8 +119,6 @@ class ApiService {
         'Accept': 'application/json',
       },
       body: jsonEncode({
-        // IMPORTANT:
-        // Laravel expects "name", NOT "full_name"
         'name': fullName,
 
         'email': email,
@@ -164,8 +166,63 @@ class ApiService {
     );
   }
 
-  // GET: CARBON RECORDS
+  // FORGOT PASSWORD
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/forgot-password'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 15));
 
+      // Debug
+      print('FORGOT PASSWORD URL: $baseUrl/forgot-password');
+      print('FORGOT PASSWORD EMAIL: [$email]');
+      print('FORGOT PASSWORD STATUS: ${response.statusCode}');
+      print('FORGOT PASSWORD RESPONSE: ${response.body}');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return data;
+      }
+
+      // Laravel validation errors
+      if (response.statusCode == 422) {
+        final errors = data['errors'];
+
+        if (errors is Map && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            throw Exception(firstError.first.toString());
+          }
+        }
+
+        throw Exception(
+          data['message'] ?? 'Please enter a valid email address.',
+        );
+      }
+
+      throw Exception(data['message'] ?? 'Failed to send password reset link.');
+    } on SocketException {
+      throw Exception(
+        'Unable to connect to the server. '
+        'Make sure Laravel is running and your phone is connected '
+        'to the same Wi-Fi network.',
+      );
+    } on HttpException {
+      throw Exception('Could not communicate with the Laravel server.');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // GET: CARBON RECORDS
   Future<List<dynamic>> getCarbonRecords(String email) async {
     final response = await http
         .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
@@ -181,7 +238,6 @@ class ApiService {
   }
 
   // POST: CARBON RECORD
-
   Future<void> addCarbonRecord({
     required double transportation,
     required double electricity,
@@ -219,7 +275,6 @@ class ApiService {
   }
 
   // GET: ONE CARBON RECORD
-
   Future<List<dynamic>> getCarbonRecord(String email) async {
     final response = await http
         .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
@@ -235,7 +290,6 @@ class ApiService {
   }
 
   // PUT: UPDATE CARBON RECORD
-
   Future<void> updateCarbonRecord({
     required int id,
     required double transportation,
@@ -264,7 +318,6 @@ class ApiService {
   }
 
   // DELETE: CARBON RECORD
-
   Future<void> deleteCarbonRecord(int id) async {
     final response = await http
         .delete(Uri.parse('$baseUrl/carbon-records/$id'), headers: _headers)
@@ -278,7 +331,6 @@ class ApiService {
   }
 
   // GET: USER INFO
-
   Future<Map<String, dynamic>> getUserInfo([String? email]) async {
     try {
       final response = await http
@@ -303,7 +355,6 @@ class ApiService {
   }
 
   // GET: USER CAMPUS
-
   Future<String?> getUserCampus(String email) async {
     final data = await getUserInfo(email);
 
@@ -489,10 +540,7 @@ class ApiService {
         await http
             .post(Uri.parse('$baseUrl/logout'), headers: _headers)
             .timeout(const Duration(seconds: 10));
-      } catch (_) {
-        // Even if the server request fails,
-        // clear the local token.
-      }
+      } catch (_) {}
     }
 
     clearToken();
@@ -568,7 +616,7 @@ class ApiService {
   }
 
   // GET USER PROFILE
-  Future<Map<String, dynamic>> getUserProfile() async {
+  static Future<Map<String, dynamic>> getUserProfile() async {
     final response = await http
         .get(Uri.parse('$baseUrl/profile'), headers: _headers)
         .timeout(const Duration(seconds: 15));
@@ -719,18 +767,23 @@ class ApiService {
   // GET: TFT 30-DAY FORECAST
   Future<Map<String, dynamic>> getTft30DayForecast() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/forecast/tft-30-days'), headers: _headers)
-          .timeout(const Duration(seconds: 120));
+      final response = await http.get(
+        Uri.parse('$baseUrl/forecast/tft-30-days'),
+        headers: _headers,
+      );
 
-      final data = _decodeResponse(response);
+      print('TFT STATUS: ${response.statusCode}');
+      print('TFT RESPONSE: ${response.body}');
 
       if (response.statusCode == 200) {
-        return data;
+        return jsonDecode(response.body);
+      } else {
+        throw Exception(
+          'Forecast API ${response.statusCode}: ${response.body}',
+        );
       }
-
-      throw Exception(data['message'] ?? 'Failed to load TFT forecast data.');
     } catch (e) {
+      print('TFT API ERROR: $e');
       throw Exception('Error connecting to forecasting service: $e');
     }
   }
