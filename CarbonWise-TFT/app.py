@@ -84,15 +84,17 @@ def forecast(request: ForecastRequest):
     ].max()
 
 
-    # KEEP TRAINING DATA
+    # KEEP TRAINING DATA FOR HISTORY
 
     training_history = training_df[
         training_df["time_idx"] <= training_cutoff
     ].copy()
 
-    training_history = training_history.sort_values(
-        "record_date"
-    ).reset_index(drop=True)
+    training_history = (
+        training_history
+        .sort_values("record_date")
+        .reset_index(drop=True)
+    )
 
 
     # CONVERT REQUEST RECORDS
@@ -125,19 +127,6 @@ def forecast(request: ForecastRequest):
     )
 
 
-    # REMOVE TRAINING RECORDS THAT HAVE THE SAME DATES
-
-    request_dates = set(
-        request_df["record_date"]
-    )
-
-    training_history = training_history[
-        ~training_history["record_date"].isin(
-            request_dates
-        )
-    ].copy()
-
-
     # COMBINE TRAINING HISTORY AND REQUEST DATA
 
     history_df = pd.concat(
@@ -148,9 +137,18 @@ def forecast(request: ForecastRequest):
         ignore_index=True
     )
 
-    history_df = history_df.sort_values(
-        "record_date"
-    ).reset_index(drop=True)
+    # Remove duplicate dates.
+    # The latest CarbonWise database/request value is kept.
+
+    history_df = (
+        history_df
+        .sort_values("record_date")
+        .drop_duplicates(
+            subset=["record_date"],
+            keep="last"
+        )
+        .reset_index(drop=True)
+    )
 
 
     # GET ORIGINAL DATASET START DATE
@@ -309,10 +307,68 @@ def forecast(request: ForecastRequest):
     )
 
 
+    # CREATE A FRESH TRAINING DATASET
+
+    training_source = training_df[
+        training_df["dataset"] == "TRAIN"
+    ].copy()
+
+    training_source = (
+        training_source
+        .sort_values("time_idx")
+        .reset_index(drop=True)
+    )
+
+    training_source["series"] = (
+        "carbon_emissions"
+    )
+
+
+    # MAKE SURE NUMERIC FEATURES ARE NUMERIC
+
+    numeric_columns = [
+        "time_idx",
+        "total_emission",
+        "transportation",
+        "electricity",
+        "food",
+        "day_of_week",
+        "month",
+        "day_of_month",
+        "is_weekend",
+        "emission_lag_1",
+        "emission_lag_7",
+        "emission_lag_14",
+        "emission_rolling_7",
+        "emission_rolling_30"
+    ]
+
+
+    for column in numeric_columns:
+
+        if column in training_source.columns:
+
+            training_source[column] = pd.to_numeric(
+                training_source[column],
+                errors="coerce"
+            )
+
+
+    # REMOVE INVALID TRAINING ROWS
+
+    training_source = (
+        training_source
+        .dropna(
+            subset=numeric_columns
+        )
+        .reset_index(drop=True)
+    )
+
+
     # CREATE TFT TRAINING DATASET
 
     training = TimeSeriesDataSet(
-        training_history,
+        training_source,
 
         time_idx="time_idx",
 
@@ -475,9 +531,11 @@ def forecast(request: ForecastRequest):
         ignore_index=True
     )
 
-    combined_df = combined_df.sort_values(
-        "record_date"
-    ).reset_index(drop=True)
+    combined_df = (
+        combined_df
+        .sort_values("record_date")
+        .reset_index(drop=True)
+    )
 
 
     # RECALCULATE LAG FEATURES
@@ -546,17 +604,70 @@ def forecast(request: ForecastRequest):
     ].bfill()
 
 
+    # KEEP ONLY THE FINAL 90 DAYS OF HISTORY
+    # PLUS THE 30 FUTURE DAYS.
+
+    prediction_start_date = (
+        last_date
+        - pd.Timedelta(
+            days=MAX_ENCODER_LENGTH - 1
+        )
+    )
+
+    prediction_df = combined_df[
+        combined_df["record_date"]
+        >= prediction_start_date
+    ].copy()
+
+    prediction_df = (
+        prediction_df
+        .sort_values("record_date")
+        .reset_index(drop=True)
+    )
+
+
+    # VERIFY PREDICTION WINDOW
+
+    expected_rows = (
+        MAX_ENCODER_LENGTH
+        + MAX_PREDICTION_LENGTH
+    )
+
+    if len(prediction_df) < expected_rows:
+
+        return {
+            "error": (
+                "Not enough records for "
+                "the TFT prediction window."
+            ),
+            "required_rows": expected_rows,
+            "available_rows": len(prediction_df)
+        }
+
+
     # CREATE PREDICTION DATASET
 
     prediction_dataset = (
         TimeSeriesDataSet.from_dataset(
             training,
-            combined_df,
+            prediction_df,
             predict=True,
             stop_randomization=True,
-            allow_missing_timesteps=False
+            allow_missing_timesteps=True
         )
     )
+
+
+    # CHECK THAT A PREDICTION SAMPLE EXISTS
+
+    if len(prediction_dataset) == 0:
+
+        return {
+            "error": (
+                "TFT could not create a "
+                "valid prediction window."
+            )
+        }
 
 
     # CREATE DATALOADER
