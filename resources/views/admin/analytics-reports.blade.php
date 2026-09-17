@@ -3,603 +3,708 @@
 @section('page-title', 'Analytics and Report')
 @section('page-subtitle', 'Generate reports and gain insights')
 
-
 @section('content')
 
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
-<div class="bg-[#f1f1ee] min-h-screen p-8 -mx-6 -mt-6 space-y-6">
+    .analytics-page {
+        font-family: 'Poppins', sans-serif;
+        color: #111111;
+    }
 
+    .analytics-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.10);
+    }
 
+    /* Section titles */
 
+    .analytics-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 16px;
+        line-height: 23px;
+        font-weight: 700;
+        color: #111111;
+    }
 
+    /* Section descriptions */
 
-    <!-- Summary Report -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    .analytics-description {
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 15px;
+        font-weight: 400;
+        color: #9ca3af;
+    }
 
+    /* Summary card labels */
 
+    .analytics-label {
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 16px;
+        font-weight: 400;
+        color: #6b7280;
+    }
 
-        <h3 class="font-bold text-lg">
+    /* Summary card values */
 
+    .analytics-value {
+        font-family: 'Poppins', sans-serif;
+        font-size: 20px;
+        line-height: 28px;
+        font-weight: 700;
+        color: #111111;
+    }
+
+    /* Units */
+
+    .analytics-unit {
+        font-family: 'Poppins', sans-serif;
+        font-size: 9px;
+        line-height: 13px;
+        font-weight: 500;
+        color: #333333;
+    }
+
+    /* Emission source names */
+
+    .analytics-source-name {
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 16px;
+        font-weight: 400;
+        color: #111111;
+    }
+
+    /* Percentages */
+
+    .analytics-percentage {
+        font-family: 'Poppins', sans-serif;
+        font-size: 9px;
+        line-height: 13px;
+        font-weight: 400;
+        color: #6b7280;
+    }
+
+    /* Icons */
+
+    .analytics-icon {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .analytics-icon img {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+    }
+
+    .analytics-icon-green {
+        background: #3f8f68;
+    }
+
+    .analytics-icon-gray {
+        background: #4d8f70;
+    }
+
+    .analytics-icon-light {
+        background: #478d6b;
+    }
+
+    .analytics-icon-dark {
+        background: #2f7d57;
+    }
+
+    .analytics-icon-green img,
+    .analytics-icon-gray img,
+    .analytics-icon-light img,
+    .analytics-icon-dark img {
+        filter: brightness(0) invert(1);
+    }
+
+    /* Progress bars */
+
+    .analytics-progress {
+        height: 9px;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .analytics-progress-bar {
+        height: 100%;
+        background: #2f7d57;
+        border-radius: 999px;
+        transition: width 0.3s ease;
+    }
+
+    /* Chart */
+
+    #comparisonChart {
+        width: 100%;
+    }
+
+    .apexcharts-text,
+    .apexcharts-xaxis-label,
+    .apexcharts-yaxis-label,
+    .apexcharts-legend-text {
+        font-family: 'Poppins', sans-serif !important;
+    }
+</style>
+
+<div class="analytics-page bg-[#f4f5f4] min-h-screen p-6 -mx-6 -mt-6 space-y-5">
+
+    {{-- Summary Report --}}
+
+    <div class="analytics-card p-6">
+
+        <h3 class="analytics-title">
             Summary Report
-
         </h3>
 
-
-
-        <p class="text-gray-400 text-sm mb-8">
-
+        <p class="analytics-description mt-1 mb-7">
             Overview of overall emissions and user engagement
-
         </p>
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 items-center">
 
+            {{-- Total Users --}}
 
+            <div class="flex items-center gap-3">
 
-
-
-        <div class="grid grid-cols-5 gap-8 items-center">
-
-
-
-
-
-
-            <!-- Total Users -->
-            <div class="flex items-center gap-4">
-
-
-                <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                <div class="analytics-icon analytics-icon-green">
 
                     <img
                         src="{{ asset('icons/user.png') }}"
-                        class="w-8 h-8"
+                        alt="Total Users"
                     >
 
                 </div>
 
-
-
                 <div>
 
-                    <p class="text-xs text-gray-500">
+                    <p class="analytics-label">
                         Total Users
                     </p>
 
-
-                    <h2 class="font-bold text-xl">
-
+                    <h2 class="analytics-value">
                         {{ number_format($totalUsers) }}
-
                     </h2>
 
-
                 </div>
-
-
 
             </div>
 
 
+            {{-- Total Emissions --}}
 
+            <div class="flex items-center gap-3">
 
-
-
-
-
-
-            <!-- Total Emissions -->
-            <div class="flex items-center gap-4">
-
-
-                <div class="w-16 h-16 rounded-full bg-cyan-100 flex items-center justify-center">
-
+                <div class="analytics-icon analytics-icon-light">
 
                     <img
                         src="{{ asset('icons/emissions.png') }}"
-                        class="w-8 h-8"
+                        alt="Total Emissions"
                     >
 
-
                 </div>
-
-
-
 
                 <div>
 
-
-                    <p class="text-xs text-gray-500">
-
+                    <p class="analytics-label">
                         Total Emissions
-
                     </p>
 
+                    <h2 class="analytics-value">
 
+                        {{ number_format($totalEmissions, 2) }}
 
-                    <h2 class="font-bold text-xl">
-
-
-                        {{ number_format($totalEmissions,2) }}
-
-
-                        <span class="text-xs">
-
+                        <span class="analytics-unit">
                             kg CO₂e
-
                         </span>
-
 
                     </h2>
 
-
                 </div>
-
-
 
             </div>
 
 
+            {{-- Average Emission --}}
 
+            <div class="flex items-center gap-3">
 
-
-
-
-
-
-
-            <!-- Average -->
-            <div class="flex items-center gap-4">
-
-
-
-                <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center">
-
+                <div class="analytics-icon analytics-icon-gray">
 
                     <img
                         src="{{ asset('icons/analytics.png') }}"
-                        class="w-8 h-8"
+                        alt="Average Emission"
                     >
 
-
                 </div>
-
-
-
-
 
                 <div>
 
-
-                    <p class="text-xs text-gray-500">
-
+                    <p class="analytics-label">
                         Avg Emission per User
-
                     </p>
 
-
-
-                    <h2 class="font-bold text-xl">
-
-                        {{ number_format($averageEmission,2) }}
-
+                    <h2 class="analytics-value">
+                        {{ number_format($averageEmission, 2) }}
                     </h2>
 
-
-
                 </div>
-
-
 
             </div>
 
 
+            {{-- Active Users --}}
 
+            <div class="flex items-center gap-3">
 
-
-
-
-
-
-
-            <!-- Active Users -->
-            <div class="flex items-center gap-4">
-
-
-                <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-
+                <div class="analytics-icon analytics-icon-green">
 
                     <img
                         src="{{ asset('icons/user.png') }}"
-                        class="w-8 h-8"
+                        alt="Active Users"
                     >
 
-
                 </div>
-
-
-
-
 
                 <div>
 
-
-                    <p class="text-xs text-gray-500">
-
+                    <p class="analytics-label">
                         Active Users
-
                     </p>
 
-
-                    <h2 class="font-bold text-xl">
-
+                    <h2 class="analytics-value">
                         {{ number_format($activeUsers) }}
-
                     </h2>
 
-
                 </div>
-
-
-
 
             </div>
 
 
+            {{-- Mitigation Actions --}}
 
+            <div class="flex items-center gap-3">
 
-
-
-
-
-
-            <!-- Mitigation -->
-            <div class="flex items-center gap-4">
-
-
-                <div class="w-16 h-16 rounded-full bg-green-700 flex items-center justify-center">
-
+                <div class="analytics-icon analytics-icon-dark">
 
                     <img
                         src="{{ asset('icons/mitigation.png') }}"
-                        class="w-8 h-8"
+                        alt="Mitigation Actions"
                     >
 
-
                 </div>
-
-
-
-
 
                 <div>
 
-
-                    <p class="text-xs text-gray-500">
-
+                    <p class="analytics-label">
                         Mitigation Actions
-
                     </p>
 
-
-                    <h2 class="font-bold text-xl">
-
+                    <h2 class="analytics-value">
                         {{ number_format($mitigationActions) }}
-
                     </h2>
-
-
 
                 </div>
 
-
-
             </div>
 
-
-
-
         </div>
-
-
-
 
     </div>
 
 
+    {{-- Top Emitting Sources --}}
 
+    <div class="analytics-card p-6">
 
-
-
-
-
-
-
-
-
-    <!-- Top Emitting Sources -->
-    <div class="bg-white rounded-xl shadow-sm border p-8">
-
-
-
-        <h3 class="font-bold mb-8">
-
+        <h3 class="analytics-title mb-7">
             Top Emitting Sources
-
         </h3>
 
-
-
-
-
-
-        <div class="space-y-6">
-
-
-
-
+        <div class="space-y-5">
 
             @foreach($sources as $name => $value)
 
+                @php
+                    $percentage = $highestSource > 0
+                        ? ($value / $highestSource) * 100
+                        : 0;
+                @endphp
 
+                <div class="grid grid-cols-[170px_1fr_55px] gap-4 items-center">
 
+                    <span class="analytics-source-name">
+                        {{ $name }}
+                    </span>
 
-            @php
+                    <div class="analytics-progress">
 
+                        <div
+                            class="analytics-progress-bar"
+                            data-width="{{ $percentage }}"
+                        ></div>
 
-            $percentage =
-            $highestSource > 0
-            ? ($value / $highestSource) * 100
-            : 0;
+                    </div>
 
-
-            @endphp
-
-
-
-
-
-
-            <div class="grid grid-cols-[220px_1fr_70px] items-center">
-
-
-
-                <span class="text-sm">
-
-                    {{ $name }}
-
-                </span>
-
-
-
-
-
-
-                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
-
-
-                    <div
-
-                        class="bg-green-700 h-full rounded-full"
-
-                        @style([
-
-                            "width: {$percentage}%"
-
-                        ])
-
-                    ></div>
-
+                    <span class="analytics-percentage text-right">
+                        {{ number_format($percentage, 1) }}%
+                    </span>
 
                 </div>
 
-
-
-
-
-
-                <span class="text-xs text-gray-500 text-right">
-
-
-                    {{ number_format($percentage,1) }}%
-
-
-                </span>
-
-
-
-
-            </div>
-
-
-
-
-
             @endforeach
-
-
-
 
         </div>
 
-
-
-
-
     </div>
 
 
+    {{-- Emissions Comparison --}}
 
+    <div class="analytics-card p-6">
 
-
-
-
-
-
-
-
-
-    <!-- Chart -->
-    <div class="bg-white rounded-xl shadow-sm border p-8">
-
-
-
-        <h3 class="font-bold mb-5">
-
+        <h3 class="analytics-title mb-5">
             Emissions Comparison
-
         </h3>
 
-
-
-        <div id="comparisonChart"></div>
-
-
-
+        <div
+            id="comparisonChart"
+            style="height: 350px;"
+        ></div>
 
     </div>
-
-
-
-
 
 </div>
 
 
-
-
-
-
-
+<script
+    type="application/json"
+    id="comparisonData"
+>{!! json_encode($comparisonData) !!}</script>
 
 
 @push('scripts')
 
 <script>
 
+    // Set progress bar widths
 
-const comparisonData = JSON.parse('@json($comparisonData)');
+    document
+        .querySelectorAll('.analytics-progress-bar')
+        .forEach(function (bar) {
 
+            bar.style.width = bar.dataset.width + '%';
 
+        });
 
-new ApexCharts(
 
+    // Get comparison data
 
-document.querySelector("#comparisonChart"),
+    const comparisonDataElement =
+        document.getElementById('comparisonData');
 
 
-{
+    let comparisonData = {
+        current: [],
+        last: []
+    };
 
 
-chart:{
+    if (comparisonDataElement) {
 
+        try {
 
-type:'bar',
+            comparisonData =
+                JSON.parse(
+                    comparisonDataElement.textContent
+                );
 
-height:350,
+        } catch (error) {
 
-toolbar:false
+            console.error(
+                'Unable to read comparison data.',
+                error
+            );
 
+        }
 
-},
+    }
 
 
+    // Create emissions comparison chart
 
+    const comparisonChartElement =
+        document.querySelector('#comparisonChart');
 
-series:[
 
+    if (comparisonChartElement) {
 
-{
+        const comparisonChart =
+            new ApexCharts(
 
-name:'This Month',
+                comparisonChartElement,
 
-data:comparisonData.current
+                {
 
-},
+                    chart: {
 
+                        type: 'bar',
 
-{
+                        height: 350,
 
-name:'Last Month',
+                        toolbar: {
+                            show: false
+                        },
 
-data:comparisonData.last
+                        fontFamily:
+                            'Poppins, sans-serif'
 
-}
+                    },
 
 
-],
+                    series: [
 
+                        {
 
+                            name: 'This Month',
 
+                            data:
+                                comparisonData.current || []
 
+                        },
 
+                        {
 
-xaxis:{
+                            name: 'Last Month',
 
+                            data:
+                                comparisonData.last || []
 
-categories:[
+                        }
 
-'Transportation',
+                    ],
 
-'Electricity',
 
-'Food Consumption',
+                    // Keep the original chart colors
 
-'Others'
+                    colors: [
+                        '#2F7D57',
+                        '#D1D5DB'
+                    ],
 
-]
 
+                    plotOptions: {
 
-},
+                        bar: {
 
+                            horizontal: false,
 
+                            borderRadius: 4,
 
+                            columnWidth: '45%'
 
+                        }
 
+                    },
 
-colors:[
 
-'#4f8b3a',
+                    dataLabels: {
 
-'#9ca3af'
+                        enabled: true,
 
-],
+                        style: {
 
+                            fontFamily:
+                                'Poppins, sans-serif',
 
+                            fontSize: '10px',
 
+                            fontWeight: 600
 
+                        },
 
+                        formatter: function (value) {
 
-plotOptions:{
+                            return Number(value).toFixed(2);
 
+                        }
 
-bar:{
+                    },
 
 
-borderRadius:4,
+                    xaxis: {
 
-columnWidth:'45%'
+                        categories: [
 
+                            'Transportation',
 
-}
+                            'Electricity',
 
+                            'Food Consumption',
 
-}
+                            'Others'
 
+                        ],
 
+                        labels: {
 
-}
+                            style: {
 
+                                fontFamily:
+                                    'Poppins, sans-serif',
 
+                                fontSize: '10px',
 
-).render();
+                                colors: '#6b7280'
 
+                            }
+
+                        },
+
+                        axisBorder: {
+
+                            show: false
+
+                        },
+
+                        axisTicks: {
+
+                            show: false
+
+                        }
+
+                    },
+
+
+                    yaxis: {
+
+                        labels: {
+
+                            style: {
+
+                                fontFamily:
+                                    'Poppins, sans-serif',
+
+                                fontSize: '10px',
+
+                                colors: '#9ca3af'
+
+                            },
+
+                            formatter: function (value) {
+
+                                return Number(value).toFixed(2);
+
+                            }
+
+                        }
+
+                    },
+
+
+                    grid: {
+
+                        borderColor: '#e5e7eb',
+
+                        strokeDashArray: 3
+
+                    },
+
+
+                    legend: {
+
+                        position: 'top',
+
+                        horizontalAlign: 'right',
+
+                        fontFamily:
+                            'Poppins, sans-serif',
+
+                        fontSize: '10px',
+
+                        labels: {
+
+                            colors: '#111111'
+
+                        },
+
+                        markers: {
+
+                            width: 8,
+
+                            height: 8,
+
+                            radius: 8
+
+                        }
+
+                    },
+
+
+                    tooltip: {
+
+                        y: {
+
+                            formatter: function (value) {
+
+                                return Number(value).toFixed(2);
+
+                            }
+
+                        }
+
+                    },
+
+
+                    responsive: [
+
+                        {
+
+                            breakpoint: 768,
+
+                            options: {
+
+                                plotOptions: {
+
+                                    bar: {
+
+                                        columnWidth: '55%'
+
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    ]
+
+                }
+
+            );
+
+
+        comparisonChart.render();
+
+    }
 
 </script>
 
-
 @endpush
-
-
-
 
 @endsection

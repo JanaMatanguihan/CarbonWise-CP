@@ -20,6 +20,10 @@ class CarbonRecord extends Model
         'total_emission',
     ];
 
+    protected $casts = [
+        'record_date' => 'date',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
