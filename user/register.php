@@ -9,24 +9,12 @@ $success = '';
 // ==========================================
 // --- NEON POSTGRESQL CONFIGURATION ---
 // ==========================================
-$db_host     = getenv('DB_HOST') ?: 'localhost';
-$endpoint_id = getenv('ENDPOINT_ID') ?: '';
-$db_port     = getenv('DB_PORT') ?: '5432';
-$db_name     = getenv('DB_NAME') ?: 'neondb';
-$db_user     = getenv('DB_USER') ?: 'neondb_owner';
-$db_pass     = getenv('DB_PASS') ?: '';
-
-$dsn = "pgsql:host=$db_host;port=$db_port;dbname=$db_name;sslmode=require";
-
-try {
-    $pdo = new PDO($dsn, $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-} catch (PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
-}
-
+$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
+$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
+$db_port     = '5432';
+$db_name     = 'neondb';
+$db_user     = 'neondb_owner'; 
+$db_pass     = 'npg_B7h4oEQbqJdG'; 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role          = $_POST['role'] ?? ''; 
@@ -36,17 +24,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $campus        = $_POST['campus'] ?? '';
     $terms         = $_POST['terms'] ?? '';
     
-    // Dynamic Role-dependent assignments based on screenshots
+    // Dynamic Role-dependent assignments
     $sr_code       = ($role === 'student') ? trim($_POST['sr_code'] ?? '') : null;
     $year_level    = ($role === 'student') ? ($_POST['year_level'] ?? null) : null;
-    $department    = ($role === 'student') ? ($_POST['department'] ?? null) : null;
     $faculty_type  = ($role === 'faculty') ? ($_POST['faculty_type'] ?? null) : null;
     $office        = ($role === 'staff') ? ($_POST['office'] ?? null) : null;
 
+    // Handle Department: both Students & Teaching Faculty submit a department
     if ($role === 'student') {
-        $email = $sr_code ? $sr_code . "@g.batstate-u.edu.ph" : '';
+        $department = $_POST['department'] ?? null;
+        $email      = $sr_code ? $sr_code . "@g.batstate-u.edu.ph" : '';
+    } elseif ($role === 'faculty') {
+        $department = ($faculty_type === 'Teaching Faculty') ? ($_POST['department'] ?? null) : null;
+        $email      = trim($_POST['email'] ?? '');
     } else {
-        $email = trim($_POST['email'] ?? '');
+        $department = null;
+        $email      = trim($_POST['email'] ?? '');
     }
 
     // --- GUARD CHECK: Validation rules ---
@@ -54,6 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please choose a role.";
     } elseif ($role === 'student' && empty($year_level)) {
         $error = "Please select your year level.";
+    } elseif ($role === 'faculty' && $faculty_type === 'Teaching Faculty' && empty($department)) {
+        $error = "Please select your department college.";
     } elseif ($password !== $confirm_pwd) {
         $error = "Passwords do not match. Please verify your entries.";
     } elseif (strlen($password) < 6) {
@@ -273,6 +268,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="5th Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '5th Year') ? 'selected' : '' ?>>5th Year</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- Shared Department Field Container -->
+                <div id="departmentContainer" style="display: none;">
                     <div class="form-group">
                         <label>Department</label>
                         <select name="department" id="departmentField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
@@ -427,6 +426,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         const roleSelector = document.getElementById('roleSelector');
         const studentSrContainer = document.getElementById('studentSrContainer');
         const studentBottomContainer = document.getElementById('studentBottomContainer');
+        const departmentContainer = document.getElementById('departmentContainer');
         const facultyContainer = document.getElementById('facultyContainer');
         const staffContainer = document.getElementById('staffContainer');
 
@@ -439,7 +439,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         const facultyTypeField = document.getElementById('facultyTypeField');
         const officeField = document.getElementById('officeField');
 
-        // Helper to dynamic email value update from SR-Code input
         function updateStudentEmail() {
             if (roleSelector.value === 'student') {
                 const srValue = srCodeField.value.trim();
@@ -447,7 +446,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        function toggleDepartmentVisibility() {
+            const role = roleSelector.value;
+            const facultyType = facultyTypeField.value;
+
+            if (role === 'student' || (role === 'faculty' && facultyType === 'Teaching Faculty')) {
+                departmentContainer.style.display = 'block';
+                departmentField.setAttribute('required', 'required');
+            } else {
+                departmentContainer.style.display = 'none';
+                departmentField.removeAttribute('required');
+                departmentField.value = '';
+            }
+        }
+
         srCodeField.addEventListener('input', updateStudentEmail);
+        facultyTypeField.addEventListener('change', toggleDepartmentVisibility);
 
         function updateFormUI() {
             const role = roleSelector.value;
@@ -460,7 +474,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             srCodeField.removeAttribute('required');
             yearLevelField.removeAttribute('required');
-            departmentField.removeAttribute('required');
             facultyTypeField.removeAttribute('required');
             officeField.removeAttribute('required');
 
@@ -476,7 +489,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 srCodeField.setAttribute('required', 'required');
                 yearLevelField.setAttribute('required', 'required');
-                departmentField.setAttribute('required', 'required');
             } else if (role === 'faculty') {
                 facultyContainer.style.display = 'block';
 
@@ -500,6 +512,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 officeField.setAttribute('required', 'required');
             }
+
+            toggleDepartmentVisibility();
         }
 
         roleSelector.addEventListener('change', updateFormUI);

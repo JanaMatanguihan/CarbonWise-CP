@@ -134,6 +134,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .toggle-password-btn:hover {
             color: #098a38;
         }
+        .forgot-password-link {
+            font-size: 0.85rem;
+            color: #098a38;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .forgot-password-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -157,8 +166,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label>Password</label>
-                    <div class="password-wrapper">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin-bottom: 0;">Password</label>
+                        <a href="forgot_password.php" class="forgot-password-link">Forgot password?</a>
+                    </div>
+                    <div class="password-wrapper" style="margin-top: 6px;">
                         <input type="password" name="password" id="passwordInput" placeholder="Enter your password..." oninput="checkInputLength(this, 'togglePwdIcon')" required>
                         <i id="togglePwdIcon" class="fa-solid fa-eye-slash toggle-password-btn" onclick="toggleVisibility('passwordInput', this)"></i>
                     </div>
