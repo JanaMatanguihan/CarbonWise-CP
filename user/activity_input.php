@@ -615,15 +615,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="form-group">
                             <label for="foodType">Food Type</label>
                             <select id="foodType">
-                                <option value="" selected disabled>Select food type</option>
-                                <option value="2.5">Pork / Beef Meal (2.5 kg CO2e)</option>
-                                <option value="1.2">Chicken / Poultry (1.2 kg CO2e)</option>
-                                <option value="0.4">Vegetarian Meal (0.4 kg CO2e)</option>
+                                <option value="" selected disabled>Select Food Item</option>
+                                
+                                <optgroup label="1. High-Impact Proteins (Red Meats)">
+                                    <option value="60.0" data-unit="kg">Beef (Beef Herd) (60.0 kg CO2e/kg)</option>
+                                    <option value="24.5" data-unit="kg">Lamb & Mutton (24.5 kg CO2e/kg)</option>
+                                    <option value="21.1" data-unit="kg">Beef (Dairy Herd) (21.1 kg CO2e/kg)</option>
+                                </optgroup>
+
+                                <optgroup label="2. Moderate-Impact Proteins (Dairy & Poultry)">
+                                    <option value="21.0" data-unit="kg">Cheese (21.0 kg CO2e/kg)</option>
+                                    <option value="7.0" data-unit="kg">Pork (7.0 kg CO2e/kg)</option>
+                                    <option value="6.0" data-unit="kg">Poultry (Chicken / Turkey) (6.0 kg CO2e/kg)</option>
+                                    <option value="4.5" data-unit="kg">Eggs (4.5 kg CO2e/kg)</option>
+                                    <option value="5.0" data-unit="kg">Fish (Farmed) (5.0 kg CO2e/kg)</option>
+                                </optgroup>
+
+                                <optgroup label="3. Staples and Plant-Based Proteins">
+                                    <option value="4.4" data-unit="kg">Rice (Flooded) (4.4 kg CO2e/kg)</option>
+                                    <option value="3.0" data-unit="kg">Tofu (Soy-based) (3.0 kg CO2e/kg)</option>
+                                    <option value="2.5" data-unit="kg">Groundnuts / Peanuts (2.5 kg CO2e/kg)</option>
+                                    <option value="1.5" data-unit="kg">Pulses (Beans / Peas) (1.5 kg CO2e/kg)</option>
+                                </optgroup>
+
+                                <optgroup label="4. Grains, Vegetables, and Fruits">
+                                    <option value="1.4" data-unit="kg">Wheat & Rye (Bread) (1.4 kg CO2e/kg)</option>
+                                    <option value="1.0" data-unit="kg">Maize (Corn) (1.0 kg CO2e/kg)</option>
+                                    <option value="0.5" data-unit="kg">Potatoes (0.5 kg CO2e/kg)</option>
+                                    <option value="0.4" data-unit="kg">Apples / Bananas (0.4 kg CO2e/kg)</option>
+                                    <option value="0.4" data-unit="kg">Root Vegetables (0.4 kg CO2e/kg)</option>
+                                </optgroup>
+
+                                <optgroup label="5. Beverages and Discretionary Items">
+                                    <option value="22.0" data-unit="kg">Coffee (22.0 kg CO2e/kg)</option>
+                                    <option value="19.0" data-unit="kg">Dark Chocolate (19.0 kg CO2e/kg)</option>
+                                    <option value="3.2" data-unit="liter">Milk (Bovine) (3.2 kg CO2e/liter)</option>
+                                    <option value="1.0" data-unit="liter">Soy Milk (1.0 kg CO2e/liter)</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="foodServings">Portions Serving Count</label>
-                            <input type="number" id="foodServings" placeholder="Input total servings consumed">
+                            <label for="foodServings">Amount / Weight (Grams or Liters)</label>
+                            <input type="number" id="foodServings" placeholder="e.g., 150 (grams) or 1 (liter)" step="0.01">
                         </div>
                         <button type="button" class="btn-add" onclick="addFood()">Add Emission</button>
                     </div>
@@ -1043,7 +1076,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             let calculatedValue = (parseFloat(typeSel.value) * parseFloat(hoursInp.value) / 1000) * GHG_ELECTRICITY_FACTOR;
             totals.office += calculatedValue;
             document.getElementById('hiddenOffice').value = totals.office.toFixed(4);
-            createListItem('colOffice', 'office', calculatedValue, `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg`);
+            createListItem('colOffice', 'office', calculatedValue, `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg CO2e`);
             
             document.getElementById('officeItem').value = itemText;
 
@@ -1057,7 +1090,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const servingsInp = document.getElementById('foodServings');
             let activeTheme = localStorage.getItem('theme') || 'light';
 
-            if(!mealPeriodSel.value) {
+            if (!mealPeriodSel.value) {
                 Swal.fire({
                     title: 'Meal Period Needed',
                     text: 'Please choose whether this entry is for Breakfast, Lunch, Dinner, or a Snack.',
@@ -1069,10 +1102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 return;
             }
 
-            if(!typeSel.value || !servingsInp.value || parseFloat(servingsInp.value) <= 0) {
+            if (!typeSel.value || !servingsInp.value || parseFloat(servingsInp.value) <= 0) {
                 Swal.fire({
                     title: 'Missing Details',
-                    text: 'Please pick a food type and enter how many servings you had.',
+                    text: 'Please pick a food type and enter the quantity/weight consumed.',
                     icon: 'warning',
                     confirmButtonColor: '#52B788',
                     background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
@@ -1080,13 +1113,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 });
                 return;
             }
+
             let mealText = mealPeriodSel.value;
             let foodText = typeSel.options[typeSel.selectedIndex].text.split(' (')[0];
-            let calculatedValue = parseFloat(typeSel.value) * parseFloat(servingsInp.value);
+            let selectedOption = typeSel.options[typeSel.selectedIndex];
+            let unitType = selectedOption.getAttribute('data-unit'); // 'kg' or 'liter'
+            
+            let rawQuantity = parseFloat(servingsInp.value);
+            let emissionFactor = parseFloat(typeSel.value);
+            let consumedAmountInBaseUnit = 0;
+            let unitDisplay = "";
+
+            if (unitType === 'kg') {
+                consumedAmountInBaseUnit = rawQuantity > 10 ? (rawQuantity / 1000) : rawQuantity;
+                unitDisplay = `${rawQuantity > 10 ? rawQuantity + 'g' : consumedAmountInBaseUnit + 'kg'}`;
+            } else {
+                consumedAmountInBaseUnit = rawQuantity;
+                unitDisplay = `${rawQuantity}L`;
+            }
+
+            let calculatedValue = consumedAmountInBaseUnit * emissionFactor;
+
             totals.food += calculatedValue;
             document.getElementById('hiddenFood').value = totals.food.toFixed(4);
             
-            createListItem('colFood', 'food', calculatedValue, `[${mealText}] ${foodText}`, `${calculatedValue.toFixed(2)} kg`);
+            createListItem('colFood', 'food', calculatedValue, `[${mealText}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO2e`);
             
             document.getElementById('foodItem').value = foodText;
             document.getElementById('foodMealPeriod').value = mealText;
