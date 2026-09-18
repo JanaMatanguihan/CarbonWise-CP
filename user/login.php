@@ -20,12 +20,12 @@ if (isset($_SESSION['reg_success_message'])) {
 // ==========================================
 // --- NEON POSTGRESQL CONFIGURATION ---
 // ==========================================
-$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
-$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
-$db_port     = '5432';
-$db_name     = 'neondb';
-$db_user     = 'neondb_owner'; 
-$db_pass     = 'npg_B7h4oEQbqJdG'; 
+$db_host     = getenv('DB_HOST') ?: 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
+$endpoint_id = getenv('ENDPOINT_ID') ?: 'ep-red-hill-a5erg1sb-pooler'; 
+$db_port     = getenv('DB_PORT') ?: '5432';
+$db_name     = getenv('DB_NAME') ?: 'neondb';
+$db_user     = getenv('DB_USER') ?: 'neondb_owner'; 
+$db_pass     = getenv('DB_PASS') ?: 'npg_B7h4oEQbqJdG'; 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identifier    = trim($_POST['username_or_email'] ?? ''); 
@@ -95,7 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
         } catch (PDOException $e) {
-            $error = "Unable to connect right now. Please try again in a few moments.";
+            // EXPOSE RAW ERROR DETAILS FOR DEBUGGING
+            $error = "DB Connection Error: " . $e->getMessage();
         }
     }
 }
