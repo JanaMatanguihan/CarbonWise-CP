@@ -4,7 +4,14 @@ providers = ['php']
 [phases.setup]
 nixPkgs = [
     'php82',
-    'php82Extensions.pdo_pgsql',
-    'php82Extensions.pgsql',
+    'php82Packages.composer',
     'postgresql'
 ]
+
+[phases.build]
+cmds = [
+    'composer install --no-interaction --prefer-dist'
+]
+
+[nixPkgs]
+php82 = { extensions = ["pdo_pgsql", "pgsql"] }
