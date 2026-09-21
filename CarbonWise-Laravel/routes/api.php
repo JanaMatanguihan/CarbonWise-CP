@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ForecastController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\NotificationController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -40,6 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
     Route::put('/change-password', [PasswordController::class, 'update']);
     Route::post('/profile-picture', [ProfileController::class, 'uploadProfilePicture']);
+    Route::get('/notifications', [NotificationController::class, 'index']);
+Route::post('/notifications', [NotificationController::class, 'store']);
 
     Route::get('/campus-rankings', [DashboardController::class, 'campusRankings']);
     Route::get('/department-rankings', [DashboardController::class, 'departmentRankings']);

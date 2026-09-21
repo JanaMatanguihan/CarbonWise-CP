@@ -8,7 +8,6 @@ use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Schema\Grammars\PostgresGrammar;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Auth\Notifications\VerifyEmail;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
@@ -21,39 +20,38 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(DatabaseManager::class)->extend('pgsql', function ($config, $name) {
-            $connector = new NeonPostgresConnector();
+        // Register the custom pgsql connector LAZILY so config is loaded first.
+        $this->app->resolving(DatabaseManager::class, function (DatabaseManager $db) {
+            $db->extend('pgsql', function ($config, $name) {
+                $connector = new NeonPostgresConnector();
+                $pdo = $connector->connect($config);
 
-            $pdo = $connector->connect($config);
+                $connection = new PostgresConnection(
+                    $pdo,
+                    $config['database'],
+                    $config['prefix'] ?? '',
+                    $config
+                );
 
-            $connection = new PostgresConnection(
-                $pdo,
-                $config['database'],
-                $config['prefix'] ?? '',
-                $config
-            );
+                $connection->setSchemaGrammar(
+                    new PostgresGrammar($connection)
+                );
 
-            $connection->setSchemaGrammar(
-                new PostgresGrammar($connection)
-            );
-
-            return $connection;
+                return $connection;
+            });
         });
 
-        // Customize the email verification link generation
-    VerifyEmail::createUrlUsing(function ($notifiable) {
-        $expireMinutes = config('auth.verification.expire', 60);
+        VerifyEmail::createUrlUsing(function ($notifiable) {
+            $expireMinutes = config('auth.verification.expire', 60);
 
-        // This generates a secure signed URL pointing to your web route
-        return URL::temporarySignedRoute(
-            'verification.verify',
-            Carbon::now()->addMinutes($expireMinutes),
-            [
-                'id' => $notifiable->getKey(),
-                'hash' => sha1($notifiable->getEmailForVerification()),
-            ]
-        );
-    });
-    
+            return URL::temporarySignedRoute(
+                'verification.verify',
+                Carbon::now()->addMinutes($expireMinutes),
+                [
+                    'id' => $notifiable->getKey(),
+                    'hash' => sha1($notifiable->getEmailForVerification()),
+                ]
+            );
+        });
     }
 }
