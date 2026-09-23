@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class NewPasswordController extends Controller
 {
@@ -29,7 +30,7 @@ class NewPasswordController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): Response|RedirectResponse
     {
         $request->validate([
             'token' => ['required'],
