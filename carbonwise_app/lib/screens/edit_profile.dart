@@ -482,11 +482,6 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                     Icons.badge_outlined,
                   ),
                   readOnlyField(
-                    'G-Suite Email',
-                    widget.email,
-                    Icons.email_outlined,
-                  ),
-                  readOnlyField(
                     'Department',
                     widget.department,
                     Icons.school_outlined,

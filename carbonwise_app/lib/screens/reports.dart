@@ -118,12 +118,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadEmissionData();
-    _loadChartData(_timeframeOverTime);
-    _loadWeeklyComparison();
-    _loadCarbonReductionJourney();
+    _loadAllReportsData();
     strategyRefreshNotifier.addListener(_refreshReports);
-    _loadTftForecast();
+  }
+
+  Future<void> _loadAllReportsData() async {
+    await _loadEmissionData();
+    if (!mounted) return;
+
+    await _loadChartData(_timeframeOverTime);
+    if (!mounted) return;
+
+    await _loadWeeklyComparison();
+    if (!mounted) return;
+
+    await _loadCarbonReductionJourney();
+    if (!mounted) return;
+
+    await _loadTftForecast();
   }
 
   @override
@@ -145,7 +157,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return !d.isBefore(s) && !d.isAfter(e);
   }
 
-  Future<List<dynamic>> _records() => _apiService.getCarbonRecords('');
+  Future<List<dynamic>>? _recordsFuture;
+
+  Future<List<dynamic>> _records() {
+    _recordsFuture ??= _apiService.getCarbonRecords('');
+    return _recordsFuture!;
+  }
 
   Future<void> _loadTftForecast() async {
     try {
@@ -170,9 +187,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           item['record_date']?.toString() ?? '',
         );
 
-        final prediction = double.tryParse(
-          item['predicted_total_emission']?.toString() ?? '',
-        );
+        final prediction = double.tryParse(item['forecast']?.toString() ?? '');
 
         if (targetDate == null || prediction == null) continue;
 
@@ -182,7 +197,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       if (spots.length != 30) {
         throw Exception(
-          'Expected 30 forecast days, but received ${spots.length}.',
+          'No valid forecast entries were parsed from the API response.',
         );
       }
 
@@ -247,7 +262,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _loadChartData(ReportTimeframe timeframe) async {
     try {
+      print('>>> CHART: _loadChartData STARTED');
+
       final records = await _records();
+
+      print('>>> CHART: _records() FINISHED');
+      print('>>> CHART: RECORD COUNT = ${records.length}');
+
       final now = DateTime.now();
       late DateTime start;
       late DateTime end;
@@ -279,11 +300,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
           })
           .toList();
 
+      print('========== CHART DEBUG ==========');
+      print('TIMEFRAME: $timeframe');
+      print('TOTAL RECORDS: ${records.length}');
+      print('FILTERED RECORDS: ${filtered.length}');
+      print('START: $start');
+      print('END: $end');
+      print('=================================');
+
       filtered.sort(
         (a, b) => (a['record_date'].toString()).compareTo(
           b['record_date'].toString(),
         ),
       );
+
+      print('>>> CHART: SORT FINISHED');
 
       emissionOverTime = [];
       labels = [];
@@ -291,19 +322,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
       officeTotal = 0;
       foodTotal = 0;
 
+      print('>>> CHART: VARIABLES RESET');
+
       for (var i = 0; i < filtered.length; i++) {
         final row = filtered[i];
         final date = _recordDate(row['record_date'])!;
         emissionOverTime.add(
           FlSpot(i.toDouble(), _toDouble(row['total_emission'])),
         );
+
+        print('>>> CHART: PROCESSING RECORD $i');
+
         labels.add('${date.month}/${date.day}');
         transportTotal += _toDouble(row['transportation']);
         officeTotal += _toDouble(row['electricity']);
         foodTotal += _toDouble(row['food']);
       }
 
-      if (mounted) setState(() {});
+      print('>>> CHART: LOOP FINISHED');
+      print('>>> CHART: EMISSION POINTS = ${emissionOverTime.length}');
+      print('>>> CHART: LABELS = ${labels.length}');
+      print('>>> CHART: TRANSPORT = $transportTotal');
+      print('>>> CHART: OFFICE = $officeTotal');
+      print('>>> CHART: FOOD = $foodTotal');
+
+      if (mounted) {
+        print('>>> CHART: CALLING SETSTATE');
+        setState(() {});
+        print('>>> CHART: SETSTATE FINISHED');
+      }
     } catch (e) {
       print('Chart Data Error: $e');
     }

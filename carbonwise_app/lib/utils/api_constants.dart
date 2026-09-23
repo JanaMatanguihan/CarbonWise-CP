@@ -2,7 +2,7 @@ import 'secrets.dart';
 
 class ApiConstants {
   static const String baseUrl =
-      'https://carbonwise-cp-production.up.railway.app/api';
+      'https://carbonwise-cp-production.up.railway.app';
 
   // Base URL and API Key for Open Route Service
   static const String orsApiKey =

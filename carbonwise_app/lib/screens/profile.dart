@@ -130,6 +130,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _officeItem = "";
   String _foodItem = "";
 
+  int _profilePictureVersion = 0;
+
   IconData get currentIcon {
     switch (_selectedBreakdown) {
       case "Transportation":
@@ -213,10 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
-    _loadCarbonScore();
-    _loadRecentActivities();
-    _loadLast4Weeks();
+    _loadAllProfileData();
     profileRefreshNotifier.addListener(_refreshProfileData);
   }
 
@@ -230,6 +229,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       _loadUserInfo();
     }
+  }
+
+  Future<void> _loadAllProfileData() async {
+    await _loadUserInfo();
+    if (!mounted) return;
+
+    await _loadCarbonScore();
+    if (!mounted) return;
+
+    await _loadRecentActivities();
+    if (!mounted) return;
+
+    await _loadLast4Weeks();
   }
 
   Future<void> _loadRecentActivities() async {
@@ -349,39 +361,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final email = await ApiService.getCurrentUserEmail();
 
       if (email == null) {
-        setState(() {
-          isLoadingProfile = false;
-        });
+        if (mounted) {
+          setState(() {
+            userInfo = {};
+            isLoadingProfile = false;
+          });
+        }
         return;
       }
 
-      final response = await ApiService.getUserProfile();
+      final response = await _apiService.getUserInfo(email);
 
-      setState(() {
-        userInfo = response;
-        isLoadingProfile = false;
-      });
+      if (mounted) {
+        setState(() {
+          userInfo = response;
+          isLoadingProfile = false;
+        });
+      }
     } catch (e) {
       print("Profile Loading Error: $e");
-
-      setState(() {
-        isLoadingProfile = false;
-      });
+      if (mounted) {
+        setState(() {
+          userInfo = {
+            'name': 'Profile Unavailable',
+          }; // Prevents permanent "Loading..."
+          isLoadingProfile = false;
+        });
+      }
     }
   }
 
   Future<void> _loadLast4Weeks() async {
-    final email = await ApiService.getCurrentUserEmail();
+    try {
+      final email = await ApiService.getCurrentUserEmail();
 
-    if (email == null) return;
+      if (email == null) return;
 
-    final data = await _apiService.getLast4WeeksRecords(email);
+      final data = await _apiService.getLast4WeeksRecords(email);
 
-    setState(() {
-      last4Weeks = data.reversed
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    });
+      if (mounted) {
+        setState(() {
+          last4Weeks = data.reversed
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        });
+      }
+    } catch (e) {
+      print("Last 4 Weeks Error: $e");
+    }
   }
 
   static const Color primaryGreen = Color(0xFF3AA76D);
@@ -423,9 +450,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. Profile Header
   Widget _buildProfileHeader() {
-    final String fullName =
-        (userInfo?['name'] ?? userInfo?['full_name'] ?? 'Loading...')
-            .toString();
+    final String fullName = isLoadingProfile
+        ? 'Loading...'
+        : (userInfo?['name'] ?? userInfo?['full_name'] ?? 'User Profile')
+              .toString();
     final String department = userInfo?['department'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
     final String? rawProfilePic = userInfo?['profile_picture'];
@@ -494,8 +522,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.grey.shade100,
                       child: profilePicture != null && profilePicture.isNotEmpty
                           ? CachedNetworkImage(
-                              imageUrl:
-                                  '$profilePicture?t=${DateTime.now().millisecondsSinceEpoch}',
+                              imageUrl: _profilePictureVersion == 0
+                                  ? profilePicture
+                                  : '$profilePicture?v=$_profilePictureVersion',
                               width: 104,
                               height: 104,
                               fit: BoxFit.cover,
@@ -619,6 +648,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
 
                       if (updated == true) {
+                        setState(() {
+                          _profilePictureVersion++;
+                        });
                         await _loadUserInfo();
                         await _loadCarbonScore();
                         await _loadRecentActivities();
@@ -1178,16 +1210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icons.directions_bike_rounded,
                   hasEcoCommute(),
                   "Keep transportation emissions below 5 kg CO₂.",
-                ),
-
-                const SizedBox(width: 10),
-
-                _buildAchievementItem(
-                  "Green Streak",
-                  "You've logged emissions for 7 different days!",
-                  Icons.local_fire_department_rounded,
-                  hasGreenStreak(),
-                  "Log emissions for 7 different days.",
                 ),
 
                 const SizedBox(width: 10),

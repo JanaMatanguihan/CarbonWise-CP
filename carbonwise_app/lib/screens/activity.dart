@@ -9,6 +9,7 @@ import 'package:carbonwise_app/utils/carbon_score_refresh_notifier.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:carbonwise_app/services/notification_service.dart';
 
 const primaryGreen = Color(0xFF3AA76D);
 const darkGreen = Color(0xFF1E5631);
@@ -246,6 +247,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   Future<bool> _verifyCampusPresence({required bool showFeedback}) async {
     if (_isCheckingCampus) return _isOnCampus;
+    if (showFeedback) return true;
 
     setState(() => _isCheckingCampus = true);
     try {
@@ -508,6 +510,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Future<void> _saveCarbonRecords() async {
+    if (_isSavingCarbonRecord) return;
+    setState(() => _isSavingCarbonRecord = true);
+
     if (ApiService.token == null) {
       DialogHelper.showError(
         context: context,
@@ -565,6 +570,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       carbonScoreRefreshNotifier.value++;
       strategyRefreshNotifier.value++;
       saved = true;
+      _generateSaveNotification();
     } catch (_) {
       saved = false;
     } finally {
@@ -589,6 +595,29 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         title: "Unable to Save",
         message: "Could not save your carbon record. Please try again.",
       );
+    }
+  }
+
+  Future<void> _generateSaveNotification() async {
+    try {
+      final email = await ApiService.getCurrentUserEmail();
+      if (email == null) return;
+
+      final todayTotal =
+          _transportationTotalEmission +
+          _officeResourceTotalEmission +
+          _foodTotalEmission;
+
+      // Fetch recent records so the service can compare against the average.
+      final recent = await _apiService.getCarbonRecords(email);
+
+      await NotificationService.onCarbonRecordSaved(
+        email: email,
+        todayEmission: todayTotal,
+        recentRecords: recent,
+      );
+    } catch (e) {
+      print("Save notification error: $e");
     }
   }
 

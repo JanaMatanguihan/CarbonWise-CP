@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Verified - CarbonWise</title>
+    <title>Password Reset - CarbonWise</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -78,27 +78,29 @@
             </svg>
         </div>
 
-        <h1>Email Verified!</h1>
+        <h1>Password Reset</h1>
 
-        <p>{{ $message ?? 'Your email has been verified successfully.' }}</p>
+        <p>
+            Your CarbonWise password has been reset successfully.
+            You can now log in with your new password.
+        </p>
 
-        @isset($deepLink)
-            <a class="cta" href="{{ $deepLink }}" id="openApp">Open CarbonWise App</a>
-            <p class="hint">
-                If the app doesn't open automatically, tap the button above.<br>
-                You can also log in now on the CarbonWise mobile app.
-            </p>
-        @endisset
+        <a class="cta" href="carbonwise://open?source=password_reset_success">
+            Open CarbonWise App
+        </a>
+
+        <p class="hint">
+            If the app doesn't open automatically, tap the button above.<br>
+            You can also log in on the CarbonWise mobile app.
+        </p>
     </div>
 
-    @isset($deepLink)
     <script>
-        window.addEventListener('load', function () {
-            setTimeout(function () {
-                window.location.href = "{{ $deepLink }}";
-            }, 400);
-        });
+        // Auto-fire the deep link after a short delay so the user sees
+        // the success message before the app takes over.
+        setTimeout(function () {
+            window.location.href = "carbonwise://open?source=password_reset_success";
+        }, 900);
     </script>
-    @endisset
 </body>
 </html>

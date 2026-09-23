@@ -4,10 +4,71 @@ import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:carbonwise_app/widgets/terms_conditions_dialog.dart';
+import 'package:app_links/app_links.dart';
 
-void main() {
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // TEMP: deep links disabled for debugging
+  // final appLinks = AppLinks();
+  // try {
+  //   final initialUri = await appLinks.getInitialLink();
+  //   if (initialUri != null) _handleDeepLink(initialUri);
+  // } catch (e) { debugPrint('Initial link error: $e'); }
+  // appLinks.uriLinkStream.listen(
+  //   (uri) => _handleDeepLink(uri),
+  //   onError: (err) => debugPrint('Deep link error: $err'),
+  // );
+
   runApp(const CarbonWiseApp());
+}
+
+void _handleDeepLink(Uri uri) {
+  debugPrint('Deep link received: $uri');
+
+  if (uri.scheme != 'carbonwise') return;
+  if (uri.host != 'open') return;
+
+  final source = uri.queryParameters['source'] ?? '';
+
+  if (source == 'email_verify') {
+    final status = uri.queryParameters['status'] ?? 'unknown';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context == null) return;
+
+      if (status == 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email verified! You can now log in to CarbonWise.'),
+            backgroundColor: Color(0xFF3AA76D),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    });
+    return;
+  }
+
+  if (source == 'password_reset_success') {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context == null) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password reset! Please log in with your new password.',
+          ),
+          backgroundColor: Color(0xFF3AA76D),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    });
+    return;
+  }
 }
 
 class CarbonWiseApp extends StatelessWidget {
@@ -16,6 +77,7 @@ class CarbonWiseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'CarbonWise',
       theme: ThemeData(
@@ -61,10 +123,16 @@ class CarbonWiseApp extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/landing',
+
+      onUnknownRoute: (settings) {
+        debugPrint('Unknown route caught: ${settings.name}');
+        return MaterialPageRoute(builder: (_) => const LandingPageScreen());
+      },
+
       routes: {
         '/landing': (context) => const LandingPageScreen(),
         '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignUpScreen(),
         '/home': (context) => const CustomMainNavigation(),
       },
     );
@@ -131,12 +199,7 @@ class LandingPageScreen extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/login');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3AA76D),
@@ -341,6 +404,8 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final data = await ApiService.login(email, password);
 
+      print('TOKEN AFTER LOGIN: ${ApiService.token}');
+
       final user = data['user'];
 
       if (user['email_verified_at'] == null) {
@@ -356,22 +421,38 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      if (mounted) {
-        DialogHelper.showSuccess(
+      if (!mounted) return;
+
+      // Show Terms & Conditions first
+      final accepted = await showTermsDialog(context);
+      if (!mounted) return;
+
+      if (accepted != true) {
+        ApiService.clearToken();
+        DialogHelper.showError(
           context: context,
-          title: "Welcome!",
-          message: "Login successful. Welcome back to CarbonWise!",
-          onOk: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CustomMainNavigation(),
-              ),
-              (route) => false,
-            );
-          },
+          title: "Terms Not Accepted",
+          message: "You must accept the Terms & Conditions to use CarbonWise.",
         );
+        // Already on login screen, nothing more to do.
+        return;
       }
+
+      // User accepted — show welcome and proceed
+      DialogHelper.showSuccess(
+        context: context,
+        title: "Welcome!",
+        message: "Login successful. Welcome back to CarbonWise!",
+        onOk: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CustomMainNavigation(),
+            ),
+            (route) => false,
+          );
+        },
+      );
     } catch (error) {
       if (!mounted) return;
 
@@ -604,13 +685,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Center(
                               child: GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const SignUpScreen(),
-                                    ),
-                                  );
+                                  Navigator.pushNamed(context, '/signup');
                                 },
                                 child: RichText(
                                   textAlign: TextAlign.center,
@@ -673,7 +748,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? selectedYearLevel;
   String? selectedDepartment;
   String? selectedFacultyType;
-  String? selectedOffice;
   bool _isLoading = false;
 
   final roles = ["Student", "Faculty", "Non-Teaching Staff"];
@@ -820,7 +894,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         title: "Missing Information",
         message: "Please select your role.",
       );
-      return;
+
+      if (!agreedToTerms) {
+        DialogHelper.showError(
+          context: context,
+          title: "Terms Not Accepted",
+          message:
+              "Please read and agree to the Terms & Conditions before signing up.",
+        );
+        return;
+      }
     }
 
     // Validate text fields if the Form exists
@@ -897,18 +980,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           message: selectedFacultyType == "Teaching Faculty"
               ? "Please select your college."
               : "Please select your office.",
-        );
-        return;
-      }
-    }
-
-    // Non-teaching staff validation
-    if (selectedRole == "Non-Teaching Staff") {
-      if (selectedDepartment == null) {
-        DialogHelper.showError(
-          context: context,
-          title: "Missing Information",
-          message: "Please select your office.",
         );
         return;
       }
@@ -1125,16 +1196,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                               const SizedBox(height: 20),
 
-                              const Text(
-                                "Role",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-
-                              const SizedBox(height: 6),
-
                               _buildDropdownField(
                                 label: "Role",
                                 hint: "Select your role",
@@ -1148,6 +1209,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     selectedCampus = null;
                                     selectedDepartment = null;
                                     selectedYearLevel = null;
+                                    agreedToTerms = false;
 
                                     _srCodeController.clear();
                                     _nameController.clear();
@@ -1359,23 +1421,89 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     });
                                   },
                                 ),
-
-                                _buildDropdownField(
-                                  label: "Office",
-                                  hint: "Choose Office",
-                                  items: staffOffices,
-                                  value: selectedDepartment,
-                                  onChanged: (v) {
-                                    setState(() {
-                                      selectedDepartment = v;
-                                    });
-                                  },
-                                ),
                               ],
 
                               const SizedBox(height: 18),
 
                               const SizedBox(height: 16),
+
+                              if (selectedRole != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          value: agreedToTerms,
+                                          activeColor: const Color(0xFF3AA76D),
+                                          checkColor: Colors.white,
+                                          side: const BorderSide(
+                                            color: Colors.white70,
+                                            width: 1.5,
+                                          ),
+                                          onChanged: _isLoading
+                                              ? null
+                                              : (value) {
+                                                  setState(() {
+                                                    agreedToTerms =
+                                                        value ?? false;
+                                                  });
+                                                },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: _isLoading
+                                              ? null
+                                              : () async {
+                                                  final accepted =
+                                                      await showTermsDialog(
+                                                        context,
+                                                      );
+                                                  if (accepted == true &&
+                                                      mounted) {
+                                                    setState(
+                                                      () =>
+                                                          agreedToTerms = true,
+                                                    );
+                                                  }
+                                                },
+                                          child: RichText(
+                                            text: const TextSpan(
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                                height: 1.3,
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text:
+                                                      "I have read and agree to the ",
+                                                ),
+                                                TextSpan(
+                                                  text: "Terms & Conditions",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    decoration: TextDecoration
+                                                        .underline,
+                                                    decorationColor:
+                                                        Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
 
                               // SIGN UP BUTTON
                               SizedBox(
@@ -1415,7 +1543,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               Center(
                                 child: GestureDetector(
                                   onTap: () {
-                                    Navigator.pop(context);
+                                    Navigator.pushNamedAndRemoveUntil(
+                                      context,
+                                      '/login',
+                                      (route) => false,
+                                    );
                                   },
                                   child: RichText(
                                     textAlign: TextAlign.center,

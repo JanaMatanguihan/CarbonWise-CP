@@ -46,7 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _campusRank = "-";
   String _userCampus = "";
 
-  // Requirement 1: Default to 'weekly' on start
+  bool _isLoading = true;
+
   String _rankingPeriod = 'weekly';
 
   List<CampusRanking> _campusRankings = [];
@@ -54,16 +55,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _toDouble(dynamic value) =>
       double.tryParse(value?.toString() ?? '0') ?? 0.0;
 
+  String _getOrdinal(int number) {
+    if (number % 100 >= 11 && number % 100 <= 13) {
+      return "th";
+    }
+
+    switch (number % 10) {
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    // Requirement 2: Load concurrently for maximum speed
-    Future.wait([
-      _loadDepartmentRankings(),
-      _loadIndividualStatus(),
-      _loadCurrentRanking(),
-      _loadCampusRankings(),
-    ]);
+
+    _loadDashboardData();
   }
 
   @override
@@ -72,24 +85,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  Future<void> _loadDepartmentRankings() async {
+  Future<void> _loadDashboardData() async {
+    print('🚨 DASHBOARD DATA LOADING STARTED');
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Fetch profile ONCE and cache it
+      Map<String, dynamic> user = {};
+      try {
+        user = await ApiService.getUserProfile();
+      } catch (e) {
+        print('Dashboard: profile fetch failed: $e');
+      }
+
+      if (!mounted) return;
+
+      // 2. Now run the rest one at a time, reusing the fetched user
+      await _loadDepartmentRankings(user);
+      if (!mounted) return;
+
+      await _loadCampusRankings(user);
+      if (!mounted) return;
+
+      await _loadIndividualStatus();
+      if (!mounted) return;
+
+      await _loadCurrentRanking();
+    } catch (e) {
+      print('Dashboard Loading Error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_currentRanking == "Loading...") {
+            _currentRanking = "—";
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _loadDepartmentRankings(Map<String, dynamic> user) async {
     try {
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      // Requirement 2: Fetch rankings and user profile concurrently
-      final results = await Future.wait([
-        _apiService.getDepartmentRankings(month: month),
-        ApiService.getUserProfile(),
-      ]);
-
-      final rankingsData = results[0] as List<dynamic>;
-      final user = results[1] as Map<String, dynamic>;
+      // Only ONE API call now — no Future.wait
+      final rankingsData = await _apiService.getDepartmentRankings(
+        month: month,
+      );
 
       final rankings = rankingsData
           .map<DepartmentRanking>((item) {
             final map = Map<String, dynamic>.from(item as Map);
-
             return DepartmentRanking(
               department: map['department']?.toString() ?? '',
               totalEmission: _toDouble(map['total_emission']),
@@ -114,6 +162,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     } catch (e) {
       print('Department Ranking Error: $e');
+    }
+  }
+
+  Future<void> _loadCampusRankings(Map<String, dynamic> user) async {
+    try {
+      final now = DateTime.now();
+      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      // Only ONE API call
+      final rankingsData = await _apiService.getCampusRankings(month: month);
+
+      final rankings = rankingsData
+          .map<CampusRanking>((item) {
+            final map = Map<String, dynamic>.from(item as Map);
+            return CampusRanking(
+              campus: map['campus']?.toString() ?? '',
+              totalEmission: _toDouble(map['total_emission']),
+              totalRecords:
+                  int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
+            );
+          })
+          .where((r) => r.campus.isNotEmpty)
+          .toList();
+
+      rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
+
+      final myCampus = user['campus']?.toString() ?? '';
+      final index = rankings.indexWhere((r) => r.campus == myCampus);
+
+      if (!mounted) return;
+      setState(() {
+        _campusRankings = rankings;
+        _userCampus = myCampus;
+        _campusRank = index >= 0
+            ? '${index + 1}${_getOrdinal(index + 1)}'
+            : '-';
+      });
+    } catch (e) {
+      print('Campus Ranking Error: $e');
     }
   }
 
@@ -156,6 +243,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadIndividualStatus() async {
     try {
+      print('🚨 INDIVIDUAL STATUS: calling getCarbonRecords');
       final records = await _apiService.getCarbonRecords('');
       final now = DateTime.now();
 
@@ -188,70 +276,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     } catch (e) {
       print('Individual Status Error: $e');
-    }
-  }
-
-  Future<void> _loadCampusRankings() async {
-    try {
-      final now = DateTime.now();
-      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-
-      // Requirement 2: Fetch campus rankings and user profile concurrently
-      final results = await Future.wait([
-        _apiService.getCampusRankings(month: month),
-        ApiService.getUserProfile(),
-      ]);
-
-      final rankingsData = results[0] as List<dynamic>;
-      final user = results[1] as Map<String, dynamic>;
-
-      final rankings = rankingsData
-          .map<CampusRanking>((item) {
-            final map = Map<String, dynamic>.from(item as Map);
-
-            return CampusRanking(
-              campus: map['campus']?.toString() ?? '',
-              totalEmission: _toDouble(map['total_emission']),
-              totalRecords:
-                  int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
-            );
-          })
-          .where((r) => r.campus.isNotEmpty)
-          .toList();
-
-      rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
-
-      final myCampus = user['campus']?.toString() ?? '';
-      final index = rankings.indexWhere((r) => r.campus == myCampus);
-
-      if (!mounted) return;
-
-      setState(() {
-        _campusRankings = rankings;
-        _userCampus = myCampus;
-        _campusRank = index >= 0
-            ? '${index + 1}${_getOrdinal(index + 1)}'
-            : '-';
-      });
-    } catch (e) {
-      print('Campus Ranking Error: $e');
-    }
-  }
-
-  String _getOrdinal(int number) {
-    if (number % 100 >= 11 && number % 100 <= 13) {
-      return "th";
-    }
-
-    switch (number % 10) {
-      case 1:
-        return "st";
-      case 2:
-        return "nd";
-      case 3:
-        return "rd";
-      default:
-        return "th";
     }
   }
 

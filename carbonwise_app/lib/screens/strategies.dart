@@ -27,17 +27,21 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   void initState() {
     super.initState();
     _loadRecommendation();
-    strategyRefreshNotifier.addListener(_refreshRecommendation);
+    strategyRefreshNotifier.addListener(_forceRefreshRecommendation);
   }
 
-  void _refreshRecommendation() {
-    print("Notifier received!");
-    _loadRecommendation();
+  static String? _cachedRecommendation;
+  static String? _cachedCategory;
+  static List<String>? _cachedStrategies;
+
+  void _forceRefreshRecommendation() {
+    print("Notifier received! Forcing refresh...");
+    _loadRecommendation(forceRefresh: true);
   }
 
   @override
   void dispose() {
-    strategyRefreshNotifier.removeListener(_refreshRecommendation);
+    strategyRefreshNotifier.removeListener(_forceRefreshRecommendation);
     super.dispose();
   }
 
@@ -49,7 +53,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         child: RefreshIndicator(
           color: primaryGreen,
           onRefresh: () async {
-            await _loadRecommendation();
+            await _loadRecommendation(forceRefresh: true);
           },
           child: ListView(
             physics: const BouncingScrollPhysics(),
@@ -301,7 +305,18 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     );
   }
 
-  Future<void> _loadRecommendation() async {
+  Future<void> _loadRecommendation({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedRecommendation != null) {
+      if (mounted) {
+        setState(() {
+          _aiRecommendation = _cachedRecommendation!;
+          _highestCategory = _cachedCategory ?? '';
+          _recommendedStrategies = _cachedStrategies ?? [];
+        });
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() {
         _aiRecommendation =
@@ -373,6 +388,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       );
 
       if (!mounted) return;
+      _cachedRecommendation = recommendation;
       _parseRecommendation(recommendation);
     } catch (e) {
       print("Recommendation Error: $e");
@@ -404,6 +420,10 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
           .where((item) => item.isNotEmpty)
           .toList();
     }
+
+    _cachedCategory = _highestCategory;
+    _cachedStrategies = strategies;
+    _cachedRecommendation = mainRecommendation;
 
     setState(() {
       _aiRecommendation = mainRecommendation;

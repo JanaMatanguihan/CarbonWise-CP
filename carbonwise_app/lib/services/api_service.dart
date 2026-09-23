@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/api_constants.dart';
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
+  static const Duration _timeout = Duration(seconds: 30);
 
   // LARAVEL AUTHENTICATION TOKEN
 
@@ -24,9 +26,22 @@ class ApiService {
     _token = token;
   }
 
-  static void clearToken() {
+  static Future<void> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedToken = prefs.getString('auth_token');
+
+    if (savedToken != null && savedToken.isNotEmpty) {
+      _token = savedToken;
+    }
+  }
+
+  static Future<void> clearToken() async {
     _token = null;
     _currentUserEmail = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
   }
 
   // HEADERS
@@ -54,17 +69,17 @@ class ApiService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/login'),
+            Uri.parse('$baseUrl/api/login'),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       // Debug information
-      print('LOGIN URL: $baseUrl/login');
+      print('LOGIN URL: $baseUrl/api/login');
       print('LOGIN EMAIL: [$email]');
       print('LOGIN PASSWORD LENGTH: ${password.length}');
       print('LOGIN STATUS: ${response.statusCode}');
@@ -76,7 +91,12 @@ class ApiService {
         final token = data['token'];
 
         if (token != null) {
-          setToken(token.toString());
+          final tokenString = token.toString();
+
+          setToken(tokenString);
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', tokenString);
         }
 
         _currentUserEmail = email;
@@ -113,7 +133,7 @@ class ApiService {
     String? office,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/register'),
+      Uri.parse('$baseUrl/api/register'),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -171,17 +191,17 @@ class ApiService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/forgot-password'),
+            Uri.parse('$baseUrl/api/forgot-password'),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
             body: jsonEncode({'email': email}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       // Debug
-      print('FORGOT PASSWORD URL: $baseUrl/forgot-password');
+      print('FORGOT PASSWORD URL: $baseUrl/api/forgot-password');
       print('FORGOT PASSWORD EMAIL: [$email]');
       print('FORGOT PASSWORD STATUS: ${response.statusCode}');
       print('FORGOT PASSWORD RESPONSE: ${response.body}');
@@ -224,17 +244,40 @@ class ApiService {
 
   // GET: CARBON RECORDS
   Future<List<dynamic>> getCarbonRecords(String email) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+    try {
+      final url = '$baseUrl/api/carbon-records';
 
-    final data = _decodeResponse(response);
+      print('========== CARBON RECORDS DEBUG ==========');
+      print('CARBON URL: $url');
+      print('TOKEN EXISTS: ${_token != null}');
+      print('TOKEN LENGTH: ${_token?.length}');
+      print('CARBON HEADERS: $_headers');
 
-    if (response.statusCode == 200) {
-      return data['records'] ?? data['data'] ?? [];
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 30));
+
+      print('CARBON STATUS: ${response.statusCode}');
+      print('CARBON RESPONSE: ${response.body}');
+      print('==========================================');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final records = data['records'] ?? data['data'] ?? [];
+
+        print(
+          'CARBON RECORD COUNT: ${records is List ? records.length : 'NOT A LIST'}',
+        );
+
+        return records is List ? records : [];
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load carbon records.');
+    } catch (e) {
+      print('CARBON RECORDS ERROR: $e');
+      rethrow;
     }
-
-    throw Exception(data['message'] ?? 'Failed to load carbon records.');
   }
 
   // POST: CARBON RECORD
@@ -251,7 +294,7 @@ class ApiService {
   }) async {
     final response = await http
         .post(
-          Uri.parse('$baseUrl/carbon-records'),
+          Uri.parse('$baseUrl/api/carbon-records'),
           headers: _headers,
           body: jsonEncode({
             'transportation': transportation,
@@ -265,7 +308,7 @@ class ApiService {
             if (foodConsumedAt != null) 'food_consumed_at': foodConsumedAt,
           }),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -277,7 +320,7 @@ class ApiService {
   // GET: ONE CARBON RECORD
   Future<List<dynamic>> getCarbonRecord(String email) async {
     final response = await http
-        .get(Uri.parse('$baseUrl/carbon-records'), headers: _headers)
+        .get(Uri.parse('$baseUrl/api/carbon-records'), headers: _headers)
         .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
@@ -299,7 +342,7 @@ class ApiService {
   }) async {
     final response = await http
         .put(
-          Uri.parse('$baseUrl/carbon-records/$id'),
+          Uri.parse('$baseUrl/api/carbon-records/$id'),
           headers: _headers,
           body: jsonEncode({
             'transportation': transportation,
@@ -308,7 +351,7 @@ class ApiService {
             'record_date': recordDate,
           }),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -320,8 +363,8 @@ class ApiService {
   // DELETE: CARBON RECORD
   Future<void> deleteCarbonRecord(int id) async {
     final response = await http
-        .delete(Uri.parse('$baseUrl/carbon-records/$id'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .delete(Uri.parse('$baseUrl/api/carbon-records/$id'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -334,8 +377,8 @@ class ApiService {
   Future<Map<String, dynamic>> getUserInfo([String? email]) async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/profile'), headers: _headers)
-          .timeout(const Duration(seconds: 15));
+          .get(Uri.parse('$baseUrl/api/profile'), headers: _headers)
+          .timeout(const Duration(seconds: 30));
 
       print('PROFILE STATUS: ${response.statusCode}');
       print('PROFILE RESPONSE: ${response.body}');
@@ -410,8 +453,8 @@ class ApiService {
   // GET: CARBON PATTERNS
   Future<Map<String, dynamic>> getCarbonPatterns() async {
     final response = await http
-        .get(Uri.parse('$baseUrl/carbon-patterns'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .get(Uri.parse('$baseUrl/api/carbon-patterns'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -440,11 +483,11 @@ class ApiService {
 
     final response = await http
         .put(
-          Uri.parse('$baseUrl/profile'),
+          Uri.parse('$baseUrl/api/profile'),
           headers: _headers,
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -463,7 +506,7 @@ class ApiService {
 
     final request = http.MultipartRequest(
       'POST',
-      Uri.parse('$baseUrl/profile-picture'),
+      Uri.parse('$baseUrl/api/profile-picture'),
     );
 
     request.headers.addAll({
@@ -504,11 +547,11 @@ class ApiService {
   }) async {
     final response = await http
         .post(
-          Uri.parse('$baseUrl/notifications'),
+          Uri.parse('$baseUrl/api/notifications'),
           headers: _headers,
           body: jsonEncode({'title': title, 'message': message, 'type': type}),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -521,10 +564,10 @@ class ApiService {
   Future<String> testLaravel() async {
     final response = await http
         .get(
-          Uri.parse('$baseUrl/../up'),
+          Uri.parse('$baseUrl/api/up'),
           headers: {'Accept': 'application/json'},
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       return response.body;
@@ -535,16 +578,13 @@ class ApiService {
 
   // LOGOUT
   static Future<void> logout() async {
-    if (_token != null) {
-      try {
-        await http
-            .post(Uri.parse('$baseUrl/logout'), headers: _headers)
-            .timeout(const Duration(seconds: 10));
-      } catch (_) {}
+    try {
+      if (_token != null) {
+        await http.post(Uri.parse('$baseUrl/api/logout'), headers: _headers);
+      }
+    } finally {
+      await clearToken();
     }
-
-    clearToken();
-    _currentUserEmail = null;
   }
 
   // RESPONSE HELPER
@@ -569,8 +609,8 @@ class ApiService {
   // GET: NOTIFICATIONS
   Future<List<dynamic>> getNotifications() async {
     final response = await http
-        .get(Uri.parse('$baseUrl/notifications'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .get(Uri.parse('$baseUrl/api/notifications'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -588,7 +628,7 @@ class ApiService {
   }) async {
     final response = await http
         .put(
-          Uri.parse('$baseUrl/change-password'),
+          Uri.parse('$baseUrl/api/change-password'),
           headers: _headers,
           body: jsonEncode({
             'current_password': currentPassword,
@@ -596,7 +636,7 @@ class ApiService {
             'new_password_confirmation': newPassword,
           }),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -617,91 +657,145 @@ class ApiService {
 
   // GET USER PROFILE
   static Future<Map<String, dynamic>> getUserProfile() async {
-    final response = await http
-        .get(Uri.parse('$baseUrl/profile'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+    try {
+      final url = Uri.parse('$baseUrl/api/profile');
 
-    print('PROFILE STATUS: ${response.statusCode}');
-    print('PROFILE RESPONSE: ${response.body}');
+      print('========== PROFILE DEBUG ==========');
+      print('PROFILE URL: $url');
+      print('PROFILE TOKEN EXISTS: ${_token != null}');
+      print('PROFILE TOKEN LENGTH: ${_token?.length}');
+      print('PROFILE TOKEN START: ${_token?.substring(0, 4)}');
+      print('PROFILE HEADERS: $_headers');
 
-    final data = _decodeResponse(response);
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      return data['user'] ?? data['data'] ?? data;
+      print('PROFILE STATUS: ${response.statusCode}');
+      print('PROFILE RESPONSE: ${response.body}');
+      print('===================================');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return data['user'] ?? data['data'] ?? data;
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load profile.');
+    } catch (e) {
+      print('PROFILE API ERROR: $e');
+      rethrow;
     }
-
-    throw Exception(data['message'] ?? 'Failed to load profile.');
   }
 
   // GET DEPARTMENT RANKINGS
   Future<List<dynamic>> getDepartmentRankings({String? month}) async {
-    final query = month != null ? '?month=$month' : '';
+    try {
+      final query = month != null ? '?month=$month' : '';
+      final url = Uri.parse('$baseUrl/api/department-rankings$query');
 
-    final response = await http
-        .get(Uri.parse('$baseUrl/department-rankings$query'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+      print('========== DEPARTMENT DEBUG ==========');
+      print('DEPARTMENT URL: $url');
+      print('DEPARTMENT TOKEN EXISTS: ${_token != null}');
+      print('DEPARTMENT HEADERS: $_headers');
 
-    final data = _decodeResponse(response);
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      final value = data['rankings'] ?? data['data'] ?? data;
-      return value is List ? value : [];
+      print('DEPARTMENT STATUS: ${response.statusCode}');
+      print('DEPARTMENT BODY: ${response.body}');
+      print('======================================');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final value = data['rankings'] ?? data['data'] ?? data;
+        return value is List ? value : [];
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load department rankings.');
+    } catch (e) {
+      print('DEPARTMENT API ERROR: $e');
+      rethrow;
     }
-
-    print('DEPARTMENT STATUS: ${response.statusCode}');
-    print('DEPARTMENT BODY: ${response.body}');
-
-    throw Exception(data['message'] ?? 'Failed to load department rankings.');
   }
 
   // GET CAMPUS RANKINGS
   Future<List<dynamic>> getCampusRankings({String? month}) async {
-    final query = month != null ? '?month=$month' : '';
+    try {
+      final query = month != null ? '?month=$month' : '';
+      final url = Uri.parse('$baseUrl/api/campus-rankings$query');
 
-    final response = await http
-        .get(Uri.parse('$baseUrl/campus-rankings$query'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+      print('========== CAMPUS DEBUG ==========');
+      print('CAMPUS URL: $url');
+      print('CAMPUS TOKEN EXISTS: ${_token != null}');
+      print('CAMPUS HEADERS: $_headers');
 
-    final data = _decodeResponse(response);
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      final value = data['rankings'] ?? data['data'] ?? data;
-      return value is List ? value : [];
+      print('CAMPUS STATUS: ${response.statusCode}');
+      print('CAMPUS BODY: ${response.body}');
+      print('==================================');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final value = data['rankings'] ?? data['data'] ?? data;
+        return value is List ? value : [];
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load campus rankings.');
+    } catch (e) {
+      print('CAMPUS API ERROR: $e');
+      rethrow;
     }
-
-    print('CAMPUS STATUS: ${response.statusCode}');
-    print('CAMPUS BODY: ${response.body}');
-
-    throw Exception(data['message'] ?? 'Failed to load campus rankings.');
   }
 
   // GET: PEER COMPARISON
   Future<Map<String, dynamic>> getMyPeerComparison({
     String period = 'monthly',
   }) async {
-    final query = '?period=$period';
+    try {
+      final query = '?period=$period';
+      final url = Uri.parse('$baseUrl/api/my-peer-comparison$query');
 
-    final response = await http
-        .get(Uri.parse('$baseUrl/my-peer-comparison$query'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+      print('========== PEER COMPARISON DEBUG ==========');
+      print('PEER URL: $url');
+      print('PEER TOKEN EXISTS: ${_token != null}');
+      print('PEER HEADERS: $_headers');
 
-    final data = _decodeResponse(response);
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      return Map<String, dynamic>.from(data);
+      print('PEER STATUS: ${response.statusCode}');
+      print('PEER BODY: ${response.body}');
+      print('===========================================');
+
+      final data = _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(data);
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load peer comparison.');
+    } catch (e) {
+      print('PEER API ERROR: $e');
+      rethrow;
     }
-
-    throw Exception(data['message'] ?? 'Failed to load peer comparison.');
   }
 
   // GET USER CARBON RECORDS
   Future<List<dynamic>> getUserCarbonRecords(String email) async {
     final response = await http
         .get(
-          Uri.parse('$baseUrl/profile/$email/carbon-records'),
+          Uri.parse('$baseUrl/api/profile/$email/carbon-records'),
           headers: _headers,
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -714,11 +808,10 @@ class ApiService {
   }
 
   // GET: DASHBOARD SUMMARY / RANKINGS
-  // Laravel should return the authenticated user's dashboard data.
   Future<Map<String, dynamic>> getDashboardSummary() async {
     final response = await http
-        .get(Uri.parse('$baseUrl/dashboard'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .get(Uri.parse('$baseUrl/api/dashboard'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -735,8 +828,8 @@ class ApiService {
   // GET: ALL INDIVIDUAL ACTIVITIES RECORDED TODAY
   Future<List<dynamic>> getTodayActivities() async {
     final response = await http
-        .get(Uri.parse('$baseUrl/carbon-records/today'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .get(Uri.parse('$baseUrl/api/carbon-records/today'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -752,8 +845,8 @@ class ApiService {
   // GET CURRENT USER
   static Future<Map<String, dynamic>> getCurrentUser() async {
     final response = await http
-        .get(Uri.parse('$baseUrl/profile'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .get(Uri.parse('$baseUrl/api/profile'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
@@ -768,7 +861,7 @@ class ApiService {
   Future<Map<String, dynamic>> getTft30DayForecast() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/forecast/tft-30-days'),
+        Uri.parse('$baseUrl/api/forecast/tft-30-days'),
         headers: _headers,
       );
 
