@@ -96,7 +96,7 @@
         window.addEventListener('load', function () {
             setTimeout(function () {
                 window.location.href = "{{ $deepLink }}";
-            }, 400);
+            }, 900);
         });
     </script>
     @endisset
