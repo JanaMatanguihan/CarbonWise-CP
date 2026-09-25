@@ -5,101 +5,302 @@
 
 @section('content')
 
-<div class="grid grid-cols-12 gap-6 mt-6">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
-    {{-- Left Sidebar --}}
-    @include('admin.partials.user-sidebar')
+    .records-page {
+        font-family: 'Poppins', sans-serif;
+        color: #111827;
+    }
 
-    {{-- Right Side --}}
-    <div class="col-span-8 flex">
+    .records-page,
+    .records-page * {
+        font-family: 'Poppins', sans-serif;
+    }
 
-        <div class="bg-white rounded-xl shadow flex flex-col w-full h-full">
+    .records-layout {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 24px;
+        align-items: stretch;
+        margin-top: 24px;
+    }
+
+    .records-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .records-right-card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .records-back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #374151;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .records-back-button:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+        color: #111827;
+    }
+
+    .records-content {
+        padding: 28px;
+    }
+
+    .records-title {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.4;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .records-description {
+        margin-top: 5px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #6b7280;
+    }
+
+    .records-table-wrapper {
+        height: 470px;
+        margin-top: 22px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .records-scroll {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+
+    .records-scroll::-webkit-scrollbar {
+        width: 7px;
+        height: 7px;
+    }
+
+    .records-scroll::-webkit-scrollbar-track {
+        background: #f9fafb;
+    }
+
+    .records-scroll::-webkit-scrollbar-thumb {
+        background: #9ca3af;
+        border-radius: 10px;
+    }
+
+    .records-table {
+        width: 100%;
+        min-width: 650px;
+        border-collapse: collapse;
+    }
+
+    .records-table thead {
+        background: #f9fafb;
+    }
+
+    .records-table th {
+        padding: 15px 18px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 13px;
+        line-height: 1.4;
+        font-weight: 600;
+        color: #111827;
+        white-space: nowrap;
+    }
+
+    .records-table td {
+        padding: 16px 18px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #374151;
+        white-space: nowrap;
+    }
+
+    .records-table tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    .records-total {
+        color: #15803d !important;
+        font-weight: 600 !important;
+    }
+
+    .records-pagination {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 10px 18px;
+        border-top: 1px solid #e5e7eb;
+        background: #ffffff;
+    }
+
+    .records-pagination nav {
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 12px !important;
+    }
+
+    @media (max-width: 1100px) {
+        .records-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="records-page">
+
+    {{-- Back Button --}}
+    <div>
+        <a
+            href="{{ route('admin.users') }}"
+            class="records-back-button"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M19 12H5"></path>
+                <path d="M12 19l-7-7 7-7"></path>
+            </svg>
+
+            Back to User Management
+        </a>
+    </div>
+
+
+    {{-- Main Layout --}}
+    <div class="records-layout">
+
+        {{-- Left User Profile --}}
+        <div class="records-card">
+            @include('admin.partials.user-sidebar')
+        </div>
+
+
+        {{-- Right Carbon Records --}}
+        <div class="records-card records-right-card">
 
             {{-- Tabs --}}
             @include('admin.partials.user-tabs')
 
-            <div class="p-8">
 
-                <div class="flex items-center justify-between mb-6">
+            <div class="records-content">
 
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800">
-                            Carbon Records
-                        </h2>
+                <div>
+                    <h2 class="records-title">
+                        Carbon Records
+                    </h2>
 
-                        <p class="text-sm text-gray-500 mt-1">
-                            View all carbon records submitted by this user.
-                        </p>
-                    </div>
-
-
+                    <p class="records-description">
+                        View all carbon records submitted by this user.
+                    </p>
                 </div>
 
-                <div class="bg-white border rounded-xl overflow-hidden flex flex-col h-[470px]">
 
-                    <div class="flex-1 overflow-y-auto">
+                {{-- Carbon Records Table --}}
+                <div class="records-table-wrapper">
 
-                        <table class="w-full">
+                    <div class="records-scroll">
 
-                        <thead class="bg-gray-50">
+                        <table class="records-table">
 
-                            <tr>
-                                <th class="px-6 py-4 text-left">Date</th>
-                                <th class="px-6 py-4 text-left">Transportation</th>
-                                <th class="px-6 py-4 text-left">Electricity</th>
-                                <th class="px-6 py-4 text-left">Food</th>
-                                <th class="px-6 py-4 text-left">Total CO₂e</th>
-                            </tr>
-
-                        </thead>
-                        <tbody>
-
-                            @forelse($records as $record)
-
-                                <tr class="border-t hover:bg-gray-50">
-
-                                    <td class="px-6 py-4">
-                                        {{ \Carbon\Carbon::parse($record->record_date)->format('M d, Y') }}
-                                    </td>
-
-                                    <td class="px-6 py-4">
-                                        {{ number_format($record->transportation, 2) }}
-                                    </td>
-
-                                    <td class="px-6 py-4">
-                                        {{ number_format($record->electricity, 2) }}
-                                    </td>
-
-                                    <td class="px-6 py-4">
-                                        {{ number_format($record->food, 2) }}
-                                    </td>
-
-                                    <td class="px-6 py-4 font-semibold text-green-700">
-                                        {{ number_format($record->total_emission, 2) }}
-                                    </td>
-
-                                </tr>
-
-                            @empty
-
+                            <thead>
                                 <tr>
-
-                                    <td colspan="5" class="text-center py-10 text-gray-500">
-                                        No carbon records found.
-                                    </td>
-
+                                    <th>Date</th>
+                                    <th>Transportation</th>
+                                    <th>Electricity</th>
+                                    <th>Food</th>
+                                    <th>Total CO₂e</th>
                                 </tr>
+                            </thead>
 
-                            @endforelse
+                            <tbody>
 
-                        </tbody>
-                    </table>
+                                @forelse($records as $record)
+
+                                    <tr>
+
+                                        <td>
+                                            {{ \Carbon\Carbon::parse($record->record_date)->format('M d, Y') }}
+                                        </td>
+
+                                        <td>
+                                            {{ number_format($record->transportation, 2) }}
+                                        </td>
+
+                                        <td>
+                                            {{ number_format($record->electricity, 2) }}
+                                        </td>
+
+                                        <td>
+                                            {{ number_format($record->food, 2) }}
+                                        </td>
+
+                                        <td class="records-total">
+                                            {{ number_format($record->total_emission, 2) }}
+                                        </td>
+
+                                    </tr>
+
+                                @empty
+
+                                    <tr>
+                                        <td
+                                            colspan="5"
+                                            style="text-align:center; padding:45px 20px; color:#9ca3af;"
+                                        >
+                                            No carbon records found.
+                                        </td>
+                                    </tr>
+
+                                @endforelse
+
+                            </tbody>
+
+                        </table>
+
                     </div>
-                    
-                     @if($records->hasPages())
-                        <div class="border-t px-6 py-4 bg-white">
+
+
+                    {{-- Pagination --}}
+                    @if($records->hasPages())
+
+                        <div class="records-pagination">
                             {{ $records->links() }}
                         </div>
+
                     @endif
 
                 </div>

@@ -3,12 +3,14 @@
 namespace App\Exports;
 
 use App\Models\CarbonRecord;
-use App\Models\UserInfo;
-use Maatwebsite\Excel\Concerns\FromQuery;
+use App\Models\User;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
-use Illuminate\Database\Eloquent\Builder;
+use Maatwebsite\Excel\Concerns\WithMapping;
 
-class EmissionOverviewExport implements FromQuery, WithHeadings
+class EmissionOverviewExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
     protected $month;
     protected $department;
@@ -19,44 +21,79 @@ class EmissionOverviewExport implements FromQuery, WithHeadings
         $this->department = $department;
     }
 
-    public function query(): Builder
+    /**
+     * Get the carbon emission records for the report.
+     */
+    public function collection()
     {
-        $query = CarbonRecord::query();
+        $query = CarbonRecord::query()
+            ->with('user')
+            ->orderBy('record_date', 'asc');
 
+        /*
+         * Filter by selected month.
+         */
         if ($this->month) {
-            $query->whereYear('record_date', substr($this->month, 0, 4))
-                  ->whereMonth('record_date', substr($this->month, 5, 2));
+
+            [$year, $month] = explode('-', $this->month);
+
+            $query->whereYear('record_date', $year)
+                ->whereMonth('record_date', $month);
         }
 
+        /*
+         * Filter by department through the related user.
+         */
         if ($this->department) {
 
-            $users = UserInfo::where(
-                'department',
-                $this->department
-            )->pluck('g_suite');
+            $query->whereHas('user', function ($userQuery) {
 
-            $query->whereIn('g_suite', $users);
+                $userQuery->where(
+                    'department',
+                    $this->department
+                );
+
+            });
         }
 
-        return $query->select(
-            'record_date',
-            'g_suite',
-            'transportation',
-            'electricity',
-            'food',
-            'total_emission'
-        );
+        return $query->get();
     }
 
+    /**
+     * Define the Excel column headings.
+     */
     public function headings(): array
     {
         return [
+            'G Suite',
+            'Name',
+            'Department',
             'Record Date',
-            'User',
             'Transportation',
             'Electricity',
             'Food',
             'Total Emission',
+        ];
+    }
+
+    /**
+     * Map each carbon record to an Excel row.
+     */
+    public function map($record): array
+    {
+        $user = $record->user;
+
+        return [
+            $user?->email ?? '',
+            $user?->name ?? '',
+            $user?->department ?? '',
+            $record->record_date
+                ? $record->record_date->format('Y-m-d')
+                : '',
+            number_format((float) $record->transportation, 2, '.', ''),
+            number_format((float) $record->electricity, 2, '.', ''),
+            number_format((float) $record->food, 2, '.', ''),
+            number_format((float) $record->total_emission, 2, '.', ''),
         ];
     }
 }

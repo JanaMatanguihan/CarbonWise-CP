@@ -1,99 +1,346 @@
-<!-- LEFT PROFILE CARD -->
-    <div class="col-span-4">
+@php
+    // Find the user's profile photo
 
-        <div class="bg-white rounded-xl shadow p-8">
+    $photoPath = null;
 
-            <!-- Profile Picture -->
-            <div class="flex justify-center">
+    $possiblePhotoFields = [
+        'profile_photo',
+        'profile_picture',
+        'profile_photo_path',
+        'avatar',
+        'photo',
+        'image',
+    ];
 
-                @if($user->profile_photo)
-                    <img
-                        src="{{ asset('storage/' . $user->profile_photo) }}"
-                        class="w-40 h-40 rounded-full object-cover"
-                    >
-                @else
-                    <img
-                        src="https://ui-avatars.com/api/?name={{ urlencode($user->full_name) }}&size=200&background=16a34a&color=ffffff"
-                        class="w-40 h-40 rounded-full"
-                    >
-                @endif
+    foreach ($possiblePhotoFields as $field) {
 
+        if (
+            isset($user->{$field}) &&
+            !empty($user->{$field})
+        ) {
+            $photoPath = $user->{$field};
+            break;
+        }
+    }
+
+    // Build the photo URL
+
+    $profileImage = null;
+
+    if ($photoPath) {
+
+        if (
+            str_starts_with($photoPath, 'http://') ||
+            str_starts_with($photoPath, 'https://')
+        ) {
+
+            $profileImage = $photoPath;
+
+        } elseif (
+            str_starts_with($photoPath, '/storage/')
+        ) {
+
+            $profileImage = asset(ltrim($photoPath, '/'));
+
+        } elseif (
+            str_starts_with($photoPath, 'storage/')
+        ) {
+
+            $profileImage = asset($photoPath);
+
+        } else {
+
+            $profileImage = asset('storage/' . ltrim($photoPath, '/'));
+
+        }
+    }
+
+    // Generate initials if no photo exists
+
+    $userName = trim($user->name ?? '');
+
+    $nameParts = preg_split('/\s+/', $userName);
+
+    if (count($nameParts) >= 2) {
+
+        $initials = strtoupper(
+            substr($nameParts[0], 0, 1) .
+            substr($nameParts[count($nameParts) - 1], 0, 1)
+        );
+
+    } elseif (!empty($userName)) {
+
+        $initials = strtoupper(substr($userName, 0, 2));
+
+    } else {
+
+        $initials = 'U';
+    }
+@endphp
+
+
+<style>
+    .user-sidebar {
+        width: 100%;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .user-sidebar * {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .user-sidebar-inner {
+        padding: 28px;
+        background: #ffffff;
+    }
+
+    .user-profile-photo {
+        width: 128px;
+        height: 128px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: block;
+        border: 4px solid #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    }
+
+    .user-profile-initials {
+        width: 128px;
+        height: 128px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #2f9d68;
+        color: #ffffff;
+        font-size: 34px;
+        line-height: 1;
+        font-weight: 700;
+        border: 4px solid #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    }
+
+    .user-email {
+        margin-top: 18px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #6b7280;
+        font-weight: 500;
+        word-break: break-word;
+    }
+
+    .user-role {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 14px;
+        padding: 7px 20px;
+        border-radius: 999px;
+        background: #dcfce7;
+        color: #15803d;
+        font-size: 13px;
+        line-height: 1.4;
+        font-weight: 600;
+    }
+
+    .user-information {
+        margin-top: 26px;
+        padding: 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #ffffff;
+    }
+
+    .user-information-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 8px 0;
+    }
+
+    .user-information-label {
+        font-size: 13px;
+        line-height: 1.5;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .user-information-value {
+        font-size: 13px;
+        line-height: 1.5;
+        color: #111827;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .user-information-status {
+        font-size: 13px;
+        color: #16a34a;
+        font-weight: 600;
+    }
+
+    .user-edit-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        margin-top: 20px;
+        padding: 11px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #15803d;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .user-edit-button:hover {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+</style>
+
+
+<div class="user-sidebar">
+
+    <div class="user-sidebar-inner">
+
+        {{-- Profile --}}
+        <div class="flex flex-col items-center text-center">
+
+            @if($profileImage)
+
+                <img
+                    src="{{ $profileImage }}"
+                    alt="{{ $user->name }}"
+                    class="user-profile-photo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                >
+
+                {{-- Fallback if image cannot load --}}
+                <div
+                    class="user-profile-initials"
+                    style="display:none;"
+                >
+                    {{ $initials }}
+                </div>
+
+            @else
+
+                <div class="user-profile-initials">
+                    {{ $initials }}
+                </div>
+
+            @endif
+
+            {{-- Email --}}
+            <div class="user-email">
+                {{ $user->email }}
             </div>
 
-            <!-- Name -->
-            <div class="mt-6 text-center">
+            {{-- Role --}}
+            <span class="user-role">
+                {{ ucfirst($user->role ?? 'User') }}
+            </span>
 
-                <h2 class="text-2xl font-bold">
-                    {{ $user->full_name }}
-                </h2>
+        </div>
 
-                <p class="text-gray-500 mt-2">
-                    {{ $user->g_suite }}
-                </p>
 
-                <span
-                    class="inline-block mt-4 px-4 py-2 rounded-full bg-green-100 text-green-700 font-semibold"
-                >
-                    {{ ucfirst($user->role) }}
+        {{-- User Information --}}
+        <div class="user-information">
+
+            <div class="user-information-row">
+
+                <span class="user-information-label">
+                    Department
+                </span>
+
+                <span class="user-information-value">
+                    {{ $user->department ?: 'N/A' }}
                 </span>
 
             </div>
 
-            <!-- Information -->
-            <div class="mt-8 border rounded-xl p-5 space-y-4">
 
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Department</span>
-                    <span>{{ $user->department }}</span>
-                </div>
+            <div class="user-information-row">
 
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Campus</span>
-                    <span>{{ $user->campus }}</span>
-                </div>
+                <span class="user-information-label">
+                    Campus
+                </span>
 
-                <div class="flex justify-between">
-                    <span class="text-gray-500">SR Code</span>
-                    <span>{{ $user->sr_code }}</span>
-                </div>
-
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Year Level</span>
-                    <span>{{ $user->year_level }}</span>
-                </div>
-
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Joined</span>
-                    <span>{{ \Carbon\Carbon::parse($user->created_at)->format('F d, Y') }}</span>
-                </div>
-
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Status</span>
-
-                    <span class="
-                        font-semibold
-                        {{ $user->status == 'Active'
-                            ? 'text-green-600'
-                            : 'text-red-600' }}
-                    ">
-                        {{ $user->status }}
-                    </span>
-                </div>
+                <span class="user-information-value">
+                    {{ $user->campus ?: 'N/A' }}
+                </span>
 
             </div>
 
-            <!-- Edit Button -->
-            <div class="mt-8">
 
-                <a
-                href="{{ route('admin.users.edit',$user->g_suite) }}"
-                class="block w-full text-center border border-green-600 text-green-600 py-3 rounded-lg font-semibold hover:bg-green-50"
-            >
-                Edit User
-            </a>
+            <div class="user-information-row">
+
+                <span class="user-information-label">
+                    SR Code
+                </span>
+
+                <span class="user-information-value">
+                    {{ $user->sr_code ?: 'N/A' }}
+                </span>
+
+            </div>
+
+
+            <div class="user-information-row">
+
+                <span class="user-information-label">
+                    Year Level
+                </span>
+
+                <span class="user-information-value">
+                    {{ $user->year_level ?: 'N/A' }}
+                </span>
+
+            </div>
+
+
+            <div class="user-information-row">
+
+                <span class="user-information-label">
+                    Joined
+                </span>
+
+                <span class="user-information-value">
+                    {{ $user->created_at ? $user->created_at->format('F d, Y') : 'N/A' }}
+                </span>
+
+            </div>
+
+
+            <div class="user-information-row">
+
+                <span class="user-information-label">
+                    Status
+                </span>
+
+                <span class="user-information-status">
+                    {{ ucfirst($user->status ?? 'Unknown') }}
+                </span>
 
             </div>
 
         </div>
 
+
+        {{-- Edit User --}}
+        <a
+            href="{{ route('admin.users.edit', $user->g_suite) }}"
+            class="user-edit-button"
+        >
+            Edit User
+        </a>
+
     </div>
+
+</div>

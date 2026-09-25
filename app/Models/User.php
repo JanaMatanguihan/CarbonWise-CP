@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -26,6 +25,10 @@ class User extends Authenticatable
         'role',
         'department',
         'status',
+        'sr_code',
+        'campus',
+        'year_level',
+        'profile_photo',
     ];
 
     /**

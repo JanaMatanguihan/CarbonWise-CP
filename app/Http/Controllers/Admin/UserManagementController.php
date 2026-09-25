@@ -7,8 +7,6 @@ use App\Models\User;
 use App\Models\CarbonRecord;
 use App\Models\MitigationAction;
 use App\Services\AlertService;
-use App\Services\GreenPointService;
-use App\Services\StreakService;
 use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
@@ -69,6 +67,75 @@ class UserManagementController extends Controller
             'admin.user-management',
             compact('users', 'roles', 'departments')
         );
+    }
+
+    // Create User
+
+    public function create()
+    {
+        $departments = User::select('department')
+            ->whereNotNull('department')
+            ->where('department', '!=', '')
+            ->distinct()
+            ->orderBy('department')
+            ->pluck('department');
+
+        return view(
+            'admin.add-user',
+            compact('departments')
+        );
+    }
+
+    // Store User
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'required|string|max:255',
+            'department' => 'required|string|max:255',
+            'campus' => 'required|string|max:255',
+            'year_level' => 'nullable|string|max:255',
+            'sr_code' => 'nullable|string|max:255',
+            'status' => 'required|string|max:255',
+            'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        // Upload profile picture
+        $profilePhoto = null;
+
+        if ($request->hasFile('profile_photo')) {
+            $profilePhoto = $request
+                ->file('profile_photo')
+                ->store('profile-photos', 'public');
+        }
+
+        // Create user
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => $request->password,
+            'role' => $request->role,
+            'department' => $request->department,
+            'status' => $request->status,
+            'sr_code' => $request->sr_code,
+            'campus' => $request->campus,
+            'year_level' => $request->year_level,
+            'profile_photo' => $profilePhoto,
+        ]);
+
+        // Create system alert
+        AlertService::create(
+            'User Added',
+            $user->name . ' has been added to the system.',
+            'info'
+        );
+
+        return redirect()
+            ->route('admin.users')
+            ->with('success', 'User added successfully.');
     }
 
     // Show User
@@ -233,29 +300,4 @@ class UserManagementController extends Controller
         );
     }
 
-    // User Badges
-
-    public function badges(
-        GreenPointService $greenPointService,
-        StreakService $streakService,
-        string $g_suite
-    ) {
-        $user = User::where('email', $g_suite)->firstOrFail();
-
-        $greenPoints = $greenPointService->calculate($g_suite);
-
-        $currentStreak = $streakService->calculate($g_suite);
-
-        $weekActivity = $streakService->getCurrentWeekActivity($g_suite);
-
-        return view(
-            'admin.user-badges',
-            compact(
-                'user',
-                'greenPoints',
-                'currentStreak',
-                'weekActivity'
-            )
-        );
-    }
 }

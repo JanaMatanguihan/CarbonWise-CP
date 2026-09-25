@@ -5,322 +5,1269 @@
 
 @section('content')
 
-<div class="mt-6 bg-white rounded-xl shadow overflow-visible">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
-    <form
-    method="GET"
-    id="filterForm"
-    class="flex items-center gap-4 pl-16 pr-6 py-5 border-b"
->
+    /* =========================================
+       Main Page
+    ========================================== */
 
-    <!-- Search -->
-    <div class="relative w-48">
+    .users-page {
+        font-family: 'Poppins', sans-serif;
+        color: #111111;
+    }
 
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+    .users-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+        overflow: visible;
+    }
+
+    /* =========================================
+       Toolbar
+    ========================================== */
+
+    .users-toolbar {
+        min-height: 76px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .users-search-wrapper {
+        position: relative;
+        width: 205px;
+        flex-shrink: 0;
+    }
+
+    .users-search {
+        width: 100%;
+        height: 38px;
+        padding: 0 12px 0 38px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #ffffff;
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 16px;
+        color: #111111;
+        outline: none;
+    }
+
+    .users-search::placeholder {
+        color: #9ca3af;
+    }
+
+    .users-search:focus {
+        border-color: #2f7d57;
+        box-shadow: 0 0 0 1px rgba(47, 125, 87, 0.15);
+    }
+
+    .users-filter {
+        height: 38px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #ffffff;
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 15px;
+        color: #374151;
+        padding: 0 30px 0 12px;
+        outline: none;
+    }
+
+    .users-filter:focus {
+        border-color: #2f7d57;
+        box-shadow: 0 0 0 1px rgba(47, 125, 87, 0.15);
+    }
+
+    .users-add-button {
+        height: 38px;
+        padding: 0 17px;
+        background: #2f9d68;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 15px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        text-decoration: none;
+    }
+
+    .users-add-button:hover {
+        background: #287f55;
+        color: #ffffff;
+    }
+
+    /* =========================================
+       Table
+    ========================================== */
+
+    .users-table-wrapper {
+    width: 100%;
+    overflow: visible;
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    .users-table thead th {
+        height: 52px;
+        padding: 0 18px;
+        border-bottom: 1px solid #d1d5db;
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 16px;
+        font-weight: 600;
+        color: #111111;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .users-table tbody tr {
+        height: 66px;
+        border-bottom: 1px solid #eeeeee;
+        transition: background 0.15s ease;
+    }
+
+    .users-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .users-table tbody tr:hover {
+        background: #fafafa;
+    }
+
+    .users-table tbody td {
+        padding: 9px 18px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 17px;
+        color: #111111;
+        vertical-align: middle;
+        position: relative;
+    }
+
+    /* =========================================
+       User Profile
+    ========================================== */
+
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .user-avatar {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid #e5e7eb;
+    }
+
+    .user-initials {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #2f9d68;
+        color: #ffffff;
+        font-family: 'Poppins', sans-serif;
+        font-size: 13px;
+        line-height: 18px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .user-info {
+        min-width: 0;
+    }
+
+    .user-name {
+        font-family: 'Poppins', sans-serif;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 600;
+        color: #111111;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .user-email {
+        margin-top: 2px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 14px;
+        font-weight: 400;
+        color: #6b7280;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* =========================================
+       Table Text
+    ========================================== */
+
+    .user-role {
+        font-family: 'Poppins', sans-serif;
+        font-size: 11px;
+        line-height: 17px;
+        font-weight: 500;
+        color: #111111;
+        text-transform: capitalize;
+    }
+
+    .user-department {
+        display: block;
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 16px;
+        font-weight: 400;
+        color: #374151;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .user-joined {
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 16px;
+        font-weight: 400;
+        color: #374151;
+        white-space: nowrap;
+    }
+
+    /* =========================================
+       Status
+    ========================================== */
+
+    .user-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 58px;
+        height: 25px;
+        padding: 0 11px;
+        border-radius: 2px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 9px;
+        line-height: 14px;
+        font-weight: 500;
+    }
+
+    .user-status-active {
+        background: #86efac;
+        color: #166534;
+    }
+
+    .user-status-inactive {
+        background: #fca5a5;
+        color: #b91c1c;
+    }
+
+    .user-status-pending {
+        background: #fde68a;
+        color: #92400e;
+    }
+
+    /* =========================================
+       Action Menu
+    ========================================== */
+
+    .actions-cell {
+        position: relative !important;
+        text-align: center;
+        overflow: visible !important;
+        vertical-align: middle;
+    }
+
+    .action-menu {
+        position: relative;
+        width: 100%;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .action-button {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        color: #4b5563;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .action-button:hover {
+        background: #f3f4f6;
+        border-color: #e5e7eb;
+        color: #111111;
+    }
+
+    .action-button svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .action-menu-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+
+        width: 165px;
+        min-width: 165px;
+
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 7px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+
+        overflow: hidden;
+        z-index: 9999;
+    }
+
+    .action-menu-dropdown a,
+    .action-menu-dropdown button {
+        width: 100%;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 15px;
+        text-align: left;
+        text-decoration: none;
+        box-sizing: border-box;
+    }
+
+    .action-menu-dropdown a {
+        color: #374151;
+    }
+
+    .action-menu-dropdown a:hover {
+        background: #f9fafb;
+    }
+
+    .action-menu-dropdown button {
+        border: none;
+        background: #ffffff;
+        color: #dc2626;
+        cursor: pointer;
+    }
+
+    .action-menu-dropdown button:hover {
+        background: #fef2f2;
+    }
+
+    /* =========================================
+       Pagination
+    ========================================== */
+
+    .users-pagination {
+        min-height: 62px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .users-pagination-text {
+        font-family: 'Poppins', sans-serif;
+        font-size: 10px;
+        line-height: 15px;
+        color: #9ca3af;
+        white-space: nowrap;
+    }
+
+    .users-pagination-text strong {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .pagination-list {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .pagination-button {
+        min-width: 30px;
+        height: 30px;
+        padding: 0 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        background: #ffffff;
+        color: #374151;
+        font-family: 'Poppins', sans-serif;
+        font-size: 9px;
+        line-height: 14px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+
+    .pagination-button:hover {
+        background: #f3f4f6;
+        color: #111111;
+    }
+
+    .pagination-current {
+        background: #f3f4f6;
+        color: #111111;
+        font-weight: 600;
+    }
+
+    .pagination-disabled {
+        color: #d1d5db;
+        background: #ffffff;
+        cursor: not-allowed;
+    }
+
+    .pagination-dots {
+        min-width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #6b7280;
+        font-size: 9px;
+    }
+
+    /* =========================================
+       Responsive
+    ========================================== */
+
+    @media (max-width: 1200px) {
+
+        .users-table {
+            min-width: 1050px;
+        }
+
+        .users-table-wrapper {
+            overflow-x: auto;
+        }
+    }
+
+    @media (max-width: 900px) {
+
+        .users-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .users-search-wrapper {
+            width: 100%;
+        }
+
+        .users-filter-group {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .users-filter {
+            flex: 1;
+            min-width: 130px;
+        }
+
+        .users-add-button {
+            flex-shrink: 0;
+        }
+
+        .users-pagination {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+            padding-top: 14px;
+            padding-bottom: 14px;
+        }
+    }
+</style>
+
+
+<div class="users-page bg-[#f1f1ee] min-h-screen p-5 md:p-6 space-y-5 -mx-6 -mt-6 pb-10 w-[calc(100%_+_3rem)]">
+
+    <!-- =========================================
+         USER MANAGEMENT CARD
+    ========================================== -->
+
+    <div class="users-card">
+
+        <!-- =========================================
+             SEARCH AND FILTER TOOLBAR
+        ========================================== -->
+
+        <form
+            method="GET"
+            id="filterForm"
+            class="users-toolbar flex items-center justify-between gap-6 px-6 py-4"
         >
-            <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-        </svg>
 
-        <input
-            type="text"
-            name="search"
-            value="{{ request('search') }}"
-            placeholder="Search users..."
-            class="w-full border rounded-lg py-2 pl-10 pr-4"
-            onkeydown="if(event.key==='Enter'){document.getElementById('filterForm').submit();}"
-        >
-    </div>
+            <!-- Search -->
 
-    
-    <div class="flex items-center gap-4 ml-20">
+            <div class="users-search-wrapper">
 
-        <!-- Role -->
-        <select
-        name="role"
-        class="ml-16 border rounded-lg px-4 py-2 w-40"
-        onchange="document.getElementById('filterForm').submit();"
-        >
-            <option value="">All Roles</option>
-            <option value="faculty" {{ request('role') == 'faculty' ? 'selected' : '' }}>Faculty</option>
-            <option value="student" {{ request('role') == 'student' ? 'selected' : '' }}>Student</option>
-            <option value="staff" {{ request('role') == 'staff' ? 'selected' : '' }}>Staff</option>
-        </select>
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+                    />
+                </svg>
 
-        <!-- Department -->
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ request('search') }}"
+                    placeholder="Search users..."
+                    class="users-search"
+                    onkeydown="if(event.key === 'Enter'){document.getElementById('filterForm').submit();}"
+                >
+
+            </div>
+
+
+            <!-- Filters -->
+
+            <div class="users-filter-group flex items-center gap-3">
+
+                <!-- Role -->
+
                 <select
-                name="department"
-                class="border rounded-lg px-4 py-2 w-64"
-                onchange="document.getElementById('filterForm').submit();"
-            >
-                <option value="">All Departments</option>
-
-                @foreach($departments as $department)
-                    <option
-                        value="{{ $department }}"
-                        {{ request('department') == $department ? 'selected' : '' }}>
-                        {{ $department }}
-                    </option>
-                @endforeach
-            </select>
-            
-                <!-- Campus -->
-                <select
-                    name="campus"
-                    class="border rounded-lg px-4 py-2 w-52"
+                    name="role"
+                    class="users-filter w-[130px]"
                     onchange="document.getElementById('filterForm').submit();"
                 >
-                    <option value="">All Campuses</option>
-
-                    <option value="Lipa Campus" {{ request('campus') == 'Lipa Campus' ? 'selected' : '' }}>
-                        Lipa Campus
+                    <option value="">
+                        All Roles
                     </option>
 
-                    <option value="Alangilan Campus" {{ request('campus') == 'Alangilan Campus' ? 'selected' : '' }}>
-                        Alangilan Campus
+                    <option
+                        value="faculty"
+                        {{ request('role') == 'faculty' ? 'selected' : '' }}
+                    >
+                        Faculty
                     </option>
 
-                    <option value="Pablo Borbon Campus" {{ request('campus') == 'Pablo Borbon Campus' ? 'selected' : '' }}>
-                        Pablo Borbon Campus
+                    <option
+                        value="student"
+                        {{ request('role') == 'student' ? 'selected' : '' }}
+                    >
+                        Student
                     </option>
 
-                    <option value="ARASOF Nasugbu Campus" {{ request('campus') == 'ARASOF Nasugbu Campus' ? 'selected' : '' }}>
-                        ARASOF Nasugbu Campus
+                    <option
+                        value="staff"
+                        {{ request('role') == 'staff' ? 'selected' : '' }}
+                    >
+                        Staff
                     </option>
 
-                    <option value="Rosario Campus" {{ request('campus') == 'Rosario Campus' ? 'selected' : '' }}>
-                        Rosario Campus
-                    </option>
-
-                    <option value="Balayan Campus" {{ request('campus') == 'Balayan Campus' ? 'selected' : '' }}>
-                        Balayan Campus
-                    </option>
-
-                    <option value="Lemery Campus" {{ request('campus') == 'Lemery Campus' ? 'selected' : '' }}>
-                        Lemery Campus
-                    </option>
-
-                    <option value="San Juan Campus" {{ request('campus') == 'San Juan Campus' ? 'selected' : '' }}>
-                        San Juan Campus
-                    </option>
-
-                    <option value="Malvar Campus" {{ request('campus') == 'Malvar Campus' ? 'selected' : '' }}>
-                        Malvar Campus
+                    <option
+                        value="admin"
+                        {{ request('role') == 'admin' ? 'selected' : '' }}
+                    >
+                        Admin
                     </option>
                 </select>
-        <!-- Status -->
-        <select
-            name="status"
-            class="border rounded-lg px-4 py-2 w-32"
-            onchange="document.getElementById('filterForm').submit();"
-        >
-            <option value="">All Status</option>
-            <option value="Active" {{ request('status') == 'Active' ? 'selected' : '' }}>Active</option>
-            <option value="Inactive" {{ request('status') == 'Inactive' ? 'selected' : '' }}>Inactive</option>
-        </select>
 
 
-    </div>
+                <!-- Department -->
 
-</form>
+                <select
+                    name="department"
+                    class="users-filter w-[155px]"
+                    onchange="document.getElementById('filterForm').submit();"
+                >
+                    <option value="">
+                        All Departments
+                    </option>
 
-    <div class="p-6">
-        <table class="w-full">
-            <thead class="border-b">
-            <tr>
-                <th class="text-left p-4">User</th>
-                <th class="text-left p-4">Role</th>
-                <th class="text-left p-4">Department / College</th>
-                <th class="text-left p-4">Campus</th>
-                <th class="text-left p-4">Status</th>
-                <th class="text-left p-4">Joined</th>
-                <th class="text-left p-4">Actions</th>
-            </tr>
-        </thead>
-            <tbody>
-            @foreach ($users as $index => $user)
-            <tr class="border-b">
-                <td class="p-4">
-                    <div class="flex items-center gap-3">
+                    @foreach($departments as $department)
 
-                        @if($user->profile_photo)
-                            <img
-                                src="{{ asset('storage/' . $user->profile_photo) }}"
-                                class="w-12 h-12 rounded-full object-cover"
-                            >
-                        @else
-                            <img
-                                src="https://ui-avatars.com/api/?name={{ urlencode($user->full_name) }}&background=16a34a&color=ffffff"
-                                class="w-12 h-12 rounded-full"
-                            >
-                        @endif
+                        <option
+                            value="{{ $department }}"
+                            {{ request('department') == $department ? 'selected' : '' }}
+                        >
+                            {{ $department }}
+                        </option>
 
-                        <!-- User Details -->
-                        <div class="flex flex-col">
+                    @endforeach
 
-                            <span class="font-semibold text-gray-900">
-                                {{ $user->full_name }}
-                            </span>
+                </select>
 
-                            <span class="text-sm text-gray-500">
-                                {{ $user->g_suite }}
-                            </span>
 
-                            <span class="text-xs text-gray-400">
-                                {{ $user->sr_code }}
-                            </span>
+                <!-- Status -->
 
-                        </div>
+                <select
+                    name="status"
+                    class="users-filter w-[125px]"
+                    onchange="document.getElementById('filterForm').submit();"
+                >
+                    <option value="">
+                        All Status
+                    </option>
 
-                    </div>
-                </td>
-                <td class="p-4">
-                    {{ $user->role }}
-                </td>
+                    <option
+                        value="Active"
+                        {{ request('status') == 'Active' ? 'selected' : '' }}
+                    >
+                        Active
+                    </option>
 
-                <td class="p-4">
-                    {{ $user->department }}
-                </td>
+                    <option
+                        value="Inactive"
+                        {{ request('status') == 'Inactive' ? 'selected' : '' }}
+                    >
+                        Inactive
+                    </option>
 
-                <td class="p-4">
-                    {{ $user->campus }}
-                </td>
+                    <option
+                        value="Pending"
+                        {{ request('status') == 'Pending' ? 'selected' : '' }}
+                    >
+                        Pending
+                    </option>
+                </select>
 
-                <td class="p-4">
-                    @if($user->status == 'Active')
 
-                        <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm">
-                            Active
-                        </span>
+                <!-- Add User -->
 
-                    @elseif($user->status == 'Pending')
+                <a
+                    href="{{ route('admin.users.create') }}"
+                    class="users-add-button"
+                >
+                    <span class="mr-1 text-base leading-none">
+                        +
+                    </span>
 
-                        <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm">
-                            Pending
+                    Add User
+                </a>
+
+            </div>
+
+        </form>
+
+
+        <!-- =========================================
+             USERS TABLE
+        ========================================== -->
+
+        <div class="users-table-wrapper">
+
+            <table class="users-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th style="width: 29%;">
+                            User
+                        </th>
+
+                        <th style="width: 13%;">
+                            Role
+                        </th>
+
+                        <th style="width: 28%;">
+                            Department/College
+                        </th>
+
+                        <th style="width: 10%;">
+                            Status
+                        </th>
+
+                        <th style="width: 12%;">
+                            Joined
+                        </th>
+
+                        <th
+                            style="width: 8%;"
+                            class="text-center"
+                        >
+                            Actions
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    @foreach ($users as $index => $user)
+
+                        @php
+
+                            // Get the user's display name.
+
+                            $displayName =
+                                $user->full_name
+                                ?? $user->name
+                                ?? 'User';
+
+
+                            // Create initials when no profile picture exists.
+
+                            $nameParts = preg_split(
+                                '/\s+/',
+                                trim($displayName)
+                            );
+
+
+                            $firstInitial =
+                                isset($nameParts[0])
+                                ? substr(
+                                    $nameParts[0],
+                                    0,
+                                    1
+                                )
+                                : 'U';
+
+
+                            $lastInitial =
+                                count($nameParts) > 1
+                                ? substr(
+                                    $nameParts[count($nameParts) - 1],
+                                    0,
+                                    1
+                                )
+                                : '';
+
+
+                            $initials = strtoupper(
+                                $firstInitial . $lastInitial
+                            );
+
+
+                            // Support both possible profile picture columns.
+
+                            $profilePath =
+                                $user->profile_photo
+                                ?? $user->profile_picture
+                                ?? null;
+
+
+                            // Build the profile picture URL.
+
+                            if ($profilePath) {
+
+                                if (
+                                    str_starts_with(
+                                        $profilePath,
+                                        'http://'
+                                    )
+                                    ||
+                                    str_starts_with(
+                                        $profilePath,
+                                        'https://'
+                                    )
+                                ) {
+
+                                    $profileUrl = $profilePath;
+
+                                } else {
+
+                                    $profileUrl = asset(
+                                        'storage/' .
+                                        ltrim(
+                                            $profilePath,
+                                            '/'
+                                        )
+                                    );
+                                }
+
+                            } else {
+
+                                $profileUrl = null;
+
+                            }
+
+                        @endphp
+
+
+                        <tr>
+
+                            <!-- User -->
+
+                            <td>
+
+                                <div class="user-profile">
+
+                                    @if($profileUrl)
+
+                                        <img
+                                            src="{{ $profileUrl }}"
+                                            alt="{{ $displayName }}"
+                                            class="user-avatar"
+                                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                        >
+
+                                        <div
+                                            class="user-initials"
+                                            style="display: none;"
+                                        >
+                                            {{ $initials }}
+                                        </div>
+
+                                    @else
+
+                                        <div class="user-initials">
+                                            {{ $initials }}
+                                        </div>
+
+                                    @endif
+
+
+                                    <!-- User Details -->
+
+                                    <div class="user-info">
+
+                                        <div class="user-name">
+                                            {{ $displayName }}
+                                        </div>
+
+                                        <div class="user-email">
+                                            {{ $user->g_suite ?? $user->email ?? 'N/A' }}
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </td>
+
+
+                            <!-- Role -->
+
+                            <td>
+
+                                <span class="user-role">
+                                    {{ $user->role ?? 'N/A' }}
+                                </span>
+
+                            </td>
+
+
+                            <!-- Department -->
+
+                            <td>
+
+                                <span
+                                    class="user-department"
+                                    title="{{ $user->department ?? 'N/A' }}"
+                                >
+                                    {{ $user->department ?? 'N/A' }}
+                                </span>
+
+                            </td>
+
+
+                            <!-- Status -->
+
+                            <td>
+
+                                @if($user->status == 'Active')
+
+                                    <span class="user-status user-status-active">
+                                        Active
+                                    </span>
+
+                                @elseif($user->status == 'Pending')
+
+                                    <span class="user-status user-status-pending">
+                                        Pending
+                                    </span>
+
+                                @else
+
+                                    <span class="user-status user-status-inactive">
+                                        Inactive
+                                    </span>
+
+                                @endif
+
+                            </td>
+
+
+                            <!-- Joined -->
+
+                            <td>
+
+                                <span class="user-joined">
+
+                                    {{ $user->created_at
+                                        ? \Carbon\Carbon::parse($user->created_at)->format('F d, Y')
+                                        : 'N/A'
+                                    }}
+
+                                </span>
+
+                            </td>
+
+
+                            <!-- Actions -->
+
+                            <td class="actions-cell">
+
+                                <div class="action-menu">
+
+                                    <button
+                                        type="button"
+                                        onclick="toggleMenu('{{ md5($user->g_suite) }}')"
+                                        class="action-button"
+                                        aria-label="User actions"
+                                    >
+
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                        >
+
+                                            <circle
+                                                cx="12"
+                                                cy="5"
+                                                r="1.5"
+                                            />
+
+                                            <circle
+                                                cx="12"
+                                                cy="12"
+                                                r="1.5"
+                                            />
+
+                                            <circle
+                                                cx="12"
+                                                cy="19"
+                                                r="1.5"
+                                            />
+
+                                        </svg>
+
+                                    </button>
+
+
+                                    <!-- Action Dropdown -->
+
+                                    <div
+                                        id="menu-{{ md5($user->g_suite) }}"
+                                        class="hidden action-menu-dropdown
+                                        {{ $index >= $users->count() - 3
+                                            ? 'bottom-full mb-1'
+                                            : 'top-full mt-1'
+                                        }}"
+                                    >
+
+                                        <!-- View Profile -->
+
+                                        <a
+                                            href="{{ route('admin.users.show', $user->g_suite) }}"
+                                        >
+                                            View Profile
+                                        </a>
+
+
+                                        <!-- Divider -->
+
+                                        <div class="border-t border-gray-100"></div>
+
+
+                                        <!-- Delete User -->
+
+                                        <form
+                                            action="{{ route('admin.users.destroy', $user->g_suite) }}"
+                                            method="POST"
+                                            onsubmit="return confirm('Are you sure you want to delete this user?');"
+                                        >
+
+                                            @csrf
+                                            @method('DELETE')
+
+                                            <button
+                                                type="submit"
+                                            >
+                                                Delete User
+                                            </button>
+
+                                        </form>
+
+                                    </div>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                    @endforeach
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- =========================================
+             PAGINATION
+        ========================================== -->
+
+        <div class="users-pagination flex items-center justify-between px-6 py-4">
+
+            <!-- Result Count -->
+
+            <div class="users-pagination-text">
+
+                Showing
+
+                <strong>
+                    {{ $users->firstItem() ?? 0 }}
+                </strong>
+
+                to
+
+                <strong>
+                    {{ $users->lastItem() ?? 0 }}
+                </strong>
+
+                of
+
+                <strong>
+                    {{ $users->total() }}
+                </strong>
+
+                users
+
+            </div>
+
+
+            <!-- Custom Pagination -->
+
+            @if($users->hasPages())
+
+                <div class="pagination-list">
+
+                    <!-- Previous -->
+
+                    @if($users->onFirstPage())
+
+                        <span class="pagination-button pagination-disabled">
+                            ‹
                         </span>
 
                     @else
 
-                        <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm">
-                            Inactive
+                        <a
+                            href="{{ $users->previousPageUrl() }}"
+                            class="pagination-button"
+                        >
+                            ‹
+                        </a>
+
+                    @endif
+
+
+                    @php
+
+                        $currentPage = $users->currentPage();
+                        $lastPage = $users->lastPage();
+                        $pages = [];
+
+                        if ($lastPage <= 7) {
+
+                            for (
+                                $page = 1;
+                                $page <= $lastPage;
+                                $page++
+                            ) {
+
+                                $pages[] = $page;
+
+                            }
+
+                        } else {
+
+                            $pages[] = 1;
+
+                            if ($currentPage > 4) {
+                                $pages[] = '...';
+                            }
+
+                            $start = max(
+                                2,
+                                $currentPage - 1
+                            );
+
+                            $end = min(
+                                $lastPage - 1,
+                                $currentPage + 1
+                            );
+
+                            for (
+                                $page = $start;
+                                $page <= $end;
+                                $page++
+                            ) {
+
+                                $pages[] = $page;
+
+                            }
+
+                            if ($currentPage < $lastPage - 3) {
+                                $pages[] = '...';
+                            }
+
+                            $pages[] = $lastPage;
+
+                        }
+
+                    @endphp
+
+
+                    @foreach($pages as $page)
+
+                        @if($page === '...')
+
+                            <span class="pagination-dots">
+                                ...
+                            </span>
+
+                        @elseif($page == $currentPage)
+
+                            <span class="pagination-button pagination-current">
+                                {{ $page }}
+                            </span>
+
+                        @else
+
+                            <a
+                                href="{{ $users->url($page) }}"
+                                class="pagination-button"
+                            >
+                                {{ $page }}
+                            </a>
+
+                        @endif
+
+                    @endforeach
+
+
+                    <!-- Next -->
+
+                    @if($users->hasMorePages())
+
+                        <a
+                            href="{{ $users->nextPageUrl() }}"
+                            class="pagination-button"
+                        >
+                            ›
+                        </a>
+
+                    @else
+
+                        <span class="pagination-button pagination-disabled">
+                            ›
                         </span>
 
                     @endif
 
-                </td>
-
-                <td class="p-4">
-                   {{ $user->created_at
-                    ? \Carbon\Carbon::parse($user->created_at)->format('F d, Y')
-                    : 'N/A'
-                }}
-                </td>
-
-                <td class="p-4 text-center relative action-menu overflow-visible">
-
-            <button
-                onclick="toggleMenu('{{ md5($user->g_suite) }}')"
-                class="text-xl font-bold px-2 hover:text-green-600"
-            >
-                ⋮
-            </button>
-
-            <div
-                id="menu-{{ md5($user->g_suite) }}"
-                class="hidden absolute right-6
-                {{ $index >= $users->count() - 3 ? 'bottom-full mb-2' : 'top-full mt-2' }}
-                w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
-            >
-                <a
-                    href="{{ route('admin.users.show', $user->g_suite) }}"
-                    class="block px-4 py-2 hover:bg-gray-100"
-                >
-                    View Profile
-                </a>
-
-                <hr>
-
-                <form
-                    action="{{ route('admin.users.destroy', $user->g_suite) }}"
-                    method="POST"
-                    onsubmit="return confirm('Are you sure you want to delete this user?');"
-                >
-                    @csrf
-                    @method('DELETE')
-
-                    <button
-                        type="submit"
-                        class="block w-full px-4 py-2 text-center text-red-600 hover:bg-red-50"
-                    >
-                        Delete User
-                    </button>
-                </form>
-
-            </div>
-
-        </td>
-                    </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-
-                    <!-- Pagination -->
-                    <div class="flex items-center justify-between px-6 py-4 border-t">
-
-                        <div class="text-sm text-gray-500">
-                            Showing
-                            <span class="font-semibold">{{ $users->firstItem() ?? 0 }}</span>
-                            to
-                            <span class="font-semibold">{{ $users->lastItem() ?? 0 }}</span>
-                            of
-                            <span class="font-semibold">{{ $users->total() }}</span>
-                            users
-                        </div>
-
-                        <div>
-                            {{ $users->links() }}
-                        </div>
-
-                    </div>
-
-                    </div>
-                    </div>
                 </div>
-            </div>
 
-            <script>
-        function toggleMenu(id){
+            @endif
 
-            document.querySelectorAll("[id^='menu-']").forEach(menu=>{
-                if(menu.id!="menu-"+id){
-                    menu.classList.add("hidden");
-                }
-            });
+        </div>
 
-            document
-                .getElementById("menu-"+id)
-                .classList.toggle("hidden");
-        }
+    </div>
 
-        window.addEventListener("click",function(e){
+</div>
 
-            if (!e.target.closest(".action-menu")) {
 
-                document.querySelectorAll("[id^='menu-']").forEach(menu=>{
-                    menu.classList.add("hidden");
-                });
+<!-- =========================================
+     ACTION MENU SCRIPT
+========================================== -->
 
+<script>
+
+function toggleMenu(id)
+{
+    document
+        .querySelectorAll("[id^='menu-']")
+        .forEach(function (menu) {
+
+            if (menu.id !== "menu-" + id) {
+                menu.classList.add("hidden");
             }
 
         });
-        </script>
+
+
+    const selectedMenu =
+        document.getElementById(
+            "menu-" + id
+        );
+
+
+    if (selectedMenu) {
+
+        selectedMenu.classList.toggle("hidden");
+
+    }
+}
+
+
+window.addEventListener(
+    "click",
+    function (event) {
+
+        if (!event.target.closest(".action-menu")) {
+
+            document
+                .querySelectorAll("[id^='menu-']")
+                .forEach(function (menu) {
+
+                    menu.classList.add("hidden");
+
+                });
+
+        }
+
+    }
+);
+
+</script>
+
 @endsection
