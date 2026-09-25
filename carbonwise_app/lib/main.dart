@@ -886,6 +886,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  String _mapRoleForApi(String uiRole) {
+    switch (uiRole) {
+      case 'Student':
+        return 'student';
+      case 'Faculty':
+        return 'faculty';
+      case 'Non-Teaching Staff':
+        return 'staff';
+      default:
+        return uiRole.toLowerCase();
+    }
+  }
+
   Future<void> _handleSignUp() async {
     // Make sure a role is selected
     if (selectedRole == null) {
@@ -1046,7 +1059,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         email: email,
         password: password,
         passwordConfirmation: confirmPassword,
-        role: selectedRole!,
+        role: _mapRoleForApi(selectedRole!),
         srCode: selectedRole == "Student" ? srCode : null,
         fullName: name,
         campus: selectedCampus!,

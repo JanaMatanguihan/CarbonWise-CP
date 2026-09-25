@@ -27,16 +27,18 @@ class AuthController extends Controller
             'office' => ['nullable', 'string'],
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => strtolower($validated['role']),
-            'sr_code' => $validated['sr_code'] ?? null,
-            'campus' => $validated['campus'] ?? null,
-            'year_level' => $validated['year_level'] ?? null,
-            'department' => $validated['department'] ?? null,
-        ]);
+                $user = \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
+            return User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => strtolower($validated['role']),
+                'sr_code' => $validated['sr_code'] ?? null,
+                'campus' => $validated['campus'] ?? null,
+                'year_level' => $validated['year_level'] ?? null,
+                'department' => $validated['department'] ?? null,
+            ]);
+        });
 
         // Send verification email
         $user->sendEmailVerificationNotification();
