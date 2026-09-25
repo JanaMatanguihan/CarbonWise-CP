@@ -454,11 +454,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? 'Loading...'
         : (userInfo?['name'] ?? userInfo?['full_name'] ?? 'User Profile')
               .toString();
-    final String department = userInfo?['department'] ?? '';
+
+    final String rawRole = userInfo?['role'] ?? '';
+    final String facultyType = userInfo?['faculty_type'] ?? '';
+
+    // Dynamically format the role to reflect Teaching/Administrative Faculty
+    String role = rawRole;
+    if (rawRole.toLowerCase() == 'faculty' && facultyType.isNotEmpty) {
+      role =
+          facultyType; // e.g., "Teaching Faculty" or "Administrative Faculty"
+    } else if (rawRole.toLowerCase() == 'student') {
+      role = 'Student';
+    } else if (rawRole.toLowerCase() == 'staff' ||
+        rawRole.toLowerCase() == 'non-teaching staff') {
+      role = 'Non-Teaching Staff';
+    } else if (rawRole.isNotEmpty) {
+      role = rawRole[0].toUpperCase() + rawRole.substring(1);
+    }
+
+    // Fallback to check both department and office fields depending on user type
+    final String department =
+        userInfo?['department'] ?? userInfo?['office'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
     final String? rawProfilePic = userInfo?['profile_picture'];
     final String? profilePicture = getFullImageUrl(rawProfilePic);
-    final String role = userInfo?['role'] ?? '';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
@@ -574,7 +593,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 6),
 
-                // DEPARTMENT & CAMPUS SUB-INFO
+                // ROLE & CAMPUS SUB-INFO
                 if (!isLoadingProfile && (role.isNotEmpty || campus.isNotEmpty))
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -615,6 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 4),
 
+                // DEPARTMENT / OFFICE SUB-INFO
                 if (!isLoadingProfile && department.isNotEmpty)
                   Text(
                     department,
@@ -641,7 +661,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   .toString(),
                           studentNumber: userInfo!['sr_code'] ?? '',
                           email: userInfo!['g_suite'] ?? '',
-                          department: userInfo!['department'] ?? '',
+                          department:
+                              userInfo!['department'] ??
+                              userInfo!['office'] ??
+                              '',
                           campus: userInfo!['campus'] ?? '',
                           profilePicture: userInfo!['profile_picture'],
                         ),
