@@ -694,18 +694,9 @@ class ApiService {
       final query = month != null ? '?month=$month' : '';
       final url = Uri.parse('$baseUrl/api/department-rankings$query');
 
-      print('========== DEPARTMENT DEBUG ==========');
-      print('DEPARTMENT URL: $url');
-      print('DEPARTMENT TOKEN EXISTS: ${_token != null}');
-      print('DEPARTMENT HEADERS: $_headers');
-
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 30));
-
-      print('DEPARTMENT STATUS: ${response.statusCode}');
-      print('DEPARTMENT BODY: ${response.body}');
-      print('======================================');
 
       final data = _decodeResponse(response);
 

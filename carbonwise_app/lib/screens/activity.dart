@@ -247,9 +247,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   Future<bool> _verifyCampusPresence({required bool showFeedback}) async {
     if (_isCheckingCampus) return _isOnCampus;
-    if (showFeedback) return true;
 
     setState(() => _isCheckingCampus = true);
+
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         throw const _CampusCheckException(
@@ -258,9 +258,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
       }
 
       var permission = await Geolocator.checkPermission();
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
+
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         throw const _CampusCheckException(
@@ -270,6 +272,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
       final campus = await _apiService.getUserCampus('');
       final campusAddress = campus == null ? null : campusAddresses[campus];
+
       if (campusAddress == null) {
         throw const _CampusCheckException(
           'Your profile campus is not available for location checking.',
@@ -281,16 +284,22 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
+
       final campusPoint = await _locationService.geocodeAddress(campusAddress);
+
       final metersAway = Geolocator.distanceBetween(
         position.latitude,
         position.longitude,
         campusPoint.latitude,
         campusPoint.longitude,
       );
+
       final onCampus = metersAway <= 600;
+
       if (!mounted) return onCampus;
+
       setState(() => _isOnCampus = onCampus);
+
       if (!onCampus && showFeedback) {
         DialogHelper.showWarning(
           context: context,
@@ -299,6 +308,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               'You are about ${metersAway.round()} m from your registered campus. Activities can only be added within 600 m of campus.',
         );
       }
+
       return onCampus;
     } on _CampusCheckException catch (error) {
       if (mounted && showFeedback) {
@@ -308,6 +318,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           message: error.message,
         );
       }
+
       return false;
     } catch (_) {
       if (mounted && showFeedback) {
@@ -318,9 +329,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               'We could not verify that you are on campus. Please try again with location services enabled.',
         );
       }
+
       return false;
     } finally {
-      if (mounted) setState(() => _isCheckingCampus = false);
+      if (mounted) {
+        setState(() => _isCheckingCampus = false);
+      }
     }
   }
 

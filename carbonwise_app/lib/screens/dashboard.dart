@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 
 class DepartmentRanking {
-  final String department;
+  final String name;
+  final String type;
   final double totalEmission;
   final int totalRecords;
 
   DepartmentRanking({
-    required this.department,
+    required this.name,
+    required this.type,
     required this.totalEmission,
     required this.totalRecords,
   });
@@ -45,6 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentRankingDescription = "";
   String _campusRank = "-";
   String _userCampus = "";
+  String _userDepartmentLabel = 'Department';
 
   bool _isLoading = true;
 
@@ -130,7 +133,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      // Only ONE API call now — no Future.wait
       final rankingsData = await _apiService.getDepartmentRankings(
         month: month,
       );
@@ -138,24 +140,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final rankings = rankingsData
           .map<DepartmentRanking>((item) {
             final map = Map<String, dynamic>.from(item as Map);
+
             return DepartmentRanking(
-              department: map['department']?.toString() ?? '',
+              name: map['name']?.toString() ?? '',
+              type: map['type']?.toString() ?? 'Department',
               totalEmission: _toDouble(map['total_emission']),
               totalRecords:
                   int.tryParse(map['total_records']?.toString() ?? '0') ?? 0,
             );
           })
-          .where((r) => r.department.isNotEmpty)
+          .where((r) => r.name.isNotEmpty)
           .toList();
 
       rankings.sort((a, b) => a.totalEmission.compareTo(b.totalEmission));
-      final myDepartment = user['department']?.toString() ?? '';
-      final index = rankings.indexWhere((r) => r.department == myDepartment);
+
+      final role = user['role']?.toString().toLowerCase() ?? '';
+      final facultyType = user['faculty_type']?.toString() ?? '';
+
+      String myDepartment;
+      String departmentLabel;
+
+      if (role == 'non-teaching staff' ||
+          facultyType == 'Administrative Faculty') {
+        myDepartment = user['office']?.toString() ?? '';
+        departmentLabel = 'Office';
+      } else {
+        myDepartment = user['department']?.toString() ?? '';
+        departmentLabel = 'Department';
+      }
+
+      final index = rankings.indexWhere(
+        (r) => r.name == myDepartment && r.type == departmentLabel,
+      );
 
       if (!mounted) return;
+
       setState(() {
         _departmentRankings = rankings;
         _userDepartment = myDepartment;
+        _userDepartmentLabel = departmentLabel;
+
         _departmentRank = index >= 0
             ? '${index + 1}${_getOrdinal(index + 1)}'
             : '-';
@@ -170,7 +194,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      // Only ONE API call
       final rankingsData = await _apiService.getCampusRankings(month: month);
 
       final rankings = rankingsData
@@ -319,11 +342,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Expanded(
                   child: _buildRankingCard(
-                    title: 'Department Ranking',
+                    title: '$_userDepartmentLabel Ranking',
                     icon: Icons.school_outlined,
                     badgeText: _departmentRank,
                     description: _userDepartment.isEmpty
-                        ? 'Loading department...'
+                        ? 'Loading $_userDepartmentLabel...'
                         : _userDepartment,
                   ),
                 ),
@@ -410,9 +433,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
 
             // Department Ranking Section
-            const Text(
-              "Department Rankings",
-              style: TextStyle(
+            Text(
+              "$_userDepartmentLabel Rankings",
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -422,7 +445,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 4),
 
             Text(
-              "See how departments compare in total carbon emissions.",
+              "See how ${_userDepartmentLabel.toLowerCase()}s compare in total carbon emissions.",
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
 
@@ -473,7 +496,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 child: _buildDepartmentRankingItem(
                                   rank: index + 1,
-                                  department: dept.department,
+                                  department: dept.name,
                                   emission: dept.totalEmission,
                                   records: dept.totalRecords,
                                 ),
