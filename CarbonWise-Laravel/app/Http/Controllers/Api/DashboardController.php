@@ -141,103 +141,105 @@ class DashboardController extends Controller
     }
 }
 
-    /* Get the logged-in user's peer comparison. */
-    
-    public function myPeerComparison(Request $request)
-    {
-        try {
-            $user = $request->user();
+    /* Get the logged-in user's eco-friendly standing. */
+public function myPeerComparison(Request $request)
+{
+    try {
+        $user = $request->user();
 
-            $period = $request->query('period', 'monthly');
+        // Match the web calculation:
+        // Current date + previous 6 days = 7-day period.
+        $startDate = now()->subDays(6)->toDateString();
+        $endDate = now()->toDateString();
 
-            if (!in_array($period, ['weekly', 'monthly'])) {
-                return response()->json([
-                    'message' => 'Invalid period. Use weekly or monthly.',
-                ], 400);
-            }
+        // Get total emissions for every user during the last 7 days.
+        $userTotals = DB::connection('neon')
+            ->table('carbon_records')
+            ->select(
+                'user_id',
+                DB::raw('SUM(total_emission) as total')
+            )
+            ->whereBetween('record_date', [$startDate, $endDate])
+            ->groupBy('user_id')
+            ->get();
 
-            if ($period === 'weekly') {
-                $startDate = now()->startOfWeek()->toDateString();
-                $endDate = now()->endOfWeek()->toDateString();
-            } else {
-                $startDate = now()->startOfMonth()->toDateString();
-                $endDate = now()->endOfMonth()->toDateString();
-            }
+        // Calculate the logged-in user's total emissions.
+        $userTotal = $userTotals
+            ->firstWhere('user_id', $user->id);
 
-            // Compare only with users from the same campus and role
-            // who have carbon records during the selected period.
-            $rankings = DB::connection('neon')
-                ->table('carbon_records')
-                ->join(
-                    'users',
-                    'carbon_records.user_id',
-                    '=',
-                    'users.id'
-                )
-                ->select(
-                    'users.id',
-                    DB::raw(
-                        'SUM(carbon_records.total_emission) as total_emission'
-                    )
-                )
-                ->where('users.campus', $user->campus)
-                ->where('users.role', $user->role)
-                ->whereBetween(
-                    'carbon_records.record_date',
-                    [$startDate, $endDate]
-                )
-                ->groupBy('users.id')
-                ->orderBy('total_emission', 'asc')
-                ->get();
+        $userTotalWeekEmissions = $userTotal
+            ? (float) $userTotal->total
+            : 0.0;
 
-            $totalUsers = $rankings->count();
-
-            if ($totalUsers === 0) {
-                return response()->json([
-                    'period' => $period,
-                    'campus' => $user->campus,
-                    'role' => $user->role,
-                    'participant_count' => 0,
-                    'top_percentage' => null,
-                    'message' => 'No peer comparison is available yet.',
-                ]);
-            }
-
-            $userIndex = $rankings->search(function ($ranking) use ($user) {
-                return (int) $ranking->id === (int) $user->id;
-            });
-
-            if ($userIndex === false) {
-                return response()->json([
-                    'period' => $period,
-                    'campus' => $user->campus,
-                    'role' => $user->role,
-                    'participant_count' => $totalUsers,
-                    'top_percentage' => null,
-                    'message' => 'Record emissions to see your peer comparison.',
-                ]);
-            }
-
-            $rank = $userIndex + 1;
-
-            // Lower emissions = better ranking.
-            $topPercentage = (int) ceil(
-                ($rank / $totalUsers) * 100
-            );
-
-            return response()->json([
-                'period' => $period,
-                'campus' => $user->campus,
-                'role' => $user->role,
-                'participant_count' => $totalUsers,
-                'top_percentage' => $topPercentage,
+        // If the logged-in user has no records yet,
+        // their total is treated as zero, matching the
+        // web-side fallback behavior.
+        if (!$userTotal) {
+            $userTotals->push((object) [
+                'user_id' => $user->id,
+                'total' => $userTotalWeekEmissions,
             ]);
-
-        } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'Failed to load peer comparison.',
-            ], 500);
         }
+
+        $totalTrackedUsers = $userTotals->count();
+
+        // Only one tracked user.
+        if ($totalTrackedUsers <= 1) {
+            return response()->json([
+                'period' => 'weekly',
+                'participant_count' => $totalTrackedUsers,
+                'weekly_emissions' => $userTotalWeekEmissions,
+                'top_percentage' => 10,
+                'standing' => 'Top 10%',
+            ]);
+        }
+
+        // Count users with a HIGHER carbon footprint.
+        // Lower emissions = better eco-friendly standing.
+        $higherFootprintCount = 0;
+
+        foreach ($userTotals as $row) {
+            if (
+                (int) $row->user_id !== (int) $user->id &&
+                (float) $row->total > $userTotalWeekEmissions
+            ) {
+                $higherFootprintCount++;
+            }
+        }
+
+        // Match the web calculation exactly.
+        $percentile = (
+            $higherFootprintCount /
+            ($totalTrackedUsers - 1)
+        ) * 100;
+
+        if ($percentile >= 90) {
+            $standing = 'Top 10%';
+            $topPercentage = 10;
+        } elseif ($percentile >= 75) {
+            $standing = 'Top 25%';
+            $topPercentage = 25;
+        } elseif ($percentile >= 50) {
+            $standing = 'Top 50%';
+            $topPercentage = 50;
+        } else {
+            $standing = 'Top 75%';
+            $topPercentage = 75;
+        }
+
+        return response()->json([
+            'period' => 'weekly',
+            'participant_count' => $totalTrackedUsers,
+            'weekly_emissions' => $userTotalWeekEmissions,
+            'top_percentage' => $topPercentage,
+            'standing' => $standing,
+        ]);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'message' => 'Failed to load eco-friendly standing.',
+        ], 500);
     }
+}
 
 }
