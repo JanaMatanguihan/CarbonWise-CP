@@ -310,7 +310,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             position: relative;
             z-index: 10;
         }
-        .input-card h3 { font-size: 1.3rem; font-weight: 700; color: #BA181B; margin-bottom: 15px; }
         
         .form-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; position: relative; z-index: 15; }
         
@@ -358,11 +357,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .leaflet-routing-container { display: none !important; }
 
         .list-card { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); }
-        .list-card h3 { font-size: 1.2rem; font-weight: 700; color: #BA181B; margin-bottom: 20px; }
         .list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width: 900px) { .list-grid { grid-template-columns: 1fr; } }
         .list-column { background-color: var(--input-bg); border-radius: 8px; min-height: 250px; padding: 20px; border: 1px solid var(--border-color); }
-        .list-column h4 { font-size: 1rem; font-weight: 700; color: #BA181B; text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #BA181B; padding-bottom: 5px; }
         
         .logged-item { font-size: 0.85rem; background: var(--bg-card); color: var(--text-main); padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; font-weight: 500; gap: 10px; border: 1px solid var(--border-color); }
         .logged-item span:first-child { word-break: break-word; flex: 1; }
@@ -452,7 +449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <div class="content-container">
                 <div class="input-card">
-                    <h3 id="transportCardTitle">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
+                    <h3 id="transportCardTitle" style="color: var(--accent-green);">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
                     <div class="form-row">
                         <div class="form-group" id="primarySelectorGroup">
                             <label id="campusLabel" for="campusSelect">BSU Campus (Destination)</label>
@@ -511,7 +508,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <div class="input-card">
-                    <h3>Office Resource</h3>
+                    <h3 style="color: var(--accent-green);">Office Resource</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="officeType">Office Resource / Appliance</label>
@@ -600,7 +597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <div class="input-card">
-                    <h3>Food Consumption</h3>
+                    <h3 style="color: var(--accent-green);">Food Consumption</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="foodMealPeriodSelect">Meal Period</label>
@@ -675,16 +672,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <input type="hidden" id="foodConsumedAt" name="food_consumed_at" value="">
 
                     <div class="list-card">
-                        <h3>Your Carbon Emission & Activity List</h3>
+                        <h3 style="color: var(--accent-green); margin-bottom: 20px;">Your Carbon Emission & Activity List</h3>
                         <div class="list-grid">
                             <div class="list-column" id="colTransport">
-                                <h4>Transportation (CO2e Emissions)</h4>
+                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Transportation (CO2e Emissions)</h4>
                             </div>
                             <div class="list-column" id="colOffice">
-                                <h4>Office Resource</h4>
+                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Office Resource</h4>
                             </div>
                             <div class="list-column" id="colFood">
-                                <h4>Food Consumption</h4>
+                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Food Consumption</h4>
                             </div>
                         </div>
                         <button type="submit" class="btn-calculate">Calculate my emission</button>
@@ -1262,7 +1259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     list.innerHTML = data.map(n => `
                         <div class="notif-item" data-id="${n.id}" onclick="markAsRead(${n.id}, this)" style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); background: ${n.is_read ? 'transparent' : 'var(--input-bg)'}; cursor: pointer;">
-                            <span style="font-weight: 700; color: var(--text-main);">${n.title || 'Notification'}</span>
+                            <span style="font-weight: 700; color: var(--text-main);"><?php echo '<span style="color: green;">green</span>'; ?></span>
                             <p style="margin: 0; color: var(--text-muted); font-size: 0.8rem;">${n.message}</p>
                         </div>
                     `).join('');

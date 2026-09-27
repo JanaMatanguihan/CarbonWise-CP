@@ -3,18 +3,105 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Force consistent timezone handling
+date_default_timezone_set('UTC');
+
+// ==========================================
+// --- LOAD ENVIRONMENT VARIABLES (.ENV) ---
+// ==========================================
+function loadEnv($path) {
+    if (!file_exists($path)) {
+        return;
+    }
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (empty($line) || strpos($line, '#') === 0) continue;
+        
+        list($name, $value) = explode('=', $line, 2) + [NULL, NULL];
+        if ($name && $value !== NULL) {
+            $name = trim($name);
+            $value = trim($value, " \t\n\r\0\x0B\"'");
+            $_ENV[$name] = $value;
+            putenv("{$name}={$value}");
+        }
+    }
+}
+
+// Check current directory first, then fallback to parent directory
+if (file_exists(__DIR__ . '/.env')) {
+    loadEnv(__DIR__ . '/.env');
+} else {
+    loadEnv(dirname(__DIR__) . '/.env');
+}
+
+function env($key, $default = '') {
+    $value = $_ENV[$key] ?? getenv($key);
+    return ($value !== false && $value !== null) ? trim($value, '"\'') : $default;
+}
+
 $error = '';
 $success = '';
 
 // ==========================================
-// --- NEON POSTGRESQL CONFIGURATION ---
+// --- CONFIGURATION FROM ENV ---
 // ==========================================
-$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
-$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
-$db_port     = '5432';
-$db_name     = 'neondb';
-$db_user     = 'neondb_owner'; 
-$db_pass     = 'npg_B7h4oEQbqJdG'; 
+$brevo_api_key    = env('BREVO_API_KEY', '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');
+$brevo_api_url    = env('BREVO_API_URL', 'https://api.brevo.com/v3');
+$brevo_from_email  = env('BREVO_FROM_EMAIL', 'noreplycarbonwise@gmail.com');
+$brevo_from_name   = env('BREVO_FROM_NAME', 'CarbonWise');
+
+$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
+$db_port     = env('DB_PORT', '5432');
+$db_name     = env('DB_DATABASE', 'neondb');
+$db_user     = env('DB_USERNAME', 'neondb_owner'); 
+$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
+
+if (empty($db_pass)) {
+    die("Database Connection Error: DB_PASSWORD is missing or could not be loaded from .env.");
+}
+
+$endpoint_id = explode('.', $db_host)[0] ?? '';
+
+/**
+ * Sends a transactional email using Brevo's v3 REST API via cURL
+ */
+function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientEmail, $subject, $htmlContent) {
+    $endpoint = rtrim($apiUrl, '/') . '/smtp/email';
+
+    $payload = [
+        'sender' => [
+            'name'  => $senderName,
+            'email' => $senderEmail
+        ],
+        'to' => [
+            [
+                'email' => $recipientEmail
+            ]
+        ],
+        'subject'     => $subject,
+        'htmlContent' => $htmlContent
+    ];
+
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'accept: application/json',
+            'api-key: ' . $apiKey,
+            'content-type: application/json'
+        ],
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_TIMEOUT        => 10
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return ($httpCode === 201 || $httpCode === 200);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role          = $_POST['role'] ?? ''; 
@@ -57,7 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "You must agree to the Terms and Conditions to register.";
     } else {
         try {
-            $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require;options='endpoint={$endpoint_id}'";
+            $dsn_options = "sslmode=require";
+            if (!empty($endpoint_id)) {
+                $dsn_options .= ";options='endpoint={$endpoint_id}'";
+            }
+
+            $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};{$dsn_options}";
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -73,16 +165,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($check_stmt->fetch()) {
                 $error = "You already have an account registered with this email address. Please log in instead.";
             } else {
-                // --- STEP 2: SECURE BCRYPT PASSWORD HASHING ---
-                $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-                $hashed_confirm  = password_hash($confirm_pwd, PASSWORD_BCRYPT);
-                $current_time    = date('Y-m-d H:i:s');
+                // --- STEP 2: SECURE BCRYPT PASSWORD HASHING & TOKEN GENERATION ---
+                $hashed_password     = password_hash($password, PASSWORD_BCRYPT);
+                $hashed_confirm      = password_hash($confirm_pwd, PASSWORD_BCRYPT);
+                $verification_token  = bin2hex(random_bytes(32));
+                $current_time        = date('Y-m-d H:i:s');
 
-                // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE MATCHING EXACT SCHEMA ---
+                // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE USING remember_token ---
                 $insert_sql = "INSERT INTO users 
-                    (name, email, password, confirm_password, role, sr_code, campus, year_level, department, faculty_type, office, status, created_at, \"updated_at\") 
+                    (name, email, password, confirm_password, role, sr_code, campus, year_level, department, faculty_type, office, status, remember_token, created_at, \"updated_at\") 
                     VALUES 
-                    (:name, :email, :password, :confirm_password, :role, :sr_code, :campus, :year_level, :department, :faculty_type, :office, 'Active', :created_at, :updated_at)";
+                    (:name, :email, :password, :confirm_password, :role, :sr_code, :campus, :year_level, :department, :faculty_type, :office, 'Pending Verification', :remember_token, :created_at, :updated_at)";
 
                 $insert_stmt = $pdo->prepare($insert_sql);
                 $insert_stmt->execute([
@@ -97,12 +190,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':department'       => $department,
                     ':faculty_type'     => $faculty_type,
                     ':office'           => $office,
+                    ':remember_token'   => $verification_token,
                     ':created_at'       => $current_time,
                     ':updated_at'       => $current_time
                 ]);
 
-                $_SESSION['reg_success_message'] = "Registration successful! Welcome to CarbonWise. You may log in directly now.";
-                
+                // Construct verification link
+                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+                $host = $_SERVER['HTTP_HOST'];
+                $verify_link = "{$protocol}://{$host}/verify.php?token={$verification_token}";
+
+                // HTML Body for Brevo Email
+                $subject = "CarbonWise - Verify Your Email Address";
+                $htmlBody = "
+                    <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
+                        <h2 style='color: #098a38;'>Welcome to CarbonWise!</h2>
+                        <p>Hello " . htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8') . ",</p>
+                        <p>Thank you for signing up. Please verify your email address by clicking the button below to activate your account.</p>
+                        <p style='margin: 30px 0;'>
+                            <a href='{$verify_link}' style='background-color: #098a38; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Verify Email Address</a>
+                        </p>
+                        <p>If the button above does not work, copy and paste this link into your browser:</p>
+                        <p><a href='{$verify_link}'>{$verify_link}</a></p>
+                        <hr style='border: none; border-top: 1px solid #eee; margin-top: 20px;'>
+                        <p style='font-size: 12px; color: #777;'>If you did not create a CarbonWise account, you can safely ignore this email.</p>
+                    </div>
+                ";
+
+                // Send email via Brevo REST API
+                $mailSent = sendBrevoEmail(
+                    $brevo_api_key, 
+                    $brevo_api_url, 
+                    $brevo_from_email, 
+                    $brevo_from_name, 
+                    $email, 
+                    $subject, 
+                    $htmlBody
+                );
+
+                if ($mailSent) {
+                    $_SESSION['reg_success_message'] = "Registration successful! A verification link has been sent to {$email}. Please check your inbox.";
+                } else {
+                    $_SESSION['reg_success_message'] = "Account created, but failed to send verification email. Please contact support.";
+                }
+
                 unset($_POST);
                 header('Location: login.php');
                 exit;
@@ -466,7 +597,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function updateFormUI() {
             const role = roleSelector.value;
 
-            // Reset dynamic fields visibility and required attributes
             studentSrContainer.style.display = 'none';
             studentBottomContainer.style.display = 'none';
             facultyContainer.style.display = 'none';

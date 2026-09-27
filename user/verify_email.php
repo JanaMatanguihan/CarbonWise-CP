@@ -3,21 +3,60 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Force consistent timezone handling between PHP and Database
+// Force consistent timezone handling
 date_default_timezone_set('UTC');
+
+// ==========================================
+// --- LOAD ENVIRONMENT VARIABLES (.ENV) ---
+// ==========================================
+function loadEnv($path) {
+    if (!file_exists($path)) {
+        return;
+    }
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (empty($line) || strpos($line, '#') === 0) continue;
+        
+        list($name, $value) = explode('=', $line, 2) + [NULL, NULL];
+        if ($name && $value !== NULL) {
+            $name = trim($name);
+            $value = trim($value, " \t\n\r\0\x0B\"'");
+            $_ENV[$name] = $value;
+            putenv("{$name}={$value}");
+        }
+    }
+}
+
+// Check current directory first, then fallback to parent directory
+if (file_exists(__DIR__ . '/.env')) {
+    loadEnv(__DIR__ . '/.env');
+} else {
+    loadEnv(dirname(__DIR__) . '/.env');
+}
+
+function env($key, $default = '') {
+    $value = $_ENV[$key] ?? getenv($key);
+    return ($value !== false && $value !== null) ? trim($value, '"\'') : $default;
+}
 
 $error = ''; 
 $success = '';
 
 // ==========================================
-// --- NEON POSTGRESQL CONFIGURATION ---
+// --- CONFIGURATION FROM ENV ---
 // ==========================================
-$db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
-$endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
-$db_port     = '5432';
-$db_name     = 'neondb';
-$db_user     = 'neondb_owner'; 
-$db_pass     = 'npg_B7h4oEQbqJdG'; 
+$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
+$db_port     = env('DB_PORT', '5432');
+$db_name     = env('DB_DATABASE', 'neondb');
+$db_user     = env('DB_USERNAME', 'neondb_owner'); 
+$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
+
+if (empty($db_pass)) {
+    die("Database Connection Error: DB_PASSWORD is missing or could not be loaded from .env.");
+}
+
+$endpoint_id = explode('.', $db_host)[0] ?? '';
 
 $token = trim($_GET['token'] ?? '');
 
@@ -25,32 +64,30 @@ if (empty($token)) {
     $error = "Invalid verification token provided.";
 } else {
     try {
-        $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require;options='endpoint={$endpoint_id}'";
+        $dsn_options = "sslmode=require";
+        if (!empty($endpoint_id)) {
+            $dsn_options .= ";options='endpoint={$endpoint_id}'";
+        }
+
+        $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};{$dsn_options}";
         $pdo = new PDO($dsn, $db_user, $db_pass, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
 
-        // Check if token exists regardless of expiration first
-        $stmt = $pdo->prepare("SELECT id, status, verification_token_expires FROM users WHERE verification_token = :token LIMIT 1");
+        // Check if user exists with this token inside remember_token
+        $stmt = $pdo->prepare("SELECT id, status FROM users WHERE remember_token = :token LIMIT 1");
         $stmt->execute([':token' => $token]);
         $user = $stmt->fetch();
 
         if (!$user) {
-            $error = "Token not found in database. Check if the token column was saved properly during registration.";
+            $error = "Invalid or already used verification token.";
         } else {
-            // Compare using database time comparison via SQL instead of PHP strtotime to avoid timezone bugs
-            $checkTime = $pdo->query("SELECT (verification_token_expires > NOW()) AS is_valid FROM users WHERE verification_token = " . $pdo->quote($token))->fetch();
-            
-            if (!$checkTime || !$checkTime['is_valid']) {
-                $error = "This verification link has expired.";
-            } else {
-                // Update status to Active, set email_verified_at timestamp, and clear token
-                $update = $pdo->prepare("UPDATE users SET status = 'Active', email_verified_at = NOW(), verification_token = NULL, verification_token_expires = NULL WHERE id = :id");
-                $update->execute([':id' => $user['id']]);
+            // Update status to Active, fill email_verified_at timestamp, and clear remember_token
+            $update = $pdo->prepare("UPDATE users SET status = 'Active', email_verified_at = NOW(), remember_token = NULL WHERE id = :id");
+            $update->execute([':id' => $user['id']]);
 
-                $success = "Your email has been successfully verified! You can now log in to CarbonWise.";
-            }
+            $success = "Your email has been successfully verified! You can now log in to CarbonWise.";
         }
 
     } catch (PDOException $e) {
