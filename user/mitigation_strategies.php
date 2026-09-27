@@ -3,17 +3,25 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 1. Guard check: If the user isn't logged in, send them back to login
+// 1. Guard check: Redirect unauthenticated users
 if (!isset($_SESSION['user_token'])) {
     header('Location: login.php');
     exit;
 }
 
-// 2. Extract session variables safely
-$user_data  = $_SESSION['user_profile'] ?? ($_SESSION['user_data'] ?? []);
-$user_id    = $_SESSION['user_id'] ?? ($user_data['id'] ?? null); 
+// 2. Extract session variables safely and resolve dynamic user ID
+$user_data = $_SESSION['user_profile'] ?? ($_SESSION['user_data'] ?? []);
+$raw_user_id = $_SESSION['user_id'] ?? ($user_data['id'] ?? ($_SESSION['id'] ?? null));
+
+if (!empty($raw_user_id) && !is_numeric($raw_user_id)) {
+    $clean_id = preg_replace('/[^0-9]/', '', (string)$raw_user_id);
+    $user_id  = !empty($clean_id) ? (int)$clean_id : null;
+} else {
+    $user_id = !empty($raw_user_id) ? (int)$raw_user_id : null;
+}
+
 $user_metadata = $user_data['user_metadata'] ?? [];
-$user_email = $user_data['email'] ?? ($user_metadata['email'] ?? ($_SESSION['user_email'] ?? ''));
+$user_email    = $user_data['email'] ?? ($user_metadata['email'] ?? ($_SESSION['user_email'] ?? ''));
 
 // 3. Resolve display name and user role
 $raw_name = $_SESSION['user_name'] ?? ($user_data['full_name'] ?? ($user_metadata['full_name'] ?? ($user_metadata['name'] ?? ($user_data['name'] ?? ''))));
@@ -22,7 +30,7 @@ $raw_role = $_SESSION['user_role'] ?? ((isset($user_data['role']) && strtolower(
 $full_name = !empty($raw_name) ? ucwords(strtolower(trim($raw_name))) : 'Unknown User'; 
 $role      = (!empty($raw_role) && strtolower($raw_role) !== 'authenticated') ? ucwords(strtolower(trim($raw_role))) : 'User';
 
-// --- NEON POSTGRESQL CONFIGURATION ---
+// --- NEON POSTGRESQL DATABASE CONNECTION ---
 $db_host     = 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
 $endpoint_id = 'ep-red-hill-a5erg1sb-pooler'; 
 $db_port     = '5432';
@@ -32,7 +40,12 @@ $db_pass     = 'npg_B7h4oEQbqJdG';
 
 $avatar_url = $user_data['avatar_url'] ?? ($user_metadata['avatar_url'] ?? null);
 
-// Connect to Neon Database and fetch profile_picture from the users table
+// Emissions metrics initialized
+$total_transport   = 0.0;
+$total_electricity = 0.0;
+$total_food        = 0.0;
+$record_count      = 0;
+
 try {
     $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require;options='endpoint={$endpoint_id}'";
     $options = [
@@ -43,15 +56,34 @@ try {
     $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
     if ($user_id) {
+        // Fetch User Profile Picture
         $stmt_u = $pdo->prepare("SELECT profile_picture FROM users WHERE id = :id LIMIT 1");
         $stmt_u->execute([':id' => $user_id]);
         $u_info = $stmt_u->fetch();
         if ($u_info && !empty($u_info['profile_picture'])) {
             $avatar_url = $u_info['profile_picture'];
         }
+
+        // AUTO-QUERY: Fetch current accumulated carbon records & count for the user
+        $stmt_e = $pdo->prepare("SELECT 
+                                    COALESCE(SUM(transportation), 0) as total_transport, 
+                                    COALESCE(SUM(electricity), 0) as total_electricity, 
+                                    COALESCE(SUM(food), 0) as total_food,
+                                    COUNT(*) as record_count
+                                 FROM carbon_records 
+                                 WHERE user_id = :user_id");
+        $stmt_e->execute([':user_id' => $user_id]);
+        $emissions = $stmt_e->fetch();
+
+        if ($emissions) {
+            $total_transport   = (float)$emissions['total_transport'];
+            $total_electricity = (float)$emissions['total_electricity'];
+            $total_food        = (float)$emissions['total_food'];
+            $record_count      = (int)$emissions['record_count'];
+        }
     }
 } catch (PDOException $e) {
-    // Database Connection Error Fallback
+    // Silently handle DB errors
 }
 
 // Generate initials fallback if profile picture is empty
@@ -69,33 +101,64 @@ if (empty($avatar_url)) {
     }
 }
 
-// --- STATIC/SESSION EMISSIONS DATA ---
-$total_transport = 0.0;
-$total_electricity = 0.0;
-$total_food = 0.0;
+// Calculate totals and percentage distributions dynamically
 $grand_total = $total_transport + $total_electricity + $total_food;
-$highest_emission_category = 'None';
-$emission_tier = 'Low Impact (Eco-Friendly)';
 
-// --- DYNAMIC STRATEGY ENGINE (DYNAMIC GEMINI API INTEGRATION) ---
+$highest_emission_category = 'None';
+$highest_val = 0.0;
+
+$categories = [
+    'Transport'             => $total_transport,
+    'Office Resource Usage' => $total_electricity,
+    'Food Consumption'      => $total_food
+];
+
+foreach ($categories as $cat_name => $val) {
+    if ($val > $highest_val) {
+        $highest_val = $val;
+        $highest_emission_category = $cat_name;
+    }
+}
+
+$pct_transport   = $grand_total > 0 ? round(($total_transport / $grand_total) * 100, 1) : 0;
+$pct_electricity = $grand_total > 0 ? round(($total_electricity / $grand_total) * 100, 1) : 0;
+$pct_food        = $grand_total > 0 ? round(($total_food / $grand_total) * 100, 1) : 0;
+
+if ($grand_total > 100) {
+    $emission_tier = 'High Impact';
+} elseif ($grand_total > 40) {
+    $emission_tier = 'Moderate Impact';
+} else {
+    $emission_tier = 'Low Impact (Eco-Friendly)';
+}
+
+// --- DYNAMIC AI RECOMMENDATION ENGINE (GEMINI API) ---
 $gemini_api_key = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
 $ai_insight_summary = "";
 $strategies = [];
 $api_success = false;
 
 if (!empty($gemini_api_key)) {
-    $prompt = "You are a real-time environmental analysis engine for CarbonWise.
-    Analyze these EXACT 60-day metrics logged by user {$full_name}:
-    - Transport: {$total_transport} kg CO2
-    - Electricity/Resource: {$total_electricity} kg CO2
-    - Food: {$total_food} kg CO2
-    - Combined Total: {$grand_total} kg CO2 ({$emission_tier})
+    // Dynamic Prompt with live mathematical breakdowns and continuous variation seed
+    $prompt = "You are a dynamic real-time environmental analysis engine for CarbonWise.
+    Analyze these EXACT real-time database metrics logged by user '{$full_name}':
+    - Transport: {$total_transport} kg CO2 ({$pct_transport}% of total)
+    - Office Resource/Electricity: {$total_electricity} kg CO2 ({$pct_electricity}% of total)
+    - Food Consumption: {$total_food} kg CO2 ({$pct_food}% of total)
+    - Total Footprint: {$grand_total} kg CO2 ({$emission_tier})
+    - Total User Entries: {$record_count} activity logs
+    - Random Context Seed: " . microtime(true) . "
 
-    Generate a highly customized JSON response containing a tailored 'insight_summary' paragraph and an array of 'strategies'. 
-    - Provide actionable recommendations ONLY for categories where the user has logged emissions > 0.
-    - If ALL categories are 0, return an empty strategies array [].
+    Instructions:
+    1. Do NOT use canned or static text. Dynamically generate fresh, custom recommendations tailored to these unique metrics.
+    2. 'insight_summary': Write a personalized paragraph evaluating the breakdown percentage ({$pct_transport}%, {$pct_electricity}%, {$pct_food}%).
+    3. 'strategies': Create custom actionable items ONLY for categories where emissions > 0.
+       - Calculate custom targeted reduction values ('impact') proportional to the user's specific logged numbers.
+       - Set 'priority': true ONLY for the dominant category ('{$highest_emission_category}').
+       - Assign 'icon' dynamically based on the specific recommendation topic.
+    4. If ALL category values are 0, return an empty strategies array [].
 
-    Return the response strictly as valid, raw JSON matching this schema format. Do not use markdown backticks:
+    Return JSON matching this schema:
     {
       \"insight_summary\": \"string\",
       \"strategies\": [
@@ -118,7 +181,8 @@ if (!empty($gemini_api_key)) {
             ["parts" => [["text" => $prompt]]]
         ], 
         "generationConfig" => [
-            "responseMimeType" => "application/json"
+            "responseMimeType" => "application/json",
+            "temperature"      => 0.7
         ]
     ];
 
@@ -128,7 +192,7 @@ if (!empty($gemini_api_key)) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($post_data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 12); 
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10); 
     
     $response = curl_exec($ch);
     curl_close($ch);
@@ -136,60 +200,56 @@ if (!empty($gemini_api_key)) {
     if ($response) {
         $response_arr = json_decode($response, true);
         $raw_text = trim($response_arr['candidates'][0]['content']['parts'][0]['text'] ?? '');
-        $clean_json_str = trim(preg_replace('/^```json\s*|\s*```$/', '', $raw_text));
+        $clean_json_str = trim(preg_replace('/^```json\s*|\s*```$/', '',$raw_text));
         $clean_json = json_decode($clean_json_str, true);
         
-        if (json_last_error() === JSON_ERROR_NONE && isset($clean_json['strategies'])) {
-            $ai_insight_summary = $clean_json['insight_summary'];
-            $strategies = $clean_json['strategies'];
-            $api_success = true;
+        if (json_last_error() === JSON_ERROR_NONE && isset($clean_json['strategies'])) {$ai_insight_summary = $clean_json['insight_summary'];$strategies = $clean_json['strategies'];$api_success = true;
         }
     }
 }
 
-// --- DYNAMIC ADAPTIVE STRATEGIES (STATIC TELEMETRY FALLBACK) ---
+// --- DYNAMIC ALGORITHMIC FALLBACK SYSTEM (Live Math Engine) ---
+// If the API key is not present or offline, this generates non-static, dynamic recommendations calculated directly from real-time database numbers.
 if (!$api_success) {
-    if ($grand_total > 0) {
-        $ai_insight_summary = "Based on your recent activity logs totaling <strong>" . number_format($grand_total, 1) . " kg CO2</strong>, your highest impact area is currently in <strong>{$highest_emission_category}</strong>. Review the targeted reduction strategies below to optimize your environmental footprint.";
-        
-        if ($total_transport > 0) {
-            $strategies[] = [
-                'title' => 'Optimize Transport Logistics',
-                'description' => 'Targeting your logged ' . number_format($total_transport, 1) . ' kg CO2 transport footprint via public transits or carpooling.',
-                'category' => 'Transport',
-                'frequency' => 'Weekly',
-                'impact' => round($total_transport * 0.15, 1),
-                'unit' => 'kg CO2 / week',
-                'icon' => '🚗',
-                'priority' => ($highest_emission_category === 'Transport')
+    if ($grand_total > 0) {$ai_insight_summary = "Based on your current activity logs totaling <strong>" . number_format($grand_total, 2) . " kg CO2</strong> across {$record_count} entries, your primary driver is <strong>{$highest_emission_category}</strong>. Transport accounts for {$pct_transport}%, Office/Electricity for {$pct_electricity}%, and Food for {$pct_food}% of your carbon impact.";
+
+        if ($total_transport > 0) {$target_reduction = round($total_transport * 0.22, 2);$strategies[] = [
+                'title'       => 'Reduce ' . number_format($total_transport, 1) . ' kg CO2 Transport Footprint',
+                'description' => 'Your transport footprint makes up ' . $pct_transport . '% of your total emissions. Shifting 20% of trips to public transit or carpooling can lower your carbon output.',
+                'category'    => 'Transport',
+                'frequency'   => 'Weekly',
+                'impact'      => $target_reduction,
+                'unit'        => 'kg CO2 / week',
+                'icon'        => '🚲',
+                'priority'    => ($highest_emission_category === 'Transport')
             ];
         }
-        if ($total_electricity > 0) {
-            $strategies[] = [
-                'title' => 'Curtail Idle Power Consumption',
-                'description' => 'Targeting your logged ' . number_format($total_electricity, 1) . ' kg CO2 resource profile by shutting off unused electronics.',
-                'category' => 'Office Resource Usage',
-                'frequency' => 'Daily',
-                'impact' => round($total_electricity * 0.20, 1),
-                'unit' => 'kg CO2 / day',
-                'icon' => '⚡',
-                'priority' => ($highest_emission_category === 'Office Resource Usage')
+
+        if ($total_electricity > 0) {$target_reduction = round($total_electricity * 0.18, 2);$strategies[] = [
+                'title'       => 'Optimize Office & Energy Use (' . number_format($total_electricity, 1) . ' kg CO2)',
+                'description' => 'Energy use accounts for ' . $pct_electricity . '% of your logged activities. Utilizing energy-saving power strips and adjusting thermostat controls can cut power waste.',
+                'category'    => 'Office Resource Usage',
+                'frequency'   => 'Daily',
+                'impact'      => $target_reduction,
+                'unit'        => 'kg CO2 / day',
+                'icon'        => '⚡',
+                'priority'    => ($highest_emission_category === 'Office Resource Usage')
             ];
         }
-        if ($total_food > 0) {
-            $strategies[] = [
-                'title' => 'Sustainable Diet Adjustments',
-                'description' => 'Transitioning your logged ' . number_format($total_food, 1) . ' kg CO2 dietary footprint toward eco-friendly plant choices.',
-                'category' => 'Food Consumption',
-                'frequency' => 'Daily',
-                'impact' => round($total_food * 0.12, 1),
-                'unit' => 'kg CO2 / day',
-                'icon' => '🥗',
-                'priority' => ($highest_emission_category === 'Food Consumption')
+
+        if ($total_food > 0) {$target_reduction = round($total_food * 0.25, 2);$strategies[] = [
+                'title'       => 'Lower Food Footprint of ' . number_format($total_food, 1) . ' kg CO2',
+                'description' => 'Dietary emissions represent ' . $pct_food . '% of your footprint. Substituting plant-based options for high-emission meals twice a week reduces impact significantly.',
+                'category'    => 'Food Consumption',
+                'frequency'   => 'Daily',
+                'impact'      => $target_reduction,
+                'unit'        => 'kg CO2 / day',
+                'icon'        => '🌱',
+                'priority'    => ($highest_emission_category === 'Food Consumption')
             ];
         }
     } else {
-        $ai_insight_summary = "Welcome to CarbonWise! We couldn't find any historical activity records in your logs for the last 60 days. Start logging your daily activities to receive personalized carbon reduction pathways.";
+        $ai_insight_summary = "Welcome to CarbonWise! You currently have 0.00 kg CO2 recorded in your database logs. Navigate to <strong>Activity Input</strong> to log your daily activities and generate personalized mitigation plans.";
         $strategies = [];
     }
 }
@@ -413,7 +473,7 @@ if (!$api_success) {
                     </thead>
                     <tbody id="tableBody">
                         <?php if (!empty($strategies)): ?>
-                            <?php foreach ($strategies as $strategy): ?>
+                            <?php foreach ($strategies as$strategy): ?>
                                 <tr class="strategy-row" data-category="<?= htmlspecialchars($strategy['category']) ?>" data-title="<?= strtolower(htmlspecialchars($strategy['title'])) ?>">
                                     <td>
                                         <div class="strategy-info-cell">
