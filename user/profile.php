@@ -3,18 +3,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 1. Generate CSRF Token for Secure form submissions[cite: 8]
+// 1. Generate CSRF Token for Secure form submissions
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// 2. Guard check: If the user isn't logged in, send them back to login[cite: 8]
+// 2. Guard check: If the user isn't logged in, send them back to login
 if (!isset($_SESSION['user_token'])) {
     header('Location: login.php');
     exit;
 }
 
-// --- NEON POSTGRESQL DATABASE CONFIGURATION ---[cite: 8]
+// --- NEON POSTGRESQL DATABASE CONFIGURATION ---
 $neon_host     = getenv('NEON_DB_HOST')     ?: 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech';
 $neon_port     = getenv('NEON_DB_PORT')     ?: '5432';
 $neon_dbname   = getenv('NEON_DB_NAME')     ?: 'neondb';
@@ -36,12 +36,12 @@ try {
     $db_connection_error = $e->getMessage();
 }
 
-// 3. Extract user session data strictly using user_id[cite: 8]
+// 3. Extract user session data strictly using user_id
 $user_data = $_SESSION['user_profile'] ?? ($_SESSION['user_data'] ?? []);
 $user_id   = $_SESSION['user_id'] ?? ($user_data['id'] ?? null); 
 $user_metadata = $user_data['user_metadata'] ?? [];
 
-// Redirect if user_id is missing from session[cite: 8]
+// Redirect if user_id is missing from session
 if (empty($user_id)) {
     header('Location: login.php');
     exit;
@@ -50,7 +50,7 @@ if (empty($user_id)) {
 $user_email = $_SESSION['user_email'] ?? ($user_data['email'] ?? ($user_metadata['email'] ?? 'Unknown Email'));
 $user_name  = $_SESSION['user_name'] ?? ($user_data['full_name'] ?? ($user_metadata['full_name'] ?? ($user_metadata['name'] ?? '')));
 
-// 4. Extract Name & Role[cite: 8]
+// 4. Extract Name & Role
 $raw_name = $user_name;
 if (isset($user_data['role']) && strtolower($user_data['role']) !== 'authenticated') {
     $raw_role = $user_data['role'];
@@ -58,7 +58,7 @@ if (isset($user_data['role']) && strtolower($user_data['role']) !== 'authenticat
     $raw_role = $user_metadata['role'] ?? '';
 }
 
-// 5. Extract Department & Campus from session user data[cite: 8]
+// 5. Extract Department & Campus from session user data
 $raw_dept   = $user_data['department'] ?? ($user_metadata['department'] ?? '');
 $raw_campus = $user_data['campus'] ?? ($user_metadata['campus'] ?? '');
 
@@ -75,10 +75,10 @@ if (!empty($raw_dept) && !empty($raw_campus)) {
     $dept_and_campus = 'No Department / Campus Assigned';
 }
 
-// --- POST INTERCEPTOR PIPES & CONTROLLERS ---[cite: 8]
+// --- POST INTERCEPTOR PIPES & CONTROLLERS ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // CSRF Guard verification[cite: 8]
+    // CSRF Guard verification
     $provided_token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
     if (!hash_equals($_SESSION['csrf_token'], $provided_token)) {
         header('Content-Type: application/json');
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Process Avatar Upload strictly bound to user_id[cite: 7, 8]
+    // Process Avatar Upload strictly bound to user_id
     if (isset($_FILES['profile_avatar'])) {
         $file = $_FILES['profile_avatar'];
 
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // --- LOCAL FILE STORAGE PIPELINE ---[cite: 7]
+        // --- LOCAL FILE STORAGE PIPELINE ---
         $upload_dir = 'uploads/avatars/';
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0755, true);
@@ -144,45 +144,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     }
-
-    // Process Password Updates strictly bound to user_id[cite: 8]
-    if (isset($_POST['action']) && $_POST['action'] === 'update_password') {
-        $new_password     = $_POST['new_password'] ?? '';
-        $confirm_password = $_POST['confirm_password'] ?? '';
-
-        if (empty($new_password) || strlen($new_password) < 4) {
-            header("Location: profile.php?status=error&msg=" . urlencode("Password must be at least 4 characters long."));
-            exit;
-        }
-
-        if ($new_password !== $confirm_password) {
-            header("Location: profile.php?status=error&msg=" . urlencode("Passwords do not match."));
-            exit;
-        }
-
-        if (!$pdo) {
-            header("Location: profile.php?status=error&msg=" . urlencode("Database connection failure. Password not updated."));
-            exit;
-        }
-
-        try {
-            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET password = :password WHERE id = :user_id");
-            $stmt->execute([
-                ':password' => $hashed_password,
-                ':user_id'  => $user_id
-            ]);
-
-            header("Location: profile.php?status=success&msg=" . urlencode("Password updated successfully!"));
-            exit;
-        } catch (PDOException $e) {
-            header("Location: profile.php?status=error&msg=" . urlencode("Database modification failure: " . $e->getMessage()));
-            exit;
-        }
-    }
 }
 
-// 6. DYNAMICALLY CALCULATE CARBON SCORE FROM carbon_records STRICTLY BY user_id[cite: 8]
+// 6. DYNAMICALLY CALCULATE CARBON SCORE FROM carbon_records STRICTLY BY user_id
 $current_week_score = 0;
 $last_week_score    = 0;
 $grand_total        = 0;
@@ -192,7 +156,7 @@ $info_response      = !empty($db_connection_error) ? $db_connection_error : "";
 
 if ($pdo) {
     try {
-        // Query profile_picture by user_id[cite: 8]
+        // Query profile_picture by user_id
         $avatar_stmt = $pdo->prepare("SELECT profile_picture FROM users WHERE id = :user_id LIMIT 1");
         $avatar_stmt->execute([':user_id' => $user_id]);
         $user_row = $avatar_stmt->fetch();
@@ -200,7 +164,7 @@ if ($pdo) {
             $_SESSION['user_profile']['user_metadata']['profile_picture'] = $user_row['profile_picture'];
         }
 
-        // Aggregate emissions data matching strictly by user_id[cite: 8]
+        // Aggregate emissions data matching strictly by user_id
         $score_stmt = $pdo->prepare("
             SELECT 
                 COALESCE(SUM(CAST(REGEXP_REPLACE(COALESCE(total_emission::text, '0'), '[^0-9.]', '', 'g') AS NUMERIC)), 0) AS grand_total,
@@ -219,11 +183,11 @@ if ($pdo) {
             $grand_total = floatval($score_data['grand_total']);
             $weekly_sum  = floatval($score_data['current_week']);
             
-            // Fallback: If current 7-day total is 0, display cumulative lifetime carbon score[cite: 8]
+            // Fallback: If current 7-day total is 0, display cumulative lifetime carbon score
             $current_week_score = ($weekly_sum > 0) ? round($weekly_sum, 1) : round($grand_total, 1);
             $last_week_score    = floatval($score_data['last_week']);
 
-            // Sync calculated score to users table[cite: 8]
+            // Sync calculated score to users table
             $update_stmt = $pdo->prepare("UPDATE users SET carbon_score = :score WHERE id = :user_id");
             $update_stmt->execute([
                 ':score'   => $current_week_score,
@@ -231,7 +195,7 @@ if ($pdo) {
             ]);
         }
 
-        // Generate performance text[cite: 8]
+        // Generate performance text
         if ($current_week_score > 0) {
             if ($last_week_score > 0) {
                 if ($current_week_score < $last_week_score) {
@@ -255,7 +219,7 @@ if ($pdo) {
     }
 }
 
-// 7. DYNAMICALLY COMPUTE CATEGORY BREAKDOWNS (NO HARDCODED SCHEMA)[cite: 8]
+// 7. DYNAMICALLY COMPUTE CATEGORY BREAKDOWNS (NO HARDCODED SCHEMA)
 $categories_data = [
     'transportation'   => ['current_week' => 0, 'top_activity' => 'Commuting Daily', 'icon' => 'fa-bus'],
     'office_resource'  => ['current_week' => 0, 'top_activity' => 'Electricity & Office Usage', 'icon' => 'fa-bolt'],
@@ -264,7 +228,7 @@ $categories_data = [
 
 if ($pdo) {
     try {
-        // 1. Inspect table columns dynamically at runtime[cite: 8]
+        // 1. Inspect table columns dynamically at runtime
         $col_stmt = $pdo->prepare("
             SELECT column_name 
             FROM information_schema.columns 
@@ -273,14 +237,14 @@ if ($pdo) {
         $col_stmt->execute();
         $existing_columns = $col_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        // Define search patterns matching possible emission column names[cite: 8]
+        // Define search patterns matching possible emission column names
         $category_patterns = [
             'transportation'   => ['transport', 'commute', 'travel', 'vehicle'],
             'office_resource'  => ['office', 'elec', 'energy', 'resource', 'power', 'utility'],
             'food_consumption' => ['food', 'meal', 'diet', 'consumption', 'eat']
         ];
 
-        // 2. Identify relevant emission columns dynamically for each category[cite: 8]
+        // 2. Identify relevant emission columns dynamically for each category
         $dynamic_selects = [];
         
         foreach ($category_patterns as $category_key => $patterns) {
@@ -309,7 +273,7 @@ if ($pdo) {
             }
         }
 
-        // 3. Execute dynamically assembled summation query[cite: 8]
+        // 3. Execute dynamically assembled summation query
         $dynamic_sql = "SELECT " . implode(', ', $dynamic_selects) . " FROM carbon_records WHERE user_id = :user_id";
         $breakdown_stmt = $pdo->prepare($dynamic_sql);
         $breakdown_stmt->execute([':user_id' => $user_id]);
@@ -321,7 +285,7 @@ if ($pdo) {
             $categories_data['food_consumption']['current_week'] = floatval($totals['food_consumption_sum'] ?? 0);
         }
 
-        // 4. Dynamically fetch latest activity description text without hardcoded expectations[cite: 8]
+        // 4. Dynamically fetch latest activity description text without hardcoded expectations
         $activity_fields = [
             'transportation'   => ['transport_item', 'transportation_item', 'travel_item', 'commute_type'],
             'office_resource'  => ['office_item', 'electricity_item', 'resource_item', 'appliance'],
@@ -350,7 +314,7 @@ if ($pdo) {
     }
 }
 
-// 8. FETCH RECENT ACTIVITY TIMELINE STRICTLY BY user_id[cite: 8]
+// 8. FETCH RECENT ACTIVITY TIMELINE STRICTLY BY user_id
 $timeline_records = [];
 if ($pdo) {
     try {
@@ -367,7 +331,7 @@ if ($pdo) {
     }
 }
 
-// Avatar URL retrieval using profile_picture[cite: 8]
+// Avatar URL retrieval using profile_picture
 $avatar_url = $_SESSION['user_profile']['user_metadata']['profile_picture'] ?? ($user_metadata['profile_picture'] ?? null); 
 
 $initials = '';
@@ -516,19 +480,6 @@ if (empty($avatar_url)) {
         .timeline-details p { color: var(--text-muted); font-size: 0.75rem; }
         .timeline-right { text-align: right; font-weight: 700; color: var(--text-title); font-size: 0.85rem; }
         .timeline-right span { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 400; }
-
-        .settings-banner { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s, border-color 0.3s; }
-        .settings-info { display: flex; align-items: center; gap: 20px; }
-        .settings-info i { font-size: 1.8rem; color: var(--text-muted); }
-        .settings-info h4 { font-size: 1rem; font-weight: 700; color: var(--text-title); }
-        .settings-info p { font-size: 0.85rem; color: var(--text-muted); }
-
-        .edit-profile-btn { background: transparent; border: 1px solid var(--accent-green); color: var(--accent-green); padding: 10px 22px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; text-decoration: none; }
-        .edit-profile-btn:hover { background: var(--accent-green); color: white; }
-
-        .modal-input-group { margin-bottom: 15px; text-align: left; }
-        .modal-input-group label { display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; }
-        .modal-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; background: var(--bg-body); color: var(--text-title); }
     </style>
     <script>
         (function() {
@@ -725,28 +676,17 @@ if (empty($avatar_url)) {
                     <div class="dash-card-title">Activity Timeline <a href="activity_input.php" class="card-link">View All</a></div>
                     <div class="timeline-box">
                         <?php if (!empty($timeline_records)): ?>
-                            <?php foreach ($timeline_records as $rec): 
-                                $trans_val  = floatval(preg_replace('/[^0-9.]/', '', $rec['transportation'] ?? '0'));
-                                $elec_val   = floatval(preg_replace('/[^0-9.]/', '', $rec['electricity'] ?? ($rec['office_transportation'] ?? '0')));
-                                $food_val   = floatval(preg_replace('/[^0-9.]/', '', $rec['food'] ?? ($rec['food_consumption'] ?? ($rec['food consumption'] ?? '0'))));
-                                $total_val  = floatval(preg_replace('/[^0-9.]/', '', $rec['total_emission'] ?? ($trans_val + $elec_val + $food_val)));
-                                
-                                $item_title = 'Carbon Record';
-                                $item_desc  = '';
-                                $icon_class = 'fa-leaf';
+                            <?php foreach ($timeline_records as $rec):$trans_val  = floatval(preg_replace('/[^0-9.]/', '', $rec['transportation'] ?? '0'));$elec_val   = floatval(preg_replace('/[^0-9.]/', '', $rec['electricity'] ?? ($rec['office_transportation'] ?? '0')));
+                                $food_val   = floatval(preg_replace('/[^0-9.]/', '',$rec['food'] ?? ($rec['food_consumption'] ?? ($rec['food consumption'] ?? '0'))));
+                                $total_val  = floatval(preg_replace('/[^0-9.]/', '',$rec['total_emission'] ?? ($trans_val +$elec_val + $food_val)));$item_title = 'Carbon Record';
+                                $item_desc  = '';$icon_class = 'fa-leaf';
                                 
                                 if (!empty($rec['transport_item'])) {
-                                    $item_title = 'Transportation';
-                                    $item_desc  = ucwords(strtolower($rec['transport_item']));
-                                    $icon_class = 'fa-car';
+                                    $item_title = 'Transportation';$item_desc  = ucwords(strtolower($rec['transport_item']));$icon_class = 'fa-car';
                                 } elseif (!empty($rec['office_item'])) {
-                                    $item_title = 'Office Resource';
-                                    $item_desc  = ucwords(strtolower($rec['office_item']));
-                                    $icon_class = 'fa-bolt';
+                                    $item_title = 'Office Resource';$item_desc  = ucwords(strtolower($rec['office_item']));$icon_class = 'fa-bolt';
                                 } elseif (!empty($rec['food_item'])) {
-                                    $item_title = 'Food Consumption';
-                                    $item_desc  = ucwords(strtolower($rec['food_item']));
-                                    $icon_class = 'fa-utensils';
+                                    $item_title = 'Food Consumption';$item_desc  = ucwords(strtolower($rec['food_item']));$icon_class = 'fa-utensils';
                                 } else {
                                     $item_desc  = 'Daily Emissions Entry';
                                 }
@@ -767,17 +707,6 @@ if (empty($avatar_url)) {
                         <?php endif; ?>
                     </div>
                 </div>
-            </div>
-
-            <div class="settings-banner">
-                <div class="settings-info">
-                    <i class="fa-solid fa-user-gear"></i>
-                    <div>
-                        <h4>Account Settings</h4>
-                        <p>Manage your personal information, password, and notification preferences.</p>
-                    </div>
-                </div>
-                <button type="button" class="edit-profile-btn" onclick="openPasswordModal()">Edit Profile</button>
             </div>
         </div>
     </div>
@@ -839,41 +768,6 @@ if (empty($avatar_url)) {
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             updateThemeUI(isDark);
         });
-
-        function openPasswordModal() {
-            const isDarkModeActive = bodyElement.classList.contains('dark-mode');
-            Swal.fire({
-                title: 'Update Credentials',
-                background: isDarkModeActive ? '#1E1E1E' : '#ffffff',
-                color: isDarkModeActive ? '#F7FAFC' : '#1A202C',
-                html: `
-                    <form id="swalPasswordForm" method="POST" action="profile.php">
-                        <input type="hidden" name="action" value="update_password">
-                        <input type="hidden" name="csrf_token" value="${appCsrfToken}">
-                        <div class="modal-input-group">
-                            <label style="color: ${isDarkModeActive ? '#A0AEC0' : '#718096'}">New Password</label>
-                            <input type="password" name="new_password" class="modal-input" placeholder="Enter new password" required>
-                        </div>
-                        <div class="modal-input-group">
-                            <label style="color: ${isDarkModeActive ? '#A0AEC0' : '#718096'}">Confirm Password</label>
-                            <input type="password" name="confirm_password" class="modal-input" placeholder="Confirm new password" required>
-                        </div>
-                    </form>
-                `,
-                showCancelButton: true,
-                confirmButtonColor: '#2D6A4F',
-                cancelButtonColor: '#BA181B',
-                confirmButtonText: 'Save Changes',
-                preConfirm: () => {
-                    const form = document.getElementById('swalPasswordForm');
-                    if (form.checkValidity()) {
-                        form.submit();
-                    } else {
-                        Swal.showValidationMessage('Please fill out all fields.');
-                    }
-                }
-            });
-        }
 
         function confirmLogout() {
             const isDarkModeActive = bodyElement.classList.contains('dark-mode');
