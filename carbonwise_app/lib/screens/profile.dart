@@ -18,6 +18,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double _toDouble(dynamic value) =>
       double.tryParse(value?.toString() ?? '0') ?? 0.0;
 
+  String _formatActivityName(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .split(' ')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
+        .join(' ');
+  }
+
   double getAverageEmission() {
     if (last4Weeks.isEmpty) return 0;
 
@@ -118,6 +131,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoadingTimeline = true;
 
   double carbonScore = 0.0;
+  double lastWeekCarbonScore = 0.0;
+  double grandTotalCarbon = 0.0;
+
+  String carbonTrendText = "Starting your green track!";
+
   bool isLoadingScore = true;
 
   double transportationEmission = 0;
@@ -319,36 +337,183 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print("Current user email: $email");
 
       if (email == null) {
-        print("No logged in user.");
+        if (!mounted) return;
+
+        setState(() {
+          isLoadingScore = false;
+        });
+
         return;
       }
 
-      final record = await _apiService.getLatestCarbonScore(email);
+      // Get all carbon records for the authenticated user.
+      final records = await _apiService.getCarbonRecords(email);
 
-      print("Database record: $record");
+      final now = DateTime.now();
+
+      final currentWeekStart = now.subtract(const Duration(days: 7));
+      final lastWeekStart = now.subtract(const Duration(days: 14));
+      final lastWeekEnd = currentWeekStart;
+
+      double currentWeek = 0.0;
+      double lastWeek = 0.0;
+      double grandTotal = 0.0;
+
+      // CARBON BREAKDOWN
+
+      double totalTransportation = 0.0;
+      double totalOfficeResource = 0.0;
+      double totalFoodConsumption = 0.0;
+
+      String latestTransportItem = "";
+      String latestOfficeItem = "";
+      String latestFoodItem = "";
+
+      int latestTransportRecordId = -1;
+      int latestOfficeRecordId = -1;
+      int latestFoodRecordId = -1;
+
+      for (final record in records) {
+        // TOTAL CATEGORY EMISSIONS
+
+        final transportation = _toDouble(record['transportation']);
+
+        final electricity = _toDouble(record['electricity']);
+
+        final food = _toDouble(record['food']);
+
+        totalTransportation += transportation;
+        totalOfficeResource += electricity;
+        totalFoodConsumption += food;
+
+        // LATEST ACTIVITY DESCRIPTION
+
+        final recordId = int.tryParse(record['id']?.toString() ?? '') ?? 0;
+
+        if (transportation > 0 && recordId >= latestTransportRecordId) {
+          final item = record['transport_item']?.toString() ?? '';
+
+          if (item.trim().isNotEmpty) {
+            latestTransportItem = _formatActivityName(item);
+            latestTransportRecordId = recordId;
+          }
+        }
+
+        if (electricity > 0 && recordId >= latestOfficeRecordId) {
+          final item = record['office_item']?.toString() ?? '';
+
+          if (item.trim().isNotEmpty) {
+            latestOfficeItem = _formatActivityName(item);
+            latestOfficeRecordId = recordId;
+          }
+        }
+
+        if (food > 0 && recordId >= latestFoodRecordId) {
+          final item = record['food_item']?.toString() ?? '';
+
+          if (item.trim().isNotEmpty) {
+            latestFoodItem = _formatActivityName(item);
+            latestFoodRecordId = recordId;
+          }
+        }
+
+        // CARBON SCORE CALCULATION
+
+        final totalEmission = _toDouble(record['total_emission']);
+
+        // Lifetime total
+        grandTotal += totalEmission;
+
+        final recordDateString =
+            record['created_at']?.toString() ??
+            record['record_date']?.toString();
+
+        if (recordDateString == null || recordDateString.isEmpty) {
+          continue;
+        }
+
+        DateTime? recordDate;
+
+        try {
+          recordDate = DateTime.parse(recordDateString);
+        } catch (_) {
+          continue;
+        }
+
+        if (!recordDate.isBefore(currentWeekStart)) {
+          currentWeek += totalEmission;
+        } else if (!recordDate.isBefore(lastWeekStart) &&
+            recordDate.isBefore(lastWeekEnd)) {
+          lastWeek += totalEmission;
+        }
+      }
+
+      // CARBON SCORE
+      final calculatedScore = currentWeek > 0 ? currentWeek : grandTotal;
+
+      // TREND
+
+      String trendText = "Starting your green track!";
+
+      if (calculatedScore > 0) {
+        if (lastWeek > 0) {
+          if (calculatedScore < lastWeek) {
+            final percentage = ((lastWeek - calculatedScore) / lastWeek) * 100;
+
+            trendText = "${percentage.round()}% less than last week";
+          } else if (calculatedScore > lastWeek) {
+            final percentage = ((calculatedScore - lastWeek) / lastWeek) * 100;
+
+            trendText = "${percentage.round()}% more than last week";
+          } else {
+            trendText = "Same emissions as last week";
+          }
+        } else {
+          trendText = "Tracking active emissions metrics!";
+        }
+      }
+
+      if (!mounted) return;
 
       setState(() {
-        carbonScore = _toDouble(record?['total_emission'] ?? 0);
+        // Carbon Score
+        carbonScore = double.parse(calculatedScore.toStringAsFixed(1));
 
-        transportationEmission = _toDouble(record?['transportation'] ?? 0);
+        // Carbon Breakdown
+        transportationEmission = totalTransportation;
+        officeEmission = totalOfficeResource;
+        foodEmission = totalFoodConsumption;
 
-        officeEmission = _toDouble(record?['electricity'] ?? 0);
+        // Latest activity descriptions
+        _transportItem = latestTransportItem;
+        _officeItem = latestOfficeItem;
+        _foodItem = latestFoodItem;
 
-        foodEmission = _toDouble(record?['food'] ?? 0);
-
-        _transportItem = record?["transport_item"] ?? "";
-        _officeItem = record?["office_item"] ?? "";
-        _foodItem = record?["food_item"] ?? "";
+        carbonTrendText = trendText;
 
         isLoadingScore = false;
       });
 
+      print("==========================================");
+      print("CARBON SCORE");
+      print("Current 7 days: $currentWeek");
+      print("Previous 7 days: $lastWeek");
+      print("Lifetime total: $grandTotal");
       print("Carbon Score: $carbonScore");
-      print("Transportation: $transportationEmission");
-      print("Office Resource: $officeEmission");
-      print("Food: $foodEmission");
+      print("Trend: $carbonTrendText");
+      print("------------------------------------------");
+      print("CARBON BREAKDOWN");
+      print("Transportation: $totalTransportation");
+      print("Office Resource: $totalOfficeResource");
+      print("Food Consumption: $totalFoodConsumption");
+      print("Transport Item: $latestTransportItem");
+      print("Office Item: $latestOfficeItem");
+      print("Food Item: $latestFoodItem");
+      print("==========================================");
     } catch (e) {
-      print("Carbon Score Error: $e");
+      print("Carbon Score / Breakdown Error: $e");
+
+      if (!mounted) return;
 
       setState(() {
         isLoadingScore = false;
@@ -791,10 +956,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 3),
 
-                    const Text(
-                      '12% less than last week',
+                    Text(
+                      isLoadingScore
+                          ? 'Calculating your weekly trend...'
+                          : carbonTrendText,
                       style: TextStyle(
-                        color: primaryGreen,
+                        color: carbonTrendText.contains('more')
+                            ? Colors.redAccent
+                            : primaryGreen,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1126,58 +1295,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(height: 1, color: Color(0xFFE5EEE8)),
           ),
-
-          // RECENT RECORDS
-          const Text(
-            'RECENT RECORDS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-              color: textMuted,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          SizedBox(
-            height: 65,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ...last4Weeks.reversed.take(4).toList().reversed.map((record) {
-                  double emission;
-
-                  final date = DateTime.parse(record["record_date"]);
-                  final label = "${date.month}/${date.day}";
-
-                  switch (_selectedBreakdown) {
-                    case "Transportation":
-                      emission = _toDouble(record["transportation"] ?? 0);
-                      break;
-
-                    case "Office Resource":
-                      emission = _toDouble(record["electricity"] ?? 0);
-                      break;
-
-                    case "Food Consumption":
-                      emission = _toDouble(record["food"] ?? 0);
-                      break;
-
-                    default:
-                      emission = _toDouble(record["total_emission"] ?? 0);
-                  }
-
-                  return _buildGraphBar(
-                    emission.toStringAsFixed(1),
-                    (emission / maxEmission).clamp(0.1, 1.0),
-                    label,
-                  );
-                }),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -1437,38 +1554,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildGraphBar(String value, double fillPercent, String dateLabel) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-        ),
-
-        const SizedBox(height: 1),
-
-        Container(
-          width: 14,
-          height: 32 * fillPercent,
-          decoration: BoxDecoration(
-            color: primaryGreen,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-
-        const SizedBox(height: 3),
-
-        Text(
-          dateLabel,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 10, color: textMuted, height: 1),
-        ),
-      ],
     );
   }
 

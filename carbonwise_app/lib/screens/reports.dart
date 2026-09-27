@@ -77,12 +77,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
   double weekEmission = 0;
   double monthEmission = 0;
 
-  double _journeyPercent = 0;
-  double _journeyProgress = 0;
-
-  String _journeyMessage = "";
-  String _journeySubtitle = "";
-
   double _getHorizontalInterval() {
     if (emissionOverTime.isEmpty) return 1;
 
@@ -130,9 +124,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!mounted) return;
 
     await _loadWeeklyComparison();
-    if (!mounted) return;
-
-    await _loadCarbonReductionJourney();
     if (!mounted) return;
 
     await _loadTftForecast();
@@ -390,67 +381,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
       });
     } catch (e) {
       print('Weekly comparison error: $e');
-    }
-  }
-
-  Future<void> _loadCarbonReductionJourney() async {
-    try {
-      final records = await _records();
-      final now = DateTime.now();
-      final thisMonthStart = DateTime(now.year, now.month, 1);
-      final lastMonthStart = DateTime(now.year, now.month - 1, 1);
-      final lastMonthEnd = thisMonthStart.subtract(const Duration(days: 1));
-
-      double thisMonthTotal = 0;
-      double lastMonthTotal = 0;
-      for (final raw in records) {
-        final row = Map<String, dynamic>.from(raw as Map);
-        final date = _recordDate(row['record_date']);
-        if (date == null) continue;
-        final emission = _toDouble(row['total_emission']);
-        if (_between(date, thisMonthStart, now)) thisMonthTotal += emission;
-        if (_between(date, lastMonthStart, lastMonthEnd))
-          lastMonthTotal += emission;
-      }
-
-      double score;
-      String message;
-      String subtitle;
-      if (lastMonthTotal == 0) {
-        score = 0;
-        message = 'Start your sustainability journey!';
-        subtitle = 'Record more activities to compare your monthly progress.';
-      } else {
-        final change =
-            ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
-        score = (100 - change).clamp(0, 100).toDouble();
-        if (change <= -20) {
-          message = 'Amazing work! 🎉';
-          subtitle =
-              'You reduced your emissions by ${change.abs().toStringAsFixed(1)}% this month.';
-        } else if (change < 0) {
-          message = 'Nice progress! 💚';
-          subtitle =
-              'You\'re emitting ${change.abs().toStringAsFixed(1)}% less than last month.';
-        } else if (change == 0) {
-          message = 'Steady progress 👍';
-          subtitle = 'Your emissions stayed consistent this month.';
-        } else {
-          message = 'Let\'s improve next month! 🌍';
-          subtitle =
-              'Your emissions increased by ${change.toStringAsFixed(1)}%.';
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _journeyPercent = score;
-        _journeyProgress = score / 100;
-        _journeyMessage = message;
-        _journeySubtitle = subtitle;
-      });
-    } catch (e) {
-      print('Carbon Journey Error: $e');
     }
   }
 
@@ -1164,123 +1094,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
 
               const SizedBox(height: 20),
-
-              // 7. Carbon Reduction Journey
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: _cardDecoration(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Carbon Reduction Journey',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        // Circular percentage indicator
-                        SizedBox(
-                          width: 80,
-                          height: 80,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              SizedBox(
-                                width: 80,
-                                height: 80,
-                                child: CircularProgressIndicator(
-                                  value: _journeyProgress,
-                                  strokeWidth: 8,
-                                  backgroundColor: Colors.grey.shade300,
-                                  valueColor: const AlwaysStoppedAnimation(
-                                    primaryGreen,
-                                  ),
-                                ),
-                              ),
-
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "${_journeyPercent.toStringAsFixed(0)}%",
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryGreen,
-                                    ),
-                                  ),
-
-                                  const Text(
-                                    "Goal",
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 400),
-                                child: Text(
-                                  _journeyMessage,
-                                  key: ValueKey(_journeyMessage),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 400),
-                                child: Text(
-                                  _journeySubtitle,
-                                  key: ValueKey(_journeySubtitle),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0, end: _journeyProgress),
-                                  duration: const Duration(milliseconds: 800),
-                                  builder: (context, value, _) {
-                                    return LinearProgressIndicator(
-                                      value: value,
-                                      minHeight: 8,
-                                      backgroundColor: const Color(0xFFE0E0E0),
-                                      valueColor: const AlwaysStoppedAnimation(
-                                        darkGreen,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),

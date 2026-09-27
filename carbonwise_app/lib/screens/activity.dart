@@ -25,22 +25,20 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final ApiService _apiService = ApiService();
   // Form State Values
   String? _selectedTransportType;
-  String? _selectedOfficeResourceType;
   String? _selectedOfficeResourceCategory;
-  String? _selectedFoodType;
-  String? _selectedFoodCategory;
   String? _selectedCampus;
   String? _selectedMealPeriod;
   String? _lastFoodMealPeriod;
   DateTime? _lastFoodConsumedAt;
   final DateTime _selectedFoodDate = DateTime.now();
   TimeOfDay _selectedFoodTime = TimeOfDay.now();
+  String? _selectedFoodItem;
 
   double _transportationTotalEmission = 0.0;
   double _officeResourceTotalEmission = 0.0;
   double _foodTotalEmission = 0.0;
 
-  // 🟢 Lists to store added emissions dynamically
+  // Lists to store added emissions dynamically
   final List<String> _transportEmissions = [];
   final List<String> _officeEmissions = [];
   final List<String> _foodEmissions = [];
@@ -53,7 +51,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   bool _isOnCampus = false;
 
   final TextEditingController _homeAddressController = TextEditingController();
-  final TextEditingController _officeUsageController = TextEditingController();
   final TextEditingController _officeHoursController = TextEditingController();
   final TextEditingController _servingSizeController = TextEditingController();
 
@@ -73,143 +70,205 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   };
 
   final Map<String, double> transportationEmissionFactors = {
-    'Traditional Jeepney': 0.18,
-    'Modern Jeepney': 0.09,
-    'Car': 0.21,
-    'Motorcycle': 0.10,
-    'Bicycle/Walking': 0.0,
+    'Motorcycle (0.103 kg CO₂e/km)': 0.103,
+    'Tricycle (0.095 kg C₂e/km)': 0.095,
+    'Modern Jeepney (0.035 kg C₂e/km)': 0.035,
+    'Traditional Jeepney (0.08 kg C₂e/km)': 0.08,
+    'Private Car (Gasoline) (0.171 kg C₂e/km)': 0.171,
+  };
+
+  final Map<String, List<String>> officeResourceGroups = {
+    'Laptops': [
+      'Ultra-light / Netbook (40W)',
+      'Standard Business Laptop (60W)',
+      'Performance Laptop (120W)',
+      'Gaming / High-End Workstation Laptop (300W)',
+    ],
+    'Desktop Computers & Monitors': [
+      'Standard Office PC CPU (100W)',
+      'Mid-Range Workstation CPU (200W)',
+      'High-End / Gaming PC CPU (600W)',
+      'Mini PC - NUC/Mac Mini (40W)',
+      '18.5" to 20" LED Monitor (20W)',
+      '22" to 24" LED Monitor (30W)',
+      '27" and larger LED Monitor (50W)',
+      'Old CRT Monitor (100W)',
+    ],
+    'Air Conditioners (Window & Split)': [
+      'Window Type AC - 0.5 HP (500W)',
+      'Window Type AC - 1.0 HP (1000W)',
+      'Window Type AC - 1.5 HP (1500W)',
+      'Window Type AC - 2.0 HP (2000W)',
+      'Inverter Split Type AC - 1.0 HP (900W)',
+      'Inverter Split Type AC - 1.5 HP (1300W)',
+      'Inverter Split Type AC - 2.0 HP (1800W)',
+      'Inverter Split Type AC - 2.5 HP (2300W)',
+      'Floor Standing AC - 3.0 HP (3300W)',
+      'Floor Standing AC - 5.0 HP (5300W)',
+    ],
+    'Smart Displays & Projectors': [
+      'Viewboard Smart Screen 55" to 65" (250W)',
+      'Viewboard Smart Screen 75" (350W)',
+      'Viewboard Smart Screen 86" (500W)',
+      'Viewboard Smart Screen 98" and above (800W)',
+      'Standard DLP/LCD Projector (300W)',
+      'Projector - Eco-Mode (200W)',
+      'Large Venue Projector (500W)',
+    ],
+    'Electric Fans': [
+      'AC Motor Fan (65W)',
+      'DC Motor Fan (30W)',
+      'Ceiling Fan (80W)',
+      'Stand Fan (60W)',
+      'Wall Fan (55W)',
+      'Exhaust Fan (30W)',
+      'Tower Fan (50W)',
+      'Desk Fan (40W)',
+      'Bladeless Fan (55W)',
+      'Misting Fan (130W)',
+      'Industrial Fan (200W)',
+    ],
+    'Lights': [
+      'Standard LED Bulb (10W)',
+      'LED Tube T8/T5 (15W)',
+      'LED Downlight/Panel (12W)',
+      'High-bay Gym/Halls LED (100W)',
+      'CFL Compact Fluorescent (18W)',
+    ],
+    'Printers & Scanners': [
+      'Scanner - Ready/Sleep Mode (100W)',
+      'Flatbed Scanner (20W)',
+      'High-speed Document Scanner (50W)',
+      'Inkjet Printer - Active (30W)',
+      'Laser Printer B&W - Active (400W)',
+      'Color Laser Printer - Active (500W)',
+      'Mid-size Office MFP Copier (1000W)',
+      'High-volume Photocopier (2000W)',
+    ],
+    'Audio Systems': [
+      'Desktop/PC Speakers (20W)',
+      'Wall-mounted Classroom Speakers (60W)',
+      'Large PA System Events/Gym (1000W)',
+    ],
   };
 
   final Map<String, double> officeResourcePowerRatings = {
-    'Window Type': 1500,
-    'Split-Type (Wall-Mounted)': 1800,
-    'Ceiling Cassette / Ceiling Suspended': 3000,
-    'Floor Standing (Tower)': 5300,
-    'AC Motor Fan': 65,
-    'DC Motor Fan': 30,
-    'Ceiling Fan': 80,
-    'Stand Fan': 60,
-    'Wall Fan': 55,
-    'Exhaust Fan': 30,
-    'Tower Fan': 50,
-    'Desk Fan': 40,
-    'Bladeless Fan': 55,
-    'Misting Fan': 130,
-    'Industrial Fan': 200,
-    'LED (Light Emitting Diode)': 15,
-    'Fluorescent': 40,
-    'Incandescent': 60,
-    'Standard DLP/LDC Projector': 300,
-    'Eco Mode': 200,
-    'Large Venue Projector (Auditoriums)': 700,
-    'Standby': 5,
-    'Inkjet Printer (Desktop)': 30,
-    'Laser Printer (B&W)': 400,
-    'Color Laser Printer': 500,
-    'Mid-size Office MFP': 800,
-    'High-volume Photocopier': 1500,
-    'Ultra-light/Notebook': 45,
-    'Standard Business Laptop': 60,
-    'Performance Laptop': 120,
-    'Gaming/High-End Workstation': 200,
-    'Standard Office PC': 200,
-    'Mid-range Workstation': 350,
-    'High-end/Gaming PC': 500,
-    'Mini PC (NUC/MAC Mini)': 50,
-    '18.5" to 20" LED Monitor': 20,
-    '22" to 24" LED Monitor': 30,
-    '27" and Larger': 50,
-    'OLD CRTS Monitor (Big Box Style)': 100,
-    '55" to 65"': 120,
-    '75"': 180,
-    '86"': 250,
-    '98" and above': 400,
-    'Desktop/PC Speakers': 20,
-    'Wall-mounted Classroom Speakers': 60,
-    'Large PA System (Events/Gyms)': 1000,
-  };
-
-  final Map<String, double> officeResourceEmissionFactors = {
-    'Window Type': 0.80,
-    'Split-Type (Wall-Mounted)': 0.95,
-    'Ceiling Cassette / Ceiling Suspended': 1.50,
-    'Floor Standing (Tower)': 2.50,
-
-    'AC Motor Fan': 0.03,
-    'DC Motor Fan': 0.02,
-    'Ceiling Fan': 0.04,
-    'Stand Fan': 0.03,
-    'Wall Fan': 0.03,
-    'Exhaust Fan': 0.02,
-    'Tower Fan': 0.03,
-    'Desk Fan': 0.02,
-    'Bladeless Fan': 0.03,
-    'Misting Fan': 0.06,
-    'Industrial Fan': 0.10,
-
-    'LED (Light Emitting Diode)': 0.01,
-    'Fluorescent': 0.02,
-    'Incandescent': 0.03,
-
-    'Standard DLP/LDC Projector': 0.15,
-    'Eco Mode': 0.10,
-    'Large Venue Projector (Auditoriums)': 0.35,
-    'Standby': 0.001,
-
-    'Inkjet Printer (Desktop)': 0.02,
-    'Laser Printer (B&W)': 0.15,
-    'Color Laser Printer': 0.18,
-    'Mid-size Office MFP': 0.25,
-    'High-volume Photocopier': 0.50,
-
-    'Ultra-light/Notebook': 0.02,
-    'Standard Business Laptop': 0.03,
-    'Performance Laptop': 0.06,
-    'Gaming/High-End Workstation': 0.10,
-
-    'Standard Office PC': 0.10,
-    'Mid-range Workstation': 0.18,
-    'High-end/Gaming PC': 0.25,
-    'Mini PC (NUC/MAC Mini)': 0.02,
-
-    '18.5" to 20" LED Monitor': 0.01,
-    '22" to 24" LED Monitor': 0.02,
-    '27" and Larger': 0.03,
-    'OLD CRTS Monitor (Big Box Style)': 0.05,
-
-    '55" to 65"': 0.06,
-    '75"': 0.09,
-    '86"': 0.12,
-    '98" and above': 0.18,
-
-    'Desktop/PC Speakers': 0.01,
-    'Wall-mounted Classroom Speakers': 0.03,
-    'Large PA System (Events/Gyms)': 0.50,
+    'Ultra-light / Netbook (40W)': 40,
+    'Standard Business Laptop (60W)': 60,
+    'Performance Laptop (120W)': 120,
+    'Gaming / High-End Workstation Laptop (300W)': 300,
+    'Standard Office PC CPU (100W)': 100,
+    'Mid-Range Workstation CPU (200W)': 200,
+    'High-End / Gaming PC CPU (600W)': 600,
+    'Mini PC - NUC/Mac Mini (40W)': 40,
+    '18.5" to 20" LED Monitor (20W)': 20,
+    '22" to 24" LED Monitor (30W)': 30,
+    '27" and larger LED Monitor (50W)': 50,
+    'Old CRT Monitor (100W)': 100,
+    'Window Type AC - 0.5 HP (500W)': 500,
+    'Window Type AC - 1.0 HP (1000W)': 1000,
+    'Window Type AC - 1.5 HP (1500W)': 1500,
+    'Window Type AC - 2.0 HP (2000W)': 2000,
+    'Inverter Split Type AC - 1.0 HP (900W)': 900,
+    'Inverter Split Type AC - 1.5 HP (1300W)': 1300,
+    'Inverter Split Type AC - 2.0 HP (1800W)': 1800,
+    'Inverter Split Type AC - 2.5 HP (2300W)': 2300,
+    'Floor Standing AC - 3.0 HP (3300W)': 3300,
+    'Floor Standing AC - 5.0 HP (5300W)': 5300,
+    'Viewboard Smart Screen 55" to 65" (250W)': 250,
+    'Viewboard Smart Screen 75" (350W)': 350,
+    'Viewboard Smart Screen 86" (500W)': 500,
+    'Viewboard Smart Screen 98" and above (800W)': 800,
+    'Standard DLP/LCD Projector (300W)': 300,
+    'Projector - Eco-Mode (200W)': 200,
+    'Large Venue Projector (500W)': 500,
+    'AC Motor Fan (65W)': 65,
+    'DC Motor Fan (30W)': 30,
+    'Ceiling Fan (80W)': 80,
+    'Stand Fan (60W)': 60,
+    'Wall Fan (55W)': 55,
+    'Exhaust Fan (30W)': 30,
+    'Tower Fan (50W)': 50,
+    'Desk Fan (40W)': 40,
+    'Bladeless Fan (55W)': 55,
+    'Misting Fan (130W)': 130,
+    'Industrial Fan (200W)': 200,
+    'Standard LED Bulb (10W)': 10,
+    'LED Tube T8/T5 (15W)': 15,
+    'LED Downlight/Panel (12W)': 12,
+    'High-bay Gym/Halls LED (100W)': 100,
+    'CFL Compact Fluorescent (18W)': 18,
+    'Scanner - Ready/Sleep Mode (100W)': 100,
+    'Flatbed Scanner (20W)': 20,
+    'High-speed Document Scanner (50W)': 50,
+    'Inkjet Printer - Active (30W)': 30,
+    'Laser Printer B&W - Active (400W)': 400,
+    'Color Laser Printer - Active (500W)': 500,
+    'Mid-size Office MFP Copier (1000W)': 1000,
+    'High-volume Photocopier (2000W)': 2000,
+    'Desktop/PC Speakers (20W)': 20,
+    'Wall-mounted Classroom Speakers (60W)': 60,
+    'Large PA System Events/Gym (1000W)': 1000,
   };
 
   final Map<String, double> foodEmissionFactors = {
-    'Beef (Beef Herd)': 60.0,
-    'Lamb & Mutton': 24.5,
-    'Beef (Dairy Herd)': 21.1,
-    'Cheese': 21.0,
-    'Pork': 7.0,
-    'Poultry (Chicken/Turkey)': 6.0,
-    'Eggs': 4.5,
-    'Fish (Farmed)': 5.0,
-    'Rice (Flooded)': 4.5,
-    'Tofu (Soy-based)': 3.0,
-    'Groundnuts/Peanuts': 2.5,
-    'Pulses (Beans/Pease)': 2.0,
-    'Wheat & Rye (Bread)': 1.4,
-    'Maize (Corn)': 1.0,
-    'Potatoes': 0.5,
-    'Apples/Bananas': 0.4,
-    'Root Vegetables': 0.4,
-    'Other Fruits & Vegetables': 0.2,
-    'Coffee': 28.0,
-    'Dark Chocolate': 19.0,
-    'Milk (Bovine)': 3.2,
-    'Soy Milk': 1.0,
+    'Beef (Beef Herd) (60.0 kg CO2e/kg)': 60.0,
+    'Lamb & Mutton (24.5 kg CO2e/kg)': 24.5,
+    'Beef (Dairy Herd) (21.1 kg CO2e/kg)': 21.1,
+    'Cheese (21.0 kg CO2e/kg)': 21.0,
+    'Pork (7.0 kg CO2e/kg)': 7.0,
+    'Poultry (Chicken / Turkey) (6.0 kg CO2e/kg)': 6.0,
+    'Eggs (4.5 kg CO2e/kg)': 4.5,
+    'Fish (Farmed) (5.0 kg CO2e/kg)': 5.0,
+    'Rice (Flooded) (4.4 kg CO2e/kg)': 4.4,
+    'Tofu (Soy-based) (3.0 kg CO2e/kg)': 3.0,
+    'Groundnuts / Peanuts (2.5 kg CO2e/kg)': 2.5,
+    'Pulses (Beans / Peas) (1.5 kg CO2e/kg)': 1.5,
+    'Wheat & Rye (Bread) (1.4 kg CO2e/kg)': 1.4,
+    'Maize (Corn) (1.0 kg CO2e/kg)': 1.0,
+    'Potatoes (0.5 kg CO2e/kg)': 0.5,
+    'Apples / Bananas (0.4 kg CO2e/kg)': 0.4,
+    'Root Vegetables (0.4 kg CO2e/kg)': 0.4,
+    'Coffee (22.0 kg CO2e/kg)': 22.0,
+    'Dark Chocolate (19.0 kg CO2e/kg)': 19.0,
+    'Milk (Bovine) (3.2 kg CO2e/liter)': 3.2,
+    'Soy Milk (1.0 kg CO2e/liter)': 1.0,
+  };
+
+  final Set<String> _foodLiterItems = {
+    'Milk (Bovine) (3.2 kg CO2e/liter)',
+    'Soy Milk (1.0 kg CO2e/liter)',
+  };
+
+  final Map<String, double> foodGramsPerCup = {
+    'Beef (Beef Herd) (60.0 kg CO2e/kg)': 226,
+    'Lamb & Mutton (24.5 kg CO2e/kg)': 113,
+    'Beef (Dairy Herd) (21.1 kg CO2e/kg)': 226,
+
+    'Cheese (21.0 kg CO2e/kg)': 113,
+    'Pork (7.0 kg CO2e/kg)': 135,
+    'Poultry (Chicken / Turkey) (6.0 kg CO2e/kg)': 140,
+    'Eggs (4.5 kg CO2e/kg)': 136,
+    'Fish (Farmed) (5.0 kg CO2e/kg)': 154,
+
+    'Rice (Flooded) (4.4 kg CO2e/kg)': 158,
+    'Tofu (Soy-based) (3.0 kg CO2e/kg)': 126,
+    'Groundnuts / Peanuts (2.5 kg CO2e/kg)': 146,
+    'Pulses (Beans / Peas) (1.5 kg CO2e/kg)': 177,
+
+    'Wheat & Rye (Bread) (1.4 kg CO2e/kg)': 120,
+    'Maize (Corn) (1.0 kg CO2e/kg)': 164,
+    'Potatoes (0.5 kg CO2e/kg)': 150,
+    'Apples / Bananas (0.4 kg CO2e/kg)': 150,
+    'Root Vegetables (0.4 kg CO2e/kg)': 150,
+
+    'Coffee (22.0 kg CO2e/kg)': 82,
+    'Dark Chocolate (19.0 kg CO2e/kg)': 132,
+  };
+
+  final Map<String, double> foodLitersPerCup = {
+    'Milk (Bovine) (3.2 kg CO2e/liter)': 0.236,
+    'Soy Milk (1.0 kg CO2e/liter)': 0.236,
   };
 
   @override
@@ -222,7 +281,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   @override
   void dispose() {
     _homeAddressController.dispose();
-    _officeUsageController.dispose();
     _officeHoursController.dispose();
     _servingSizeController.dispose();
     super.dispose();
@@ -238,11 +296,28 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   double _calculateOfficeResourceEmission(String category, double hours) {
     final power = officeResourcePowerRatings[category] ?? 0;
-    return (power * hours / 1000) * 0.527;
+    return (power * hours / 1000) * 0.7122;
   }
 
-  double _calculateFoodEmission(String foodCategory) {
-    return foodEmissionFactors[foodCategory] ?? 0.0;
+  double _calculateFoodEmission(String foodItem, double servings) {
+    final factor = foodEmissionFactors[foodItem] ?? 0.0;
+
+    // Milk and soy milk use liters
+    if (_foodLiterItems.contains(foodItem)) {
+      final litersPerCup = foodLitersPerCup[foodItem] ?? 0.236;
+
+      final liters = servings * litersPerCup;
+
+      return factor * liters;
+    }
+
+    // Other foods use grams -> kg
+    final gramsPerCup = foodGramsPerCup[foodItem] ?? 150.0;
+
+    final grams = servings * gramsPerCup;
+    final kilograms = grams / 1000.0;
+
+    return factor * kilograms;
   }
 
   Future<bool> _verifyCampusPresence({required bool showFeedback}) async {
@@ -356,113 +431,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
   String get _selectedFoodDateLabel =>
       '${_selectedFoodDate.year}-${_selectedFoodDate.month.toString().padLeft(2, '0')}-${_selectedFoodDate.day.toString().padLeft(2, '0')}';
-
-  List<String> _getFoodCategories(String? foodType) {
-    switch (foodType) {
-      case 'Red Meat':
-        return ['Beef (Beef Herd)', 'Lamb & Mutton', 'Beef (Dairy Herd)'];
-      case 'Dairy & Poultry':
-        return [
-          'Cheese',
-          'Pork',
-          'Poultry (Chicken/Turkey)',
-          'Eggs',
-          'Fish (Farmed)',
-        ];
-      case 'Staples & Plant-based Proteins':
-        return [
-          'Rice (Flooded)',
-          'Tofu (Soy-based)',
-          'Groundnuts/Peanuts',
-          'Pulses (Beans/Pease)',
-        ];
-      case 'Grains, Vegetables, and Fruits':
-        return [
-          'Wheat & Rye (Bread)',
-          'Maize (Corn)',
-          'Potatoes',
-          'Apples/Bananas',
-          'Root Vegetables',
-          'Other Fruits & Vegetables',
-        ];
-      case 'Beverages and Discretionary Items':
-        return ['Coffee', 'Dark Chocolate', 'Milk (Bovine)', 'Soy Milk'];
-      default:
-        return [];
-    }
-  }
-
-  List<String> _getOfficeResourceCategories(String? officeResourceType) {
-    switch (officeResourceType) {
-      case 'Air Conditioner':
-        return [
-          'Window Type',
-          'Split-Type (Wall-Mounted)',
-          'Ceiling Cassette / Ceiling Suspended',
-          'Floor Standing (Tower)',
-        ];
-      case 'Electric Fan':
-        return [
-          'AC Motor Fan',
-          'DC Motor Fan',
-          'Ceiling Fan',
-          'Stand Fan',
-          'Wall Fan',
-          'Exhaust Fan',
-          'Tower Fan',
-          'Desk Fan',
-          'Bladeless Fan',
-          'Misting Fan',
-          'Industrial Fan',
-        ];
-      case 'Lights':
-        return ['LED (Light Emitting Diode)', 'Fluorescent', 'Incandescent'];
-      case 'Projector':
-        return [
-          'Standard DLP/LDC Projector',
-          'Eco Mode',
-          'Large Venue Projector (Auditoriums)',
-          'Standby',
-        ];
-      case 'Printer (Laser)':
-        return [
-          'Inkjet Printer (Desktop)',
-          'Laser Printer (B&W)',
-          'Color Laser Printer',
-        ];
-      case 'Photocopier / Multifunction Printer':
-        return ['Mid-size Office MFP', 'High-volume Photocopier'];
-      case 'Laptop':
-        return [
-          'Ultra-light/Notebook',
-          'Standard Business Laptop',
-          'Performance Laptop',
-          'Gaming/High-End Workstation',
-        ];
-      case 'Desktop Computer (CPU + Monitor)':
-      case 'Scanner':
-        return [
-          'Standard Office PC',
-          'Mid-range Workstation',
-          'High-end/Gaming PC',
-          'Mini PC (NUC/MAC Mini)',
-          '18.5" to 20" LED Monitor',
-          '22" to 24" LED Monitor',
-          '27" and Larger',
-          'OLD CRTS Monitor (Big Box Style)',
-        ];
-      case 'Viewboard / Smart Screen':
-        return ['55" to 65"', '75"', '86"', '98" and above'];
-      case 'Sound Speaker':
-        return [
-          'Desktop/PC Speakers',
-          'Wall-mounted Classroom Speakers',
-          'Large PA System (Events/Gyms)',
-        ];
-      default:
-        return [];
-    }
-  }
 
   Future<void> _loadSavedCarbonRecords() async {
     if (ApiService.token == null) return;
@@ -622,7 +590,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           _officeResourceTotalEmission +
           _foodTotalEmission;
 
-      // Fetch recent records so the service can compare against the average.
       final recent = await _apiService.getCarbonRecords(email);
 
       await NotificationService.onCarbonRecordSaved(
@@ -697,11 +664,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   hint: 'Select your mode of transportation',
                   value: _selectedTransportType,
                   items: const [
-                    'Traditional Jeepney',
-                    'Modern Jeepney',
-                    'Car',
-                    'Motorcycle',
-                    'Bicycle/Walking',
+                    'Motorcycle (0.103 kg CO₂e/km)',
+                    'Tricycle (0.095 kg C₂e/km)',
+                    'Modern Jeepney (0.035 kg C₂e/km)',
+                    'Traditional Jeepney (0.08 kg C₂e/km)',
+                    'Private Car (Gasoline) (0.171 kg C₂e/km)',
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -814,50 +781,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             _buildFormCard(
               title: 'Office Resource',
               icon: Icons.devices_other_outlined,
-              subtitle: 'Record the resources you used.',
+              subtitle: 'Record the resources or appliances you used.',
               children: [
-                _buildDropdownField(
-                  label: 'Office Resource Type',
-                  hint: 'Select resource type',
-                  value: _selectedOfficeResourceType,
-                  items: const [
-                    'Air Conditioner',
-                    'Desktop Computer (CPU + Monitor)',
-                    'Electric Fan',
-                    'Lights',
-                    'Laptop',
-                    'Viewboard / Smart Screen',
-                    'Projector',
-                    'Printer (Laser)',
-                    'Photocopier / Multifunction Printer',
-                    'Scanner',
-                    'Sound Speaker',
-                  ],
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedOfficeResourceType = val;
-                      _selectedOfficeResourceCategory = null;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 14),
-
-                _buildDropdownField(
-                  label: 'Resource Category',
-                  hint: _selectedOfficeResourceType == null
-                      ? 'Select a resource type first'
-                      : 'Select resource category',
-                  value: _selectedOfficeResourceCategory,
-                  items: _getOfficeResourceCategories(
-                    _selectedOfficeResourceType,
-                  ),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedOfficeResourceCategory = val;
-                    });
-                  },
-                ),
+                _buildOfficeResourceDropdown(),
 
                 const SizedBox(height: 14),
 
@@ -875,13 +801,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   width: double.infinity,
                   child: _buildAddButton(
                     onPressed: () {
-                      if (_selectedOfficeResourceType == null ||
-                          _selectedOfficeResourceCategory == null) {
+                      if (_selectedOfficeResourceCategory == null) {
                         DialogHelper.showWarning(
                           context: context,
                           title: "Incomplete Information",
                           message:
-                              "Please select an office resource type and category before adding an emission.",
+                              "Please select an office resource or appliance before adding an emission.",
                         );
                         return;
                       }
@@ -921,7 +846,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                         _officeResourceTotalEmission += emission;
 
-                        _selectedOfficeResourceType = null;
                         _selectedOfficeResourceCategory = null;
                         _officeHoursController.clear();
                       });
@@ -939,63 +863,31 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               icon: Icons.restaurant_outlined,
               subtitle: 'Record what you consumed today.',
               children: [
-                // Food Type
-                _buildDropdownField(
-                  label: 'Food Type',
-                  hint: 'Select food type',
-                  value: _selectedFoodType,
-                  items: const [
-                    'Red Meat',
-                    'Dairy & Poultry',
-                    'Staples & Plant-based Proteins',
-                    'Grains, Vegetables, and Fruits',
-                    'Beverages and Discretionary Items',
-                  ],
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedFoodType = val;
-                      _selectedFoodCategory = null;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 14),
-
-                // Food Category
-                _buildDropdownField(
-                  label: 'Food Category',
-                  hint: _selectedFoodType == null
-                      ? 'Select food type'
-                      : 'Select food category',
-                  value: _selectedFoodCategory,
-                  items: _getFoodCategories(_selectedFoodType),
-                  onChanged: _selectedFoodType == null
-                      ? (_) {}
-                      : (val) => setState(() => _selectedFoodCategory = val),
-                ),
-
-                const SizedBox(height: 14),
-
                 _buildDropdownField(
                   label: 'Meal Period',
                   hint: 'Select meal period',
                   value: _selectedMealPeriod,
                   items: const ['Breakfast', 'Lunch', 'Dinner', 'Snack'],
                   onChanged: (value) {
-                    setState(() => _selectedMealPeriod = value);
+                    setState(() {
+                      _selectedMealPeriod = value;
+                    });
                   },
                 ),
 
                 const SizedBox(height: 14),
 
+                _buildFoodDropdown(),
+
+                const SizedBox(height: 14),
+
                 Row(
                   children: [
-                    // Requirement 2: Users should not be able to change the date
                     Expanded(
                       child: Opacity(
                         opacity: 0.7,
                         child: OutlinedButton.icon(
-                          onPressed: null, // Disabled so date cannot be changed
+                          onPressed: null,
                           icon: const Icon(Icons.calendar_today_outlined),
                           label: Text(_selectedFoodDateLabel),
                         ),
@@ -1014,78 +906,69 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
                 const SizedBox(height: 14),
 
-                // Servings
                 _buildTextField(
-                  label: "Servings",
-                  hint: "Enter number of servings",
+                  label: 'Amount / Serving (Cups)',
+                  hint: 'e.g., 1 cup',
                   controller: _servingSizeController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   numbersOnly: true,
                 ),
 
                 const SizedBox(height: 16),
 
-                // Add Activity
                 SizedBox(
                   width: double.infinity,
                   child: _buildAddButton(
                     onPressed: () {
-                      if (_selectedFoodType == null ||
-                          _selectedFoodCategory == null ||
+                      if (_selectedFoodItem == null ||
                           _selectedMealPeriod == null) {
                         DialogHelper.showWarning(
                           context: context,
-                          title: "Incomplete Information",
+                          title: 'Incomplete Information',
                           message:
-                              "Please select a food type, category, and meal period before adding an emission.",
+                              'Please select a food item and meal period before adding an emission.',
                         );
                         return;
                       }
 
-                      if (_servingSizeController.text.isEmpty) {
-                        DialogHelper.showWarning(
-                          context: context,
-                          title: "Incomplete Information",
-                          message: "Please enter the serving size.",
-                        );
-                        return;
-                      }
-
-                      final serving = double.tryParse(
+                      final amount = double.tryParse(
                         _servingSizeController.text.trim(),
                       );
-                      if (serving == null || serving <= 0) {
+
+                      if (amount == null || amount <= 0) {
                         DialogHelper.showWarning(
                           context: context,
-                          title: "Invalid Servings",
-                          message: "Enter a number greater than zero.",
+                          title: 'Invalid Amount',
+                          message: 'Enter a number greater than zero.',
                         );
                         return;
                       }
 
-                      // Emission factors are in kg CO₂e per kilogram of food.
-                      // Approximate 1 serving = 100 g (0.1 kg).
-                      const servingWeight = 0.1;
+                      final emission = _calculateFoodEmission(
+                        _selectedFoodItem!,
+                        amount,
+                      );
 
-                      final emission =
-                          _calculateFoodEmission(_selectedFoodCategory!) *
-                          serving *
-                          servingWeight;
+                      final unit = amount == 1 ? 'cup' : 'cups';
 
                       setState(() {
                         _foodEmissions.add(
-                          '${_selectedFoodCategory!}\n'
-                          '$_selectedMealPeriod • $_selectedFoodDateLabel ${_selectedFoodTime.format(context)}\n'
-                          '$serving serving(s)\n'
+                          '${_selectedFoodItem!}\n'
+                          '$_selectedMealPeriod • '
+                          '$_selectedFoodDateLabel '
+                          '${_selectedFoodTime.format(context)}\n'
+                          '$amount $unit\n'
                           '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
 
                         _foodTotalEmission += emission;
+
                         _lastFoodMealPeriod = _selectedMealPeriod;
                         _lastFoodConsumedAt = _selectedFoodDateTime;
 
-                        _selectedFoodType = null;
-                        _selectedFoodCategory = null;
+                        _selectedFoodItem = null;
                         _selectedMealPeriod = null;
                         _servingSizeController.clear();
                       });
@@ -1123,7 +1006,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
             const SizedBox(height: 24),
 
-            // 🟢 POP-UP LOGIC
+            // POP-UP LOGIC
             GestureDetector(
               onTap: _isSavingCarbonRecord
                   ? null
@@ -1260,6 +1143,224 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     );
   }
 
+  Widget _buildOfficeResourceDropdown() {
+    final dropdownItems = <DropdownMenuItem<String>>[];
+
+    for (final entry in officeResourceGroups.entries) {
+      dropdownItems.add(
+        DropdownMenuItem<String>(
+          enabled: false,
+          value: null,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(
+              entry.key,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: darkGreen,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (final item in entry.value) {
+        dropdownItems.add(
+          DropdownMenuItem<String>(
+            value: item,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                item,
+                style: const TextStyle(fontSize: 11, color: Colors.black87),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    final safeValue =
+        officeResourcePowerRatings.containsKey(_selectedOfficeResourceCategory)
+        ? _selectedOfficeResourceCategory
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Office Resource / Appliance',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: primaryGreen,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black38, width: 1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: safeValue,
+              hint: const Text(
+                'Select Appliance/Hardware',
+                style: TextStyle(fontSize: 10, color: Colors.black38),
+              ),
+              isExpanded: true,
+              menuMaxHeight: 420,
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.black,
+                size: 18,
+              ),
+              style: const TextStyle(fontSize: 11, color: Colors.black87),
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _selectedOfficeResourceCategory = value;
+                });
+              },
+              items: dropdownItems,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFoodDropdown() {
+    final dropdownItems = <DropdownMenuItem<String>>[];
+
+    final foodGroups = <String, List<String>>{
+      '1. High-Impact Proteins (Red Meats)': [
+        'Beef (Beef Herd) (60.0 kg CO2e/kg)',
+        'Lamb & Mutton (24.5 kg CO2e/kg)',
+        'Beef (Dairy Herd) (21.1 kg CO2e/kg)',
+      ],
+      '2. Moderate-Impact Proteins (Dairy & Poultry)': [
+        'Cheese (21.0 kg CO2e/kg)',
+        'Pork (7.0 kg CO2e/kg)',
+        'Poultry (Chicken / Turkey) (6.0 kg CO2e/kg)',
+        'Eggs (4.5 kg CO2e/kg)',
+        'Fish (Farmed) (5.0 kg CO2e/kg)',
+      ],
+      '3. Staples and Plant-Based Proteins': [
+        'Rice (Flooded) (4.4 kg CO2e/kg)',
+        'Tofu (Soy-based) (3.0 kg CO2e/kg)',
+        'Groundnuts / Peanuts (2.5 kg CO2e/kg)',
+        'Pulses (Beans / Peas) (1.5 kg CO2e/kg)',
+      ],
+      '4. Grains, Vegetables, and Fruits': [
+        'Wheat & Rye (Bread) (1.4 kg CO2e/kg)',
+        'Maize (Corn) (1.0 kg CO2e/kg)',
+        'Potatoes (0.5 kg CO2e/kg)',
+        'Apples / Bananas (0.4 kg CO2e/kg)',
+        'Root Vegetables (0.4 kg CO2e/kg)',
+      ],
+      '5. Beverages and Discretionary Items': [
+        'Coffee (22.0 kg CO2e/kg)',
+        'Dark Chocolate (19.0 kg CO2e/kg)',
+        'Milk (Bovine) (3.2 kg CO2e/liter)',
+        'Soy Milk (1.0 kg CO2e/liter)',
+      ],
+    };
+
+    for (final entry in foodGroups.entries) {
+      dropdownItems.add(
+        DropdownMenuItem<String>(
+          enabled: false,
+          value: null,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(
+              entry.key,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: darkGreen,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (final item in entry.value) {
+        dropdownItems.add(
+          DropdownMenuItem<String>(
+            value: item,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                item,
+                style: const TextStyle(fontSize: 11, color: Colors.black87),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    final safeValue = foodEmissionFactors.containsKey(_selectedFoodItem)
+        ? _selectedFoodItem
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Food Type',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: primaryGreen,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black38, width: 1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: safeValue,
+              hint: const Text(
+                'Select Food Item',
+                style: TextStyle(fontSize: 10, color: Colors.black38),
+              ),
+              isExpanded: true,
+              menuMaxHeight: 420,
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.black,
+                size: 18,
+              ),
+              style: const TextStyle(fontSize: 11, color: Colors.black87),
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _selectedFoodItem = value;
+                });
+              },
+              items: dropdownItems,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDropdownField({
     required String label,
     required String hint,
@@ -1267,6 +1368,12 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final uniqueItems = items.toSet().toList();
+
+    final safeValue = value != null && uniqueItems.contains(value)
+        ? value
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1281,7 +1388,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         ),
         const SizedBox(height: 6),
         Container(
-          height: 52,
+          height: 38,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black38, width: 1),
@@ -1289,10 +1396,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: value,
+              value: safeValue,
               hint: Text(
                 hint,
-                style: const TextStyle(fontSize: 13, color: Colors.black38),
+                style: const TextStyle(fontSize: 10, color: Colors.black38),
               ),
               isExpanded: true,
               icon: const Icon(
@@ -1300,9 +1407,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                 color: Colors.black,
                 size: 18,
               ),
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              style: const TextStyle(fontSize: 11, color: Colors.black87),
               onChanged: onChanged,
-              items: items.map<DropdownMenuItem<String>>((String val) {
+              items: uniqueItems.map<DropdownMenuItem<String>>((String val) {
                 return DropdownMenuItem<String>(value: val, child: Text(val));
               }).toList(),
             ),

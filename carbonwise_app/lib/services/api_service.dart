@@ -9,7 +9,6 @@ import '../utils/api_constants.dart';
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
-  static const Duration _timeout = Duration(seconds: 30);
 
   // LARAVEL AUTHENTICATION TOKEN
 
@@ -77,13 +76,6 @@ class ApiService {
             body: jsonEncode({'email': email, 'password': password}),
           )
           .timeout(const Duration(seconds: 30));
-
-      // Debug information
-      print('LOGIN URL: $baseUrl/api/login');
-      print('LOGIN EMAIL: [$email]');
-      print('LOGIN PASSWORD LENGTH: ${password.length}');
-      print('LOGIN STATUS: ${response.statusCode}');
-      print('LOGIN RESPONSE: ${response.body}');
 
       final data = _decodeResponse(response);
 
@@ -200,12 +192,6 @@ class ApiService {
           )
           .timeout(const Duration(seconds: 30));
 
-      // Debug
-      print('FORGOT PASSWORD URL: $baseUrl/api/forgot-password');
-      print('FORGOT PASSWORD EMAIL: [$email]');
-      print('FORGOT PASSWORD STATUS: ${response.statusCode}');
-      print('FORGOT PASSWORD RESPONSE: ${response.body}');
-
       final data = _decodeResponse(response);
 
       if (response.statusCode == 200) {
@@ -247,19 +233,9 @@ class ApiService {
     try {
       final url = '$baseUrl/api/carbon-records';
 
-      print('========== CARBON RECORDS DEBUG ==========');
-      print('CARBON URL: $url');
-      print('TOKEN EXISTS: ${_token != null}');
-      print('TOKEN LENGTH: ${_token?.length}');
-      print('CARBON HEADERS: $_headers');
-
       final response = await http
           .get(Uri.parse(url), headers: _headers)
           .timeout(const Duration(seconds: 30));
-
-      print('CARBON STATUS: ${response.statusCode}');
-      print('CARBON RESPONSE: ${response.body}');
-      print('==========================================');
 
       final data = _decodeResponse(response);
 
@@ -380,10 +356,6 @@ class ApiService {
           .get(Uri.parse('$baseUrl/api/profile'), headers: _headers)
           .timeout(const Duration(seconds: 30));
 
-      print('PROFILE STATUS: ${response.statusCode}');
-      print('PROFILE RESPONSE: ${response.body}');
-      print('PROFILE TOKEN: $_token');
-
       final data = _decodeResponse(response);
 
       if (response.statusCode == 200) {
@@ -392,7 +364,6 @@ class ApiService {
 
       throw Exception(data['message'] ?? 'Failed to load user information.');
     } catch (e) {
-      print('PROFILE API ERROR: $e');
       rethrow;
     }
   }
@@ -560,22 +531,6 @@ class ApiService {
     }
   }
 
-  // TEST LARAVEL CONNECTION
-  Future<String> testLaravel() async {
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl/api/up'),
-          headers: {'Accept': 'application/json'},
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (response.statusCode == 200) {
-      return response.body;
-    }
-
-    throw Exception('Laravel connection failed: ${response.statusCode}');
-  }
-
   // LOGOUT
   static Future<void> logout() async {
     try {
@@ -660,20 +615,9 @@ class ApiService {
     try {
       final url = Uri.parse('$baseUrl/api/profile');
 
-      print('========== PROFILE DEBUG ==========');
-      print('PROFILE URL: $url');
-      print('PROFILE TOKEN EXISTS: ${_token != null}');
-      print('PROFILE TOKEN LENGTH: ${_token?.length}');
-      print('PROFILE TOKEN START: ${_token?.substring(0, 4)}');
-      print('PROFILE HEADERS: $_headers');
-
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 30));
-
-      print('PROFILE STATUS: ${response.statusCode}');
-      print('PROFILE RESPONSE: ${response.body}');
-      print('===================================');
 
       final data = _decodeResponse(response);
 
@@ -683,7 +627,6 @@ class ApiService {
 
       throw Exception(data['message'] ?? 'Failed to load profile.');
     } catch (e) {
-      print('PROFILE API ERROR: $e');
       rethrow;
     }
   }
@@ -707,7 +650,6 @@ class ApiService {
 
       throw Exception(data['message'] ?? 'Failed to load department rankings.');
     } catch (e) {
-      print('DEPARTMENT API ERROR: $e');
       rethrow;
     }
   }
@@ -718,18 +660,9 @@ class ApiService {
       final query = month != null ? '?month=$month' : '';
       final url = Uri.parse('$baseUrl/api/campus-rankings$query');
 
-      print('========== CAMPUS DEBUG ==========');
-      print('CAMPUS URL: $url');
-      print('CAMPUS TOKEN EXISTS: ${_token != null}');
-      print('CAMPUS HEADERS: $_headers');
-
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 30));
-
-      print('CAMPUS STATUS: ${response.statusCode}');
-      print('CAMPUS BODY: ${response.body}');
-      print('==================================');
 
       final data = _decodeResponse(response);
 
@@ -740,7 +673,6 @@ class ApiService {
 
       throw Exception(data['message'] ?? 'Failed to load campus rankings.');
     } catch (e) {
-      print('CAMPUS API ERROR: $e');
       rethrow;
     }
   }
@@ -753,18 +685,9 @@ class ApiService {
       final query = '?period=$period';
       final url = Uri.parse('$baseUrl/api/my-peer-comparison$query');
 
-      print('========== PEER COMPARISON DEBUG ==========');
-      print('PEER URL: $url');
-      print('PEER TOKEN EXISTS: ${_token != null}');
-      print('PEER HEADERS: $_headers');
-
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 30));
-
-      print('PEER STATUS: ${response.statusCode}');
-      print('PEER BODY: ${response.body}');
-      print('===========================================');
 
       final data = _decodeResponse(response);
 
@@ -774,7 +697,6 @@ class ApiService {
 
       throw Exception(data['message'] ?? 'Failed to load peer comparison.');
     } catch (e) {
-      print('PEER API ERROR: $e');
       rethrow;
     }
   }

@@ -266,7 +266,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadIndividualStatus() async {
     try {
-      print('🚨 INDIVIDUAL STATUS: calling getCarbonRecords');
       final records = await _apiService.getCarbonRecords('');
       final now = DateTime.now();
 
@@ -278,7 +277,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final record = Map<String, dynamic>.from(raw as Map);
         final date = DateTime.tryParse(record['record_date']?.toString() ?? '');
 
-        // Requirement 3: Strictly filter for today's inputs only
         if (date == null ||
             date.year != now.year ||
             date.month != now.month ||
