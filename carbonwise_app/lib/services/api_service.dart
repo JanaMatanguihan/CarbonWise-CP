@@ -773,23 +773,26 @@ class ApiService {
   // GET: TFT 30-DAY FORECAST
   Future<Map<String, dynamic>> getTft30DayForecast() async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/forecast/tft-30-days'),
-        headers: _headers,
-      );
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/forecast/tft-30-days'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 30));
 
       print('TFT STATUS: ${response.statusCode}');
       print('TFT RESPONSE: ${response.body}');
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(
-          'Forecast API ${response.statusCode}: ${response.body}',
-        );
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
       }
+
+      throw Exception('Invalid forecast response from server.');
     } catch (e) {
       print('TFT API ERROR: $e');
+
       throw Exception('Error connecting to forecasting service: $e');
     }
   }

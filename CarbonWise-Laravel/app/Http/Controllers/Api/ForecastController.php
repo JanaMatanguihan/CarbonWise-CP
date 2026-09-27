@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CarbonRecord;
 use Illuminate\Support\Facades\Http;
-use Carbon\Carbon;
 
 class ForecastController extends Controller
 {
@@ -22,51 +21,56 @@ class ForecastController extends Controller
                     'total_emission',
                 ]);
 
-            $records = $records->map(function ($record) {
-                return $record->toArray();
-            })->values();
+            $recordCount = $records->count();
 
-            // The TFT model uses a 90-day history window.
-            // Pad shorter histories so the existing model can still run.
-            if ($records->count() === 0) {
+            // NEW USER / NO CARBON RECORDS
+            if ($recordCount === 0) {
                 return response()->json([
-                    'message' => 'At least one carbon record is required for forecasting.'
-                ], 422);
+                    'status' => 'no_data',
+                    'message' => 'No carbon records available yet.',
+                    'records_available' => 0,
+                    'records_required' => 90,
+                    'forecast' => [],
+                ], 200);
             }
 
-            if ($records->count() < 90) {
-                $needed = 90 - $records->count();
-                $firstRecord = $records->first();
-                $firstDate = Carbon::parse($firstRecord['record_date']);
-                $paddedRecords = collect();
-                for ($i = $needed; $i >= 1; $i--) {
-                    $copy = $firstRecord;
-                    $copy['record_date'] = $firstDate->copy()->subDays($i)->toDateString();
-                    $paddedRecords->push($copy);
-                }
-                $records = $paddedRecords->concat($records)->values();
+            // NOT ENOUGH HISTORY FOR TFT
+            if ($recordCount < 90) {
+                return response()->json([
+                    'status' => 'insufficient_data',
+                    'message' => 'More carbon activity history is needed before a 30-day forecast can be generated.',
+                    'records_available' => $recordCount,
+                    'records_required' => 90,
+                    'forecast' => [],
+                ], 200);
             }
 
+            // ENOUGH DATA -> CALL TFT SERVICE
             $response = Http::timeout(120)->post(
                 env('TFT_API_URL') . '/forecast',
                 [
-                    'records' => $records->toArray()
+                    'records' => $records->toArray(),
                 ]
             );
 
             if ($response->successful()) {
-                return response()->json($response->json());
+                return response()->json([
+                    'status' => 'success',
+                    ...$response->json(),
+                ]);
             }
 
             return response()->json([
+                'status' => 'error',
                 'message' => 'Unable to generate forecast from TFT service.',
-                'details' => $response->json()
+                'details' => $response->json(),
             ], 500);
 
         } catch (\Exception $e) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'TFT forecasting service is unavailable.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

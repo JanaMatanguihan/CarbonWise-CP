@@ -109,6 +109,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool isTftLoading = true;
   String? tftForecastError;
 
+  String? tftForecastStatus;
+  int tftRecordsAvailable = 0;
+  int tftRecordsRequired = 90;
+
   @override
   void initState() {
     super.initState();
@@ -160,6 +164,65 @@ class _ReportsScreenState extends State<ReportsScreen> {
       print('TFT: requesting forecast...');
 
       final data = await _apiService.getTft30DayForecast();
+
+      final status = data['status']?.toString();
+
+      final recordsAvailable =
+          int.tryParse(data['records_available']?.toString() ?? '') ?? 0;
+
+      final recordsRequired =
+          int.tryParse(data['records_required']?.toString() ?? '') ?? 90;
+
+      print('TFT STATUS: $status');
+      print('TFT RECORDS: $recordsAvailable / $recordsRequired');
+
+      // NO DATA / NEW USER
+      if (status == 'no_data') {
+        if (!mounted) return;
+
+        setState(() {
+          tftForecastSpots = [];
+          tftForecastLabels = [];
+
+          isTftLoading = false;
+          tftForecastError = null;
+
+          tftForecastStatus = 'no_data';
+          tftRecordsAvailable = recordsAvailable;
+          tftRecordsRequired = recordsRequired;
+        });
+
+        return;
+      }
+
+      // NOT ENOUGH HISTORY
+      if (status == 'insufficient_data') {
+        if (!mounted) return;
+
+        setState(() {
+          tftForecastSpots = [];
+          tftForecastLabels = [];
+
+          isTftLoading = false;
+          tftForecastError = null;
+
+          tftForecastStatus = 'insufficient_data';
+          tftRecordsAvailable = recordsAvailable;
+          tftRecordsRequired = recordsRequired;
+        });
+
+        return;
+      }
+
+      // SERVER ERROR
+      if (status == 'error') {
+        throw Exception(
+          data['message']?.toString() ??
+              'The forecasting service is currently unavailable.',
+        );
+      }
+
+      // SUCCESS
       final forecast = data['forecast'];
 
       if (forecast is! List || forecast.isEmpty) {
@@ -169,8 +232,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final spots = <FlSpot>[];
       final dateLabels = <String>[];
 
-      // The API should return the forecast in order.
-      // We use the returned dates instead of hard-coding July or another month.
       for (int i = 0; i < forecast.length && i < 30; i++) {
         final item = Map<String, dynamic>.from(forecast[i] as Map);
 
@@ -180,15 +241,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
         final prediction = double.tryParse(item['forecast']?.toString() ?? '');
 
-        if (targetDate == null || prediction == null) continue;
+        if (targetDate == null || prediction == null) {
+          continue;
+        }
 
         spots.add(FlSpot(spots.length.toDouble(), prediction));
+
         dateLabels.add('${targetDate.month}/${targetDate.day}');
       }
 
       if (spots.length != 30) {
         throw Exception(
-          'No valid forecast entries were parsed from the API response.',
+          'Expected 30 forecast entries, but received ${spots.length}.',
         );
       }
 
@@ -197,8 +261,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       setState(() {
         tftForecastSpots = spots;
         tftForecastLabels = dateLabels;
+
         isTftLoading = false;
         tftForecastError = null;
+
+        tftForecastStatus = 'success';
+        tftRecordsAvailable = recordsAvailable;
+        tftRecordsRequired = recordsRequired;
       });
     } catch (e) {
       print('TFT FORECAST ERROR: $e');
@@ -206,8 +275,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (!mounted) return;
 
       setState(() {
+        tftForecastSpots = [];
+        tftForecastLabels = [];
+
         isTftLoading = false;
         tftForecastError = e.toString();
+
+        tftForecastStatus = 'error';
       });
     }
   }
@@ -912,24 +986,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 color: primaryGreen,
                               ),
                             )
-                          : tftForecastError != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(
-                                  "Forecast model is initializing or building baseline. Check back soon!",
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            )
+                          : tftForecastStatus == 'no_data'
+                          ? _buildTftEmptyState()
+                          : tftForecastStatus == 'insufficient_data'
+                          ? _buildTftInsufficientDataState()
+                          : tftForecastStatus == 'error'
+                          ? _buildTftErrorState()
                           : tftForecastSpots.isEmpty
                           ? const Center(
                               child: Text(
-                                "Generating 30-day trajectory...",
+                                'No forecast available.',
                                 style: TextStyle(
                                   color: Colors.black54,
                                   fontSize: 13,
@@ -940,7 +1006,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
                               child: SizedBox(
-                                // Dynamically size width so all 30 points fit comfortably with spacing
                                 width: tftForecastSpots.length * 45.0,
                                 child: LineChart(
                                   LineChartData(
@@ -953,22 +1018,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                                     gridData: FlGridData(
                                       show: true,
-                                      drawVerticalLine: true,
-                                      getDrawingVerticalLine: (value) => FlLine(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.03,
-                                        ),
-                                        strokeWidth: 1,
-                                      ),
-                                      horizontalInterval: 50,
-                                      getDrawingHorizontalLine: (value) =>
-                                          FlLine(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.04,
-                                            ),
-                                            strokeWidth: 1,
+                                      drawVerticalLine: false,
+                                      horizontalInterval: 5,
+                                      getDrawingHorizontalLine: (value) {
+                                        return FlLine(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.07,
                                           ),
+                                          strokeWidth: 1,
+                                        );
+                                      },
                                     ),
+
+                                    borderData: FlBorderData(show: false),
 
                                     titlesData: FlTitlesData(
                                       topTitles: const AxisTitles(
@@ -976,19 +1038,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                           showTitles: false,
                                         ),
                                       ),
+
                                       rightTitles: const AxisTitles(
                                         sideTitles: SideTitles(
                                           showTitles: false,
                                         ),
                                       ),
+
                                       leftTitles: AxisTitles(
                                         sideTitles: SideTitles(
                                           showTitles: true,
                                           reservedSize: 40,
-                                          interval: 50,
+                                          interval: 5,
                                           getTitlesWidget: (value, meta) {
+                                            if (value == 0) {
+                                              return const SizedBox();
+                                            }
+
                                             return Text(
-                                              value.toInt().toString(),
+                                              value.toStringAsFixed(0),
                                               style: const TextStyle(
                                                 fontSize: 9,
                                                 color: Colors.black45,
@@ -997,19 +1065,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                           },
                                         ),
                                       ),
+
                                       bottomTitles: AxisTitles(
                                         sideTitles: SideTitles(
                                           showTitles: true,
                                           reservedSize: 32,
                                           interval:
-                                              1, // Show every date label since it's scrollable
+                                              tftForecastLabels.length > 10
+                                              ? 5
+                                              : 1,
                                           getTitlesWidget: (value, meta) {
                                             final index = value.toInt();
+
                                             if (index < 0 ||
                                                 index >=
                                                     tftForecastLabels.length) {
                                               return const SizedBox();
                                             }
+
                                             return Padding(
                                               padding: const EdgeInsets.only(
                                                 top: 8,
@@ -1018,8 +1091,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                                 tftForecastLabels[index],
                                                 style: const TextStyle(
                                                   fontSize: 9,
-                                                  color: Colors.black54,
-                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.black45,
                                                 ),
                                               ),
                                             );
@@ -1028,23 +1100,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       ),
                                     ),
 
-                                    borderData: FlBorderData(show: false),
-
                                     lineTouchData: LineTouchData(
                                       enabled: true,
                                       touchTooltipData: LineTouchTooltipData(
                                         getTooltipItems: (touchedSpots) {
                                           return touchedSpots.map((spot) {
                                             final index = spot.x.toInt();
+
                                             final date =
                                                 index >= 0 &&
                                                     index <
                                                         tftForecastLabels.length
                                                 ? tftForecastLabels[index]
-                                                : "";
+                                                : '';
 
                                             return LineTooltipItem(
-                                              "Date: $date\nPredicted: ${spot.y.toStringAsFixed(2)} kg CO₂e",
+                                              '$date\n'
+                                              '${spot.y.toStringAsFixed(2)} kg CO₂e',
                                               const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 11,
@@ -1060,26 +1132,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       LineChartBarData(
                                         spots: tftForecastSpots,
                                         isCurved: true,
-                                        curveSmoothness: 0.35,
+                                        curveSmoothness: 0.25,
                                         color: primaryGreen,
                                         barWidth: 3,
                                         isStrokeCapRound: true,
+
                                         dotData: FlDotData(
                                           show: true,
-                                        ), // Show dots for easier tapping when scrolling
+                                          getDotPainter:
+                                              (spot, percent, barData, index) {
+                                                return FlDotCirclePainter(
+                                                  radius: 3,
+                                                  color: Colors.white,
+                                                  strokeWidth: 2,
+                                                  strokeColor: primaryGreen,
+                                                );
+                                              },
+                                        ),
+
                                         belowBarData: BarAreaData(
                                           show: true,
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              primaryGreen.withValues(
-                                                alpha: 0.25,
-                                              ),
-                                              primaryGreen.withValues(
-                                                alpha: 0.0,
-                                              ),
-                                            ],
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
+                                          color: primaryGreen.withValues(
+                                            alpha: 0.10,
                                           ),
                                         ),
                                       ),
@@ -1246,6 +1320,153 @@ class _ReportsScreenState extends State<ReportsScreen> {
             color: isSelected ? Colors.white : const Color(0xFF265D3B),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTftEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: primaryGreen.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.insights_outlined,
+              color: primaryGreen,
+              size: 30,
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          const Text(
+            'Your forecast will appear here',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2933),
+            ),
+          ),
+
+          const SizedBox(height: 7),
+
+          const Text(
+            'Start recording your daily activities to build your '
+            'carbon emission history and generate a personalized '
+            '30-day forecast.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.5, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTftInsufficientDataState() {
+    final progress = tftRecordsRequired > 0
+        ? (tftRecordsAvailable / tftRecordsRequired).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: primaryGreen.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.trending_up_rounded,
+              color: primaryGreen,
+              size: 28,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          const Text(
+            'Building your emission history',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2933),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'You have recorded $tftRecordsAvailable '
+            'of $tftRecordsRequired required history entries.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+
+          const SizedBox(height: 14),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: const Color(0xFFE5EEE8),
+              valueColor: const AlwaysStoppedAnimation<Color>(primaryGreen),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            '${(progress * 100).round()}% of required history',
+            style: const TextStyle(fontSize: 11, color: Colors.black45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTftErrorState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off_outlined, color: Colors.black38, size: 38),
+
+          const SizedBox(height: 10),
+
+          const Text(
+            'Forecast temporarily unavailable',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2933),
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          const Text(
+            'We could not generate your forecast right now. '
+            'Please try again later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ],
       ),
     );
   }
