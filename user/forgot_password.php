@@ -12,9 +12,6 @@ if (isset($_SESSION['user_token'])) {
 // ==========================================
 // --- LOAD ENVIRONMENT VARIABLES (.ENV) ---
 // ==========================================
-/**
- * Custom lightweight .env loader
- */
 function loadEnv($path) {
     if (!file_exists($path)) {
         return;
@@ -22,7 +19,7 @@ function loadEnv($path) {
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         $line = trim($line);
-        if (empty($line) || strpos($line, '#') === 0) continue; // Skip comments and empty lines
+        if (empty($line) || strpos($line, '#') === 0) continue;
         
         list($name, $value) = explode('=', $line, 2) + [NULL, NULL];
         if ($name && $value !== NULL) {
@@ -34,16 +31,12 @@ function loadEnv($path) {
     }
 }
 
-// Check local directory or parent folder for .env
 if (file_exists(__DIR__ . '/.env')) {
     loadEnv(__DIR__ . '/.env');
 } else {
     loadEnv(dirname(__DIR__) . '/.env');
 }
 
-/**
- * Helper to fetch environment variables safely with fallback
- */
 function env($key, $default = '') {
     $value = $_ENV[$key] ?? getenv($key);
     return ($value !== false && $value !== null) ? trim($value, '"\'') : $default;
@@ -67,7 +60,6 @@ $db_name     = env('DB_DATABASE', 'neondb');
 $db_user     = env('DB_USERNAME'); 
 $db_pass     = env('DB_PASSWORD'); 
 
-// Extract Neon endpoint ID if available in host string
 $endpoint_id = explode('.', $db_host)[0] ?? '';
 
 /**
@@ -143,12 +135,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
-            // Search for user by email or sr_code
+            // Fetch user safely checking email first
             $stmt = $pdo->prepare("
-                SELECT id, name, email FROM users 
+                SELECT * FROM users 
                 WHERE LOWER(email) = LOWER(:identifier) 
                    OR LOWER(email) = LOWER(:formatted_email)
-                   OR LOWER(sr_code) = LOWER(:identifier)
                 LIMIT 1
             ");
             
@@ -159,22 +150,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $user = $stmt->fetch();
 
+            // Fallback search if sr_code column exists in your schema
+            if (!$user) {
+                try {
+                    $srStmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(sr_code) = LOWER(:identifier) LIMIT 1");
+                    $srStmt->execute([':identifier' => $identifier]);
+                    $user = $srStmt->fetch();
+                } catch (PDOException $e) {
+                    // Ignore if sr_code column doesn't exist
+                }
+            }
+
             if ($user) {
-                // Generate secure random token
                 $token = bin2hex(random_bytes(32));
 
-                // Store secure token in remember_token column
-                $updateStmt = $pdo->prepare("
-                    UPDATE users 
-                    SET remember_token = :token, updated_at = NOW() 
-                    WHERE id = :id
-                ");
+                // Detect token column name (remember_token vs reset_token)
+                $hasRememberToken = array_key_exists('remember_token', $user);
+                $tokenColumn = $hasRememberToken ? 'remember_token' : 'reset_token';
+
+                $updateSql = "UPDATE users SET {$tokenColumn} = :token";
+                if (array_key_exists('updated_at', $user)) {
+                    $updateSql .= ", updated_at = NOW()";
+                }
+                $updateSql .= " WHERE id = :id";
+
+                $updateStmt = $pdo->prepare($updateSql);
                 $updateStmt->execute([
                     ':token' => $token,
                     ':id'    => $user['id']
                 ]);
 
-                // Construct reset link based on APP_URL or current host
+                // Construct reset link
                 if (!empty($app_url) && $app_url !== 'http://localhost') {
                     $base_domain = rtrim($app_url, '/');
                 } else {
@@ -187,7 +193,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $recipient_name = !empty($user['name']) ? htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8') : 'User';
 
-                // Email Body
                 $subject = "CarbonWise - Password Reset Request";
                 $htmlBody = "
                     <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
@@ -204,7 +209,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 ";
 
-                // Dispatch via Brevo API
                 $mailSent = sendBrevoEmail(
                     $brevo_api_key, 
                     $brevo_api_url,
@@ -221,16 +225,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = "Failed to send the password reset email. Please try again later.";
                 }
             } else {
-                // Return uniform message to prevent user enumeration
                 $success = "If an account with that SR-Code or email exists, a password reset link will be sent.";
             }
 
         } catch (PDOException $e) {
-            error_log("Forgot Password PDO Exception: " . $e->getMessage());
-            $error = "Unable to process your request right now. Please try again later.";
+            error_log("Forgot Password PDO Error: " . $e->getMessage());
+            // Displays detailed error to help diagnose database schema mismatches
+            $error = "Database Error: " . $e->getMessage();
         } catch (Exception $e) {
-            error_log("Forgot Password System Exception: " . $e->getMessage());
-            $error = "An unexpected error occurred. Please try again later.";
+            error_log("Forgot Password System Error: " . $e->getMessage());
+            $error = "System Error: " . $e->getMessage();
         }
     }
 }
