@@ -24,7 +24,9 @@ function loadEnv($path) {
         list($name, $value) = explode('=', $line, 2) + [NULL, NULL];
         if ($name && $value !== NULL) {
             $name = trim($name);
+            // Clean quotes, whitespaces, and HTML entities
             $value = trim($value, " \t\n\r\0\x0B\"'");
+            $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $_ENV[$name] = $value;
             putenv("{$name}={$value}");
         }
@@ -39,26 +41,29 @@ if (file_exists(__DIR__ . '/.env')) {
 
 function env($key, $default = '') {
     $value = $_ENV[$key] ?? getenv($key);
-    return ($value !== false && $value !== null) ? trim($value, '"\'') : $default;
+    if ($value === false || $value === null || $value === '') {
+        return $default;
+    }
+    return html_entity_decode(trim($value, " \t\n\r\0\x0B\"'"), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
 $error = '';
 $success = '';
 
 // ==========================================
-// --- CONFIGURATION FROM ENV ---
+// --- CONFIGURATION FROM ENV & FALLBACKS ---
 // ==========================================
-$app_url          = env('APP_URL', '');
-$brevo_api_key    = env('BREVO_API_KEY');
+$app_url          = env('APP_URL', 'http://localhost');
+$brevo_api_key    = env('BREVO_API_KEY', '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');
 $brevo_api_url    = env('BREVO_API_URL', 'https://api.brevo.com/v3');
 $brevo_from_email  = env('BREVO_FROM_EMAIL', env('MAIL_FROM_ADDRESS', 'noreplycarbonwise@gmail.com'));
 $brevo_from_name   = env('BREVO_FROM_NAME', env('MAIL_FROM_NAME', 'CarbonWise'));
 
-$db_host     = env('DB_HOST');
+$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
 $db_port     = env('DB_PORT', '5432');
 $db_name     = env('DB_DATABASE', 'neondb');
-$db_user     = env('DB_USERNAME'); 
-$db_pass     = env('DB_PASSWORD'); 
+$db_user     = env('DB_USERNAME', 'neondb_owner'); 
+$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
 
 $endpoint_id = explode('.', $db_host)[0] ?? '';
 
@@ -135,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
-            // Fetch user safely checking email first
+            // Query user
             $stmt = $pdo->prepare("
                 SELECT * FROM users 
                 WHERE LOWER(email) = LOWER(:identifier) 
@@ -150,21 +155,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $user = $stmt->fetch();
 
-            // Fallback search if sr_code column exists in your schema
+            // Try SR-Code column if present
             if (!$user) {
                 try {
                     $srStmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(sr_code) = LOWER(:identifier) LIMIT 1");
                     $srStmt->execute([':identifier' => $identifier]);
                     $user = $srStmt->fetch();
                 } catch (PDOException $e) {
-                    // Ignore if sr_code column doesn't exist
+                    // Ignore column missing errors
                 }
             }
 
             if ($user) {
                 $token = bin2hex(random_bytes(32));
 
-                // Detect token column name (remember_token vs reset_token)
                 $hasRememberToken = array_key_exists('remember_token', $user);
                 $tokenColumn = $hasRememberToken ? 'remember_token' : 'reset_token';
 
@@ -180,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':id'    => $user['id']
                 ]);
 
-                // Construct reset link
+                // Reset link host URL construction
                 if (!empty($app_url) && $app_url !== 'http://localhost') {
                     $base_domain = rtrim($app_url, '/');
                 } else {
@@ -230,11 +234,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (PDOException $e) {
             error_log("Forgot Password PDO Error: " . $e->getMessage());
-            // Displays detailed error to help diagnose database schema mismatches
-            $error = "Database Error: " . $e->getMessage();
+            $error = "Unable to process your request right now. Please try again later.";
         } catch (Exception $e) {
             error_log("Forgot Password System Error: " . $e->getMessage());
-            $error = "System Error: " . $e->getMessage();
+            $error = "An unexpected error occurred. Please try again later.";
         }
     }
 }
