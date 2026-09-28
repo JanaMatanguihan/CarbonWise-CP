@@ -46,10 +46,11 @@ $success = '';
 // ==========================================
 // --- CONFIGURATION FROM ENV ---
 // ==========================================
-$brevo_api_key    = env('BREVO_API_KEY', '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');
-$brevo_api_url    = env('BREVO_API_URL', 'https://api.brevo.com/v3');
-$brevo_from_email  = env('BREVO_FROM_EMAIL', 'noreplycarbonwise@gmail.com');
-$brevo_from_name   = env('BREVO_FROM_NAME', 'CarbonWise');
+$app_url           = env('APP_URL', 'https://carbonwise.up.railway.app');
+$brevo_api_key     = env('BREVO_API_KEY', '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');
+$brevo_api_url     = env('BREVO_API_URL', 'https://api.brevo.com/v3');
+$brevo_from_email   = env('BREVO_FROM_EMAIL', 'noreplycarbonwise@gmail.com');
+$brevo_from_name    = env('BREVO_FROM_NAME', 'CarbonWise');
 
 $db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
 $db_port     = env('DB_PORT', '5432');
@@ -99,6 +100,10 @@ function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientE
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        error_log("Brevo API Email Error [HTTP {$httpCode}]: " . $response);
+    }
 
     return ($httpCode === 201 || $httpCode === 200);
 }
@@ -195,10 +200,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':updated_at'       => $current_time
                 ]);
 
-                // Construct verification link
-                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-                $host = $_SERVER['HTTP_HOST'];
-                $verify_link = "{$protocol}://{$host}/verify.php?token={$verification_token}";
+                // Construct production verification link targeted to verify_email.php
+                $base_domain  = rtrim($app_url, '/');
+                $verify_link = "{$base_domain}/verify_email.php?token={$verification_token}";
 
                 // HTML Body for Brevo Email
                 $subject = "CarbonWise - Verify Your Email Address";
