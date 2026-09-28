@@ -770,21 +770,39 @@ if (empty($avatar_url)) {
         });
 
         function confirmLogout() {
-            const isDarkModeActive = bodyElement.classList.contains('dark-mode');
+            let activeTheme = localStorage.getItem('theme') || 'light';
+            let popupBg = activeTheme === 'dark' ? '#1E1E1E' : '#ffffff';
+            let popupText = activeTheme === 'dark' ? '#F7FAFC' : '#1A202C';
+
             Swal.fire({
                 title: 'Are you sure?',
                 text: "You want to log out of your CarbonWise session?",
                 icon: 'warning',
                 iconColor: '#f42828',
-                background: isDarkModeActive ? '#1E1E1E' : '#ffffff',
-                color: isDarkModeActive ? '#F7FAFC' : '#1A202C',
                 showCancelButton: true,
                 confirmButtonColor: '#2D6A4F',
                 cancelButtonColor: '#BA181B',
                 confirmButtonText: 'Yes, log me out',
-                cancelButtonText: 'Cancel'
+                cancelButtonText: 'Cancel',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                background: popupBg,
+                color: popupText,
+                backdrop: `rgba(0, 0, 0, 0.4)`,
+                scrollbarPadding: false,
+                heightAuto: false
             }).then((result) => {
                 if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Logging out...',
+                        text: 'Please wait a moment.',
+                        allowOutsideClick: false,
+                        scrollbarPadding: false,
+                        heightAuto: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                     window.location.href = 'logout.php?t=' + new Date().getTime();
                 }
             });

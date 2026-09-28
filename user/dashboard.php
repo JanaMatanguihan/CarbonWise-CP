@@ -456,7 +456,7 @@ function time_elapsed_string($datetime, $full = false) {
                 <button class="theme-toggle-item" id="themeToggle" title="Toggle Light/Dark Mode">
                     <i class="fa-solid fa-moon" id="themeIcon"></i> <span id="themeText">Dark Mode</span>
                 </button>
-                <a href="javascript:void(0);" onclick="confirmLogout();" class="menu-item"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
+                <a href="javascript:void(0);" onclick="confirmLogout(event);" class="menu-item"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
             </div>
         </div>
     </div>
@@ -561,20 +561,20 @@ function time_elapsed_string($datetime, $full = false) {
                 </div>
 
                 <div class="ranking-card">
-                    <h3>Campus Ranking</h3>
-                    <div class="card-icon"><i class="fa-solid fa-building-user"></i></div>
-                    <p class="sub-text">Your campus currently ranks</p>
-                    <div class="metric-value"><?= htmlspecialchars($campus_rank) ?></div>
-                    <p class="desc-text">
-                        <?php if ($user_campus === 'Unassigned'): ?>
-                            Please configure your institutional campus inside your user account profile layout.
-                        <?php elseif ($campus_rank === 'N/A' || $total_campuses === 0): ?>
-                            Emissions tracking data is currently processing for your campus community view.
-                        <?php else: ?>
-                            Outstanding achievement! The <strong><?= htmlspecialchars($user_campus) ?></strong> campus ranks <strong><?= htmlspecialchars($campus_rank) ?></strong> out of <?= (int)$total_campuses; ?> tracked active university campuses for sustainable low footprints.
-                        <?php endif; ?>
-                    </p>
-                </div>
+         <h3>Campus Ranking</h3>
+          <div class="card-icon"><i class="fa-solid fa-building-user"></i></div>
+          <p class="sub-text">Your campus currently ranks</p>
+          <div class="metric-value"><?= htmlspecialchars($campus_rank) ?></div>
+                   <p class="desc-text">
+                  <?php if ($user_campus === 'Unassigned'): ?>
+                      Please configure your institutional campus inside your user account profile layout.
+                           <?php elseif ($campus_rank === 'N/A' OR $total_campuses === 0): ?>
+                          Emissions tracking data is currently processing for your campus community view.
+                            <?php else: ?>
+                             Outstanding achievement! The <strong><?= htmlspecialchars($user_campus) ?></strong> campus ranks <strong><?= htmlspecialchars($campus_rank) ?></strong> out of <?= (int)$total_campuses; ?> tracked active university campuses for sustainable low footprints.
+                         <?php endif; ?>
+                         </p>
+                    </div>
             </div>
 
             <div class="charts-row">
@@ -636,10 +636,12 @@ function time_elapsed_string($datetime, $full = false) {
             }
         }
 
-        function confirmLogout() {
+        function confirmLogout(event) {
+            if (event) event.preventDefault();
+
             let activeTheme = localStorage.getItem('theme') || 'light';
             let popupBg = activeTheme === 'dark' ? '#121A16' : '#ffffff';
-            let popupText = activeTheme === 'dark' ? '#333333' : '#333333';
+            let popupText = activeTheme === 'dark' ? '#F3F4F6' : '#1F2937';
 
             Swal.fire({
                 title: 'Are you sure?',
@@ -651,14 +653,30 @@ function time_elapsed_string($datetime, $full = false) {
                 cancelButtonColor: '#BA181B',
                 confirmButtonText: 'Yes, log me out',
                 cancelButtonText: 'Cancel',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
                 background: popupBg,
-                color: popupText
+                color: popupText,
+                backdrop: `rgba(0, 0, 0, 0.4)`,
+                scrollbarPadding: false,
+                heightAuto: false
             }).then((result) => {
                 if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Logging out...',
+                        text: 'Please wait a moment.',
+                        allowOutsideClick: false,
+                        scrollbarPadding: false,
+                        heightAuto: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                     window.location.href = 'logout.php?t=' + new Date().getTime();
                 }
             });
         }
+
 
         const bellBtn = document.getElementById('bellBtn');
         const notificationMenu = document.getElementById('notificationMenu');

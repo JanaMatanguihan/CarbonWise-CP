@@ -303,16 +303,29 @@ function time_elapsed_string($datetime, $full = false) {
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
         body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; height: 100%; border-right: 1px solid var(--border-color); }
+        /* Lock Sidebar Dimensions to Prevent Collapsing/Text Truncation on Modal Open */
+        .sidebar { 
+            width: 260px !important; 
+            min-width: 260px !important;
+            max-width: 260px !important;
+            background-color: var(--bg-sidebar); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 20px 0; 
+            flex-shrink: 0 !important; 
+            height: 100%; 
+            border-right: 1px solid var(--border-color); 
+        }
+
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
-        
         .brand-logo-container { width: 32px; height: 32px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
-        .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; }
+        .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; white-space: nowrap; }
         
         .menu-items { flex: 1; display: flex; flex-direction: column; }
-        .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; }
-        .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; }
+        .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; white-space: nowrap; }
+        .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; flex-shrink: 0; }
         .menu-item:hover, .menu-item.active, .theme-toggle-item:hover { background-color: var(--bg-sidebar-hover); color: #ffffff; }
         .menu-item.active { font-weight: 600; background-color: var(--bg-sidebar-hover); color: #ffffff; }
         
@@ -579,7 +592,7 @@ function time_elapsed_string($datetime, $full = false) {
 
             Swal.fire({
                 title: 'Are you sure?',
-                text: "Do you want to exit your dashboard report session?",
+                text: "You want to log out of your CarbonWise session?",
                 icon: 'warning',
                 iconColor: '#f42828',
                 showCancelButton: true,
@@ -587,14 +600,30 @@ function time_elapsed_string($datetime, $full = false) {
                 cancelButtonColor: '#BA181B',
                 confirmButtonText: 'Yes, log me out',
                 cancelButtonText: 'Cancel',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
                 background: popupBg,
-                color: popupText
+                color: popupText,
+                backdrop: `rgba(0, 0, 0, 0.4)`,
+                scrollbarPadding: false,
+                heightAuto: false
             }).then((result) => {
                 if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Logging out...',
+                        text: 'Please wait a moment.',
+                        allowOutsideClick: false,
+                        scrollbarPadding: false,
+                        heightAuto: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                     window.location.href = 'logout.php?t=' + new Date().getTime();
                 }
             });
         }
+
 
         const bellBtn = document.getElementById('bellBtn');
         const notificationMenu = document.getElementById('notificationMenu');

@@ -139,7 +139,6 @@ $strategies = [];
 $api_success = false;
 
 if (!empty($gemini_api_key)) {
-    // Dynamic Prompt with live mathematical breakdowns and continuous variation seed
     $prompt = "You are a dynamic real-time environmental analysis engine for CarbonWise.
     Analyze these EXACT real-time database metrics logged by user '{$full_name}':
     - Transport: {$total_transport} kg CO2 ({$pct_transport}% of total)
@@ -200,18 +199,21 @@ if (!empty($gemini_api_key)) {
     if ($response) {
         $response_arr = json_decode($response, true);
         $raw_text = trim($response_arr['candidates'][0]['content']['parts'][0]['text'] ?? '');
-        $clean_json_str = trim(preg_replace('/^```json\s*|\s*```$/', '',$raw_text));
+        $clean_json_str = trim(preg_replace('/^```json\s*|\s*```$/', '', $raw_text));
         $clean_json = json_decode($clean_json_str, true);
         
-        if (json_last_error() === JSON_ERROR_NONE && isset($clean_json['strategies'])) {$ai_insight_summary = $clean_json['insight_summary'];$strategies = $clean_json['strategies'];$api_success = true;
+        if (json_last_error() === JSON_ERROR_NONE && isset($clean_json['strategies'])) {
+            $ai_insight_summary = $clean_json['insight_summary'];
+            $strategies = $clean_json['strategies'];
+            $api_success = true;
         }
     }
 }
 
 // --- DYNAMIC ALGORITHMIC FALLBACK SYSTEM (Live Math Engine) ---
-// If the API key is not present or offline, this generates non-static, dynamic recommendations calculated directly from real-time database numbers.
 if (!$api_success) {
-    if ($grand_total > 0) {$ai_insight_summary = "Based on your current activity logs totaling <strong>" . number_format($grand_total, 2) . " kg CO2</strong> across {$record_count} entries, your primary driver is <strong>{$highest_emission_category}</strong>. Transport accounts for {$pct_transport}%, Office/Electricity for {$pct_electricity}%, and Food for {$pct_food}% of your carbon impact.";
+    if ($grand_total > 0) {
+        $ai_insight_summary = "Based on your current activity logs totaling <strong>" . number_format($grand_total, 2) . " kg CO2</strong> across {$record_count} entries, your primary driver is <strong>{$highest_emission_category}</strong>. Transport accounts for {$pct_transport}%, Office/Electricity for {$pct_electricity}%, and Food for {$pct_food}% of your carbon impact.";
 
         if ($total_transport > 0) {$target_reduction = round($total_transport * 0.22, 2);$strategies[] = [
                 'title'       => 'Reduce ' . number_format($total_transport, 1) . ' kg CO2 Transport Footprint',
@@ -220,7 +222,7 @@ if (!$api_success) {
                 'frequency'   => 'Weekly',
                 'impact'      => $target_reduction,
                 'unit'        => 'kg CO2 / week',
-                'icon'        => '🚲',
+                'icon'        => '🚗',
                 'priority'    => ($highest_emission_category === 'Transport')
             ];
         }
@@ -232,7 +234,7 @@ if (!$api_success) {
                 'frequency'   => 'Daily',
                 'impact'      => $target_reduction,
                 'unit'        => 'kg CO2 / day',
-                'icon'        => '⚡',
+                'icon'        => '💡',
                 'priority'    => ($highest_emission_category === 'Office Resource Usage')
             ];
         }
@@ -244,7 +246,7 @@ if (!$api_success) {
                 'frequency'   => 'Daily',
                 'impact'      => $target_reduction,
                 'unit'        => 'kg CO2 / day',
-                'icon'        => '🌱',
+                'icon'        => '🥗',
                 'priority'    => ($highest_emission_category === 'Food Consumption')
             ];
         }
@@ -307,15 +309,29 @@ if (!$api_success) {
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
         body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; border-right: 1px solid var(--border-color); }
+        /* Fixed Lock Sidebar to avoid layout shrink and text truncation on modal popups */
+        .sidebar { 
+            width: 260px !important; 
+            min-width: 260px !important; 
+            max-width: 260px !important; 
+            background-color: var(--bg-sidebar); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 20px 0; 
+            flex-shrink: 0 !important; 
+            height: 100%;
+            border-right: 1px solid var(--border-color); 
+        }
+
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
         .brand-logo-container { width: 32px; height: 32px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
-        .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; }
+        .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; white-space: nowrap; }
         
         .menu-items { flex: 1; display: flex; flex-direction: column; }
-        .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; }
-        .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; }
+        .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; white-space: nowrap; }
+        .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; flex-shrink: 0; }
         .menu-item:hover, .menu-item.active, .theme-toggle-item:hover { background-color: var(--bg-sidebar-hover); color: #ffffff; }
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; }
         .sidebar-divider { height: 1px; background-color: var(--sidebar-divider); margin: 10px 25px; }
@@ -477,7 +493,7 @@ if (!$api_success) {
                                 <tr class="strategy-row" data-category="<?= htmlspecialchars($strategy['category']) ?>" data-title="<?= strtolower(htmlspecialchars($strategy['title'])) ?>">
                                     <td>
                                         <div class="strategy-info-cell">
-                                            <div class="strategy-icon"><?= htmlspecialchars($strategy['icon'] ?? '📊') ?></div>
+                                            <div class="strategy-icon"><?= htmlspecialchars($strategy['icon'] ?? '💡') ?></div>
                                             <div class="strategy-details">
                                                 <div class="title">
                                                     <?= htmlspecialchars($strategy['title']) ?>
@@ -563,13 +579,17 @@ if (!$api_success) {
                 allowEscapeKey: false,
                 background: popupBg,
                 color: popupText,
-                backdrop: `rgba(0, 0, 0, 0.4)`
+                backdrop: `rgba(0, 0, 0, 0.4)`,
+                scrollbarPadding: false,
+                heightAuto: false
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         title: 'Logging out...',
                         text: 'Please wait a moment.',
                         allowOutsideClick: false,
+                        scrollbarPadding: false,
+                        heightAuto: false,
                         didOpen: () => {
                             Swal.showLoading();
                         }

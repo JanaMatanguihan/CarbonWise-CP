@@ -34,7 +34,7 @@
             <button class="theme-toggle-item" id="themeToggle" title="Toggle Light/Dark Mode">
                 <i class="fa-solid fa-moon" id="themeIcon"></i> <span id="themeText">Dark Mode</span>
             </button>
-            <a href="logout.php" class="menu-item">
+            <a href="#" class="menu-item" onclick="confirmLogout(event)">
                 <i class="fa-solid fa-right-from-bracket"></i> Log Out
             </a>
         </div>
@@ -42,7 +42,7 @@
 </div>
 
 <script>
-    // This script runs on EVERY page that includes this sidebar
+    // Theme Toggle Logic
     const themeToggleBtn = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const themeText = document.getElementById('themeText');
@@ -69,5 +69,27 @@
             themeIcon.className = 'fa-solid fa-moon';
             themeText.textContent = 'Dark Mode';
         }
+    }
+
+    // Logout Confirmation Logic using SweetAlert2
+    function confirmLogout(event) {
+        event.preventDefault();
+
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "You will be logged out of your current session.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Log Out',
+            cancelButtonText: 'Cancel',
+            heightAuto: false,
+            scrollbarPadding: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = 'logout.php';
+            }
+        });
     }
 </script>

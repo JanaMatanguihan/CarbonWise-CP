@@ -257,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
         body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; border-right: 1px solid var(--border-color); }
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; border-right: 1px solid var(--border-color); z-index: 100; }
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
         .brand-logo-container { width: 32px; height: 32px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
@@ -361,7 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         @media(max-width: 900px) { .list-grid { grid-template-columns: 1fr; } }
         .list-column { background-color: var(--input-bg); border-radius: 8px; min-height: 250px; padding: 20px; border: 1px solid var(--border-color); }
         
-        .logged-item { font-size: 0.85rem; background: var(--bg-card); color: var(--text-main); padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; font-weight: 500; gap: 10px; border: 1px solid var(--border-color); }
+        .logged-item { font-size: 0.85rem; background: var(--bg-card); color: var(--text-main); padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-between: space-between; align-items: center; font-weight: 500; gap: 10px; border: 1px solid var(--border-color); }
         .logged-item span:first-child { word-break: break-word; flex: 1; }
         .logged-item-value { font-weight: 600; margin-right: 5px; }
         .btn-delete-item { background: transparent; border: none; color: #BA181B; cursor: pointer; font-size: 0.95rem; padding: 2px 6px; border-radius: 4px; transition: 0.2s; }
@@ -371,6 +371,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .btn-calculate:hover { background-color: var(--accent-green-hover); }
         
         .swal2-popup { font-family: 'Inter', sans-serif !important; border-radius: 12px !important; }
+        
+        /* SweetAlert container overlay layout protection */
+        .swal2-container.logout-swal-container {
+            z-index: 99999 !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
     </style>
 </head>
 <body>
@@ -394,7 +404,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <button class="theme-toggle-item" id="themeToggle" title="Toggle Light/Dark Mode">
                     <i class="fa-solid fa-sun" id="themeIcon"></i> <span id="themeText">Dark Mode</span>
                 </button>
-                <a href="javascript:void(0);" onclick="confirmLogout();" class="menu-item"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
+                <button type="button" onclick="confirmLogout()" class="menu-item" style="cursor: pointer;"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
             </div>
         </div>
     </div>
@@ -722,35 +732,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
 
+        // Updated confirmLogout to match Dashboard copy and design while maintaining sidebar width fixes
         function confirmLogout() {
             let activeTheme = localStorage.getItem('theme') || 'light';
             let popupBg = activeTheme === 'dark' ? '#121A16' : '#ffffff';
             let popupText = activeTheme === 'dark' ? '#F3F4F6' : '#333333';
 
             Swal.fire({
-                title: 'Log out?',
-                text: "Are you sure you want to end your session?",
+                title: 'Log Out',
+                text: "Are you sure you want to exit your session?",
                 icon: 'warning',
                 iconColor: '#f42828',
                 showCancelButton: true,
                 confirmButtonColor: '#2D6A4F',
                 cancelButtonColor: '#BA181B',
                 confirmButtonText: 'Yes, log out',
-                cancelButtonText: 'Stay',
+                cancelButtonText: 'Cancel',
                 allowOutsideClick: false,
                 allowEscapeKey: false,
+                heightAuto: false,
                 background: popupBg,
                 color: popupText,
-                backdrop: `rgba(0, 0, 0, 0.4)`
+                backdrop: `rgba(0, 0, 0, 0.5)`,
+                customClass: {
+                    container: 'logout-swal-container'
+                }
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         title: 'Logging out...',
-                        text: 'Taking you safely back to the login screen.',
+                        text: 'Redirecting to login screen...',
                         allowOutsideClick: false,
+                        heightAuto: false,
                         didOpen: () => { Swal.showLoading(); }
                     });
-                    window.location.href = 'logout.php?t=' + new Date().getTime();
+                    window.location.replace('logout.php?t=' + new Date().getTime());
                 }
             });
         }
