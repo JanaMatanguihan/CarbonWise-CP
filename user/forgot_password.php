@@ -13,7 +13,7 @@ if (isset($_SESSION['user_token'])) {
 // --- LOAD ENVIRONMENT VARIABLES (.ENV) ---
 // ==========================================
 /**
- * Custom lightweight .env loader (No Composer required)
+ * Custom lightweight .env loader
  */
 function loadEnv($path) {
     if (!file_exists($path)) {
@@ -34,8 +34,12 @@ function loadEnv($path) {
     }
 }
 
-// Load .env from root directory (parent folder of /user)
-loadEnv(dirname(__DIR__) . '/.env');
+// Check local directory or parent folder for .env
+if (file_exists(__DIR__ . '/.env')) {
+    loadEnv(__DIR__ . '/.env');
+} else {
+    loadEnv(dirname(__DIR__) . '/.env');
+}
 
 /**
  * Helper to fetch environment variables safely with fallback
@@ -51,10 +55,11 @@ $success = '';
 // ==========================================
 // --- CONFIGURATION FROM ENV ---
 // ==========================================
-$brevo_api_key   = env('BREVO_API_KEY', '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');
-$brevo_api_url   = env('BREVO_API_URL', 'https://api.brevo.com/v3');
-$brevo_from_email = env('BREVO_FROM_EMAIL', 'noreplycarbonwise@gmail.com');
-$brevo_from_name  = env('BREVO_FROM_NAME', 'CarbonWise');
+$app_url          = env('APP_URL', '');
+$brevo_api_key    = env('BREVO_API_KEY');
+$brevo_api_url    = env('BREVO_API_URL', 'https://api.brevo.com/v3');
+$brevo_from_email  = env('BREVO_FROM_EMAIL', env('MAIL_FROM_ADDRESS', 'noreplycarbonwise@gmail.com'));
+$brevo_from_name   = env('BREVO_FROM_NAME', env('MAIL_FROM_NAME', 'CarbonWise'));
 
 $db_host     = env('DB_HOST');
 $db_port     = env('DB_PORT', '5432');
@@ -102,6 +107,10 @@ function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientE
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        error_log("Brevo API Email Error [HTTP {$httpCode}]: " . $response);
+    }
+
     return ($httpCode === 201 || $httpCode === 200);
 }
 
@@ -134,9 +143,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
-            // Search for user
+            // Search for user by email or sr_code
             $stmt = $pdo->prepare("
-                SELECT id, email FROM users 
+                SELECT id, name, email FROM users 
                 WHERE LOWER(email) = LOWER(:identifier) 
                    OR LOWER(email) = LOWER(:formatted_email)
                    OR LOWER(sr_code) = LOWER(:identifier)
@@ -151,34 +160,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
 
             if ($user) {
-                // Generate secure random token and expiration (1 hour from now)
+                // Generate secure random token
                 $token = bin2hex(random_bytes(32));
-                $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-                // Save token to database
+                // Store secure token in remember_token column
                 $updateStmt = $pdo->prepare("
                     UPDATE users 
-                    SET reset_token = :token, reset_token_expires = :expires 
+                    SET remember_token = :token, updated_at = NOW() 
                     WHERE id = :id
                 ");
                 $updateStmt->execute([
-                    ':token'   => $token,
-                    ':expires' => $expires,
-                    ':id'      => $user['id']
+                    ':token' => $token,
+                    ':id'    => $user['id']
                 ]);
 
-                // Construct reset link
-                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-                $host = $_SERVER['HTTP_HOST'];
-                $reset_link = "{$protocol}://{$host}/reset_password.php?token={$token}";
+                // Construct reset link based on APP_URL or current host
+                if (!empty($app_url) && $app_url !== 'http://localhost') {
+                    $base_domain = rtrim($app_url, '/');
+                } else {
+                    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
+                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                    $base_domain = "{$protocol}://{$host}";
+                }
+                
+                $reset_link = "{$base_domain}/reset_password.php?token={$token}";
 
-                // HTML Body for Brevo Email
+                $recipient_name = !empty($user['name']) ? htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8') : 'User';
+
+                // Email Body
                 $subject = "CarbonWise - Password Reset Request";
                 $htmlBody = "
                     <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
                         <h2 style='color: #098a38;'>CarbonWise Password Reset</h2>
-                        <p>Hello,</p>
-                        <p>We received a request to reset your password. Click the button below to set a new password. This link will expire in 1 hour.</p>
+                        <p>Hello {$recipient_name},</p>
+                        <p>We received a request to reset your password. Click the button below to set a new password for your account.</p>
                         <p style='margin: 30px 0;'>
                             <a href='{$reset_link}' style='background-color: #098a38; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Reset Password</a>
                         </p>
@@ -189,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 ";
 
-                // Send email via Brevo REST API using .env values
+                // Dispatch via Brevo API
                 $mailSent = sendBrevoEmail(
                     $brevo_api_key, 
                     $brevo_api_url,
@@ -206,12 +221,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = "Failed to send the password reset email. Please try again later.";
                 }
             } else {
-                // Prevent email enumeration while informing user
+                // Return uniform message to prevent user enumeration
                 $success = "If an account with that SR-Code or email exists, a password reset link will be sent.";
             }
 
         } catch (PDOException $e) {
+            error_log("Forgot Password PDO Exception: " . $e->getMessage());
             $error = "Unable to process your request right now. Please try again later.";
+        } catch (Exception $e) {
+            error_log("Forgot Password System Exception: " . $e->getMessage());
+            $error = "An unexpected error occurred. Please try again later.";
         }
     }
 }
