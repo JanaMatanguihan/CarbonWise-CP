@@ -89,30 +89,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
 
             $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
-            // Locate user by remember_token or reset_token
-            $stmt = $pdo->prepare("
-                SELECT * FROM users 
-                WHERE remember_token = :token 
-                   OR reset_token = :token
-                LIMIT 1
-            ");
-            $stmt->execute([':token' => $token]);
-            $user = $stmt->fetch();
+            // 1. Safe Token Match: check remember_token first
+            $user = null;
+            $tokenColumnUsed = 'remember_token';
+
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE remember_token = :token LIMIT 1");
+                $stmt->execute([':token' => $token]);
+                $user = $stmt->fetch();
+            } catch (PDOException $e) {
+                // Ignore if remember_token column missing
+            }
+
+            // Fallback: check reset_token column
+            if (!$user) {
+                try {
+                    $stmt = $pdo->prepare("SELECT * FROM users WHERE reset_token = :token LIMIT 1");
+                    $stmt->execute([':token' => $token]);
+                    $user = $stmt->fetch();
+                    if ($user) {
+                        $tokenColumnUsed = 'reset_token';
+                    }
+                } catch (PDOException $e) {
+                    // Ignore if reset_token column missing
+                }
+            }
 
             if ($user) {
-                // Hash new password using standard bcrypt
+                // Hash new password using bcrypt
                 $hashed_password = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 
-                // Clear token and update password
-                $hasRememberToken = array_key_exists('remember_token', $user);
-                $tokenColumn = $hasRememberToken ? 'remember_token' : 'reset_token';
-
-                $updateSql = "UPDATE users SET password = :password, {$tokenColumn} = NULL";
+                // Construct UPDATE query dynamically based on existing schema
+                $updateFields = ["password = :password", "{$tokenColumnUsed} = NULL"];
                 if (array_key_exists('updated_at', $user)) {
-                    $updateSql .= ", updated_at = NOW()";
+                    $updateFields[] = "updated_at = NOW()";
                 }
-                $updateSql .= " WHERE id = :id";
 
+                $updateSql = "UPDATE users SET " . implode(', ', $updateFields) . " WHERE id = :id";
                 $updateStmt = $pdo->prepare($updateSql);
                 $updateStmt->execute([
                     ':password' => $hashed_password,
@@ -121,12 +134,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
 
                 $success = "Your password has been successfully reset! You can now log in with your new password.";
             } else {
-                $error = "This password reset token is invalid or has expired.";
+                $error = "This password reset link is invalid or has expired.";
             }
 
         } catch (PDOException $e) {
             error_log("Reset Password PDO Error: " . $e->getMessage());
-            $error = "Unable to reset password. Please try again later.";
+            // Displays detailed error message for troubleshooting
+            $error = "Database Error: " . $e->getMessage();
+        } catch (Exception $e) {
+            error_log("Reset Password System Error: " . $e->getMessage());
+            $error = "System Error: " . $e->getMessage();
         }
     }
 }
@@ -177,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
         <script>
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
+                title: 'Reset Failed',
                 text: '<?= addslashes(htmlspecialchars($error, ENT_QUOTES, 'UTF-8')) ?>',
                 confirmButtonColor: '#e74c3c'
             });
