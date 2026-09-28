@@ -172,22 +172,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // --- STEP 2: SECURE BCRYPT PASSWORD HASHING & TOKEN GENERATION ---
                 $hashed_password     = password_hash($password, PASSWORD_BCRYPT);
-                $hashed_confirm      = password_hash($confirm_pwd, PASSWORD_BCRYPT);
                 $verification_token  = bin2hex(random_bytes(32));
                 $current_time        = date('Y-m-d H:i:s');
 
-                // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE USING remember_token ---
+                // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE ---
+                // Clean schema insert: omitting confirm_password, unescaping updated_at, using sr_code
                 $insert_sql = "INSERT INTO users 
-                    (name, email, password, confirm_password, role, sr_code, campus, year_level, department, faculty_type, office, status, remember_token, created_at, \"updated_at\") 
+                    (name, email, password, role, sr_code, campus, year_level, department, faculty_type, office, status, remember_token, created_at, updated_at) 
                     VALUES 
-                    (:name, :email, :password, :confirm_password, :role, :sr_code, :campus, :year_level, :department, :faculty_type, :office, 'Pending Verification', :remember_token, :created_at, :updated_at)";
+                    (:name, :email, :password, :role, :sr_code, :campus, :year_level, :department, :faculty_type, :office, 'Pending Verification', :remember_token, :created_at, :updated_at)";
 
                 $insert_stmt = $pdo->prepare($insert_sql);
                 $insert_stmt->execute([
                     ':name'             => $full_name,
                     ':email'            => $email,
                     ':password'         => $hashed_password,
-                    ':confirm_password' => $hashed_confirm,
                     ':role'             => $role,
                     ':sr_code'          => $sr_code,
                     ':campus'           => $campus,
@@ -235,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($mailSent) {
                     $_SESSION['reg_success_message'] = "Registration successful! A verification link has been sent to {$email}. Please check your inbox.";
                 } else {
-                    $_SESSION['reg_success_message'] = "Account created, but failed to send verification email. Please contact support.";
+                    $_SESSION['reg_success_message'] = "Account created, but failed to send verification email. Please check Brevo settings or logs.";
                 }
 
                 unset($_POST);
@@ -245,6 +244,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (PDOException $e) {
             $error = "Database Error: " . $e->getMessage();
+        } catch (Exception $e) {
+            $error = "System Error: " . $e->getMessage();
         }
     }
 }
