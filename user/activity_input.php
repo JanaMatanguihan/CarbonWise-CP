@@ -106,6 +106,24 @@ if (!empty($user_id) && isset($pdo)) {
     }
 }
 
+// Fetch today's logged activities for permanent daily persistence
+$today_records = [];
+if (!empty($user_id) && isset($pdo)) {
+    try {
+        $recStmt = $pdo->prepare("
+            SELECT id, transport_item, office_item, food_item, 
+                   transportation, electricity, food, total_emission, created_at 
+            FROM carbon_records 
+            WHERE user_id = :user_id AND record_date = :record_date
+            ORDER BY created_at DESC
+        ");
+        $recStmt->execute([':user_id' => $user_id, ':record_date' => $today_date]);
+        $today_records = $recStmt->fetchAll();
+    } catch (\PDOException $e) {
+        $today_records = [];
+    }
+}
+
 // Save process block
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_emissions') {
     header('Content-Type: application/json');
@@ -357,22 +375,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .leaflet-routing-container { display: none !important; }
 
         .list-card { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); }
-        .list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
-        @media(max-width: 900px) { .list-grid { grid-template-columns: 1fr; } }
-        .list-column { background-color: var(--input-bg); border-radius: 8px; min-height: 250px; padding: 20px; border: 1px solid var(--border-color); }
         
-        .logged-item { font-size: 0.85rem; background: var(--bg-card); color: var(--text-main); padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-between: space-between; align-items: center; font-weight: 500; gap: 10px; border: 1px solid var(--border-color); }
-        .logged-item span:first-child { word-break: break-word; flex: 1; }
-        .logged-item-value { font-weight: 600; margin-right: 5px; }
-        .btn-delete-item { background: transparent; border: none; color: #BA181B; cursor: pointer; font-size: 0.95rem; padding: 2px 6px; border-radius: 4px; transition: 0.2s; }
-        .btn-delete-item:hover { background-color: #fee2e2; }
+        /* Single-column Activity Card Layout */
+        .activity-card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .activity-card-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        }
+
+        .activity-icon-box {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .activity-icon-box.transport {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .activity-icon-box.office {
+            background-color: #E8EAF6;
+            color: #3F51B5;
+        }
+
+        .activity-icon-box.food {
+            background-color: #FFF3E0;
+            color: #E65100;
+        }
+
+        [data-theme="dark"] .activity-icon-box.transport { background-color: #1b382b; color: #74c69d; }
+        [data-theme="dark"] .activity-icon-box.office { background-color: #1e2640; color: #8c9eff; }
+        [data-theme="dark"] .activity-icon-box.food { background-color: #3a2512; color: #ffb74d; }
+
+        .activity-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .activity-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .activity-subtext {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .btn-delete-card {
+            background: transparent;
+            border: none;
+            color: #BA181B;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 6px;
+            border-radius: 50%;
+        }
+        .btn-delete-card:hover { background-color: rgba(186, 24, 27, 0.1); }
         
         .btn-calculate { width: 100%; background-color: var(--accent-green); color: white; border: none; padding: 16px; border-radius: 8px; font-size: 1.2rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
         .btn-calculate:hover { background-color: var(--accent-green-hover); }
         
         .swal2-popup { font-family: 'Inter', sans-serif !important; border-radius: 12px !important; }
         
-        /* SweetAlert container overlay layout protection */
         .swal2-container.logout-swal-container {
             z-index: 99999 !important;
             position: fixed !important;
@@ -606,6 +693,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     </div>
                 </div>
 
+                <!-- HTML Food Consumption Card -->
                 <div class="input-card">
                     <h3 style="color: var(--accent-green);">Food Consumption</h3>
                     <div class="form-row">
@@ -625,45 +713,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <option value="" selected disabled>Select Food Item</option>
                                 
                                 <optgroup label="1. High-Impact Proteins (Red Meats)">
-                                    <option value="60.0" data-unit="kg">Beef (Beef Herd) (60.0 kg CO2e/kg)</option>
-                                    <option value="24.5" data-unit="kg">Lamb & Mutton (24.5 kg CO2e/kg)</option>
-                                    <option value="21.1" data-unit="kg">Beef (Dairy Herd) (21.1 kg CO2e/kg)</option>
+                                    <option value="9.0" data-unit="cup">Beef (Beef Herd) (9.0 kg CO2e/cup)</option>
+                                    <option value="3.68" data-unit="cup">Lamb & Mutton (3.68 kg CO2e/cup)</option>
+                                    <option value="3.17" data-unit="cup">Beef (Dairy Herd) (3.17 kg CO2e/cup)</option>
                                 </optgroup>
 
                                 <optgroup label="2. Moderate-Impact Proteins (Dairy & Poultry)">
-                                    <option value="21.0" data-unit="kg">Cheese (21.0 kg CO2e/kg)</option>
-                                    <option value="7.0" data-unit="kg">Pork (7.0 kg CO2e/kg)</option>
-                                    <option value="6.0" data-unit="kg">Poultry (Chicken / Turkey) (6.0 kg CO2e/kg)</option>
-                                    <option value="4.5" data-unit="kg">Eggs (4.5 kg CO2e/kg)</option>
-                                    <option value="5.0" data-unit="kg">Fish (Farmed) (5.0 kg CO2e/kg)</option>
+                                    <option value="2.31" data-unit="cup">Cheese (2.31 kg CO2e/cup)</option>
+                                    <option value="1.05" data-unit="cup">Pork (1.05 kg CO2e/cup)</option>
+                                    <option value="0.84" data-unit="cup">Poultry (Chicken / Turkey) (0.84 kg CO2e/cup)</option>
+                                    <option value="1.08" data-unit="cup">Eggs (1.08 kg CO2e/cup)</option>
+                                    <option value="0.75" data-unit="cup">Fish (Farmed) (0.75 kg CO2e/cup)</option>
                                 </optgroup>
 
                                 <optgroup label="3. Staples and Plant-Based Proteins">
-                                    <option value="4.4" data-unit="kg">Rice (Flooded) (4.4 kg CO2e/kg)</option>
-                                    <option value="3.0" data-unit="kg">Tofu (Soy-based) (3.0 kg CO2e/kg)</option>
-                                    <option value="2.5" data-unit="kg">Groundnuts / Peanuts (2.5 kg CO2e/kg)</option>
-                                    <option value="1.5" data-unit="kg">Pulses (Beans / Peas) (1.5 kg CO2e/kg)</option>
+                                    <option value="0.70" data-unit="cup">Rice (Flooded) (0.70 kg CO2e/cup)</option>
+                                    <option value="0.75" data-unit="cup">Tofu (Soy-based) (0.75 kg CO2e/cup)</option>
+                                    <option value="0.38" data-unit="cup">Groundnuts / Peanuts (0.38 kg CO2e/cup)</option>
+                                    <option value="0.30" data-unit="cup">Pulses (Beans / Peas) (0.30 kg CO2e/cup)</option>
                                 </optgroup>
 
                                 <optgroup label="4. Grains, Vegetables, and Fruits">
-                                    <option value="1.4" data-unit="kg">Wheat & Rye (Bread) (1.4 kg CO2e/kg)</option>
-                                    <option value="1.0" data-unit="kg">Maize (Corn) (1.0 kg CO2e/kg)</option>
-                                    <option value="0.5" data-unit="kg">Potatoes (0.5 kg CO2e/kg)</option>
-                                    <option value="0.4" data-unit="kg">Apples / Bananas (0.4 kg CO2e/kg)</option>
-                                    <option value="0.4" data-unit="kg">Root Vegetables (0.4 kg CO2e/kg)</option>
+                                    <option value="0.17" data-unit="cup">Wheat & Rye (Bread) (0.17 kg CO2e/cup)</option>
+                                    <option value="0.16" data-unit="cup">Maize (Corn) (0.16 kg CO2e/cup)</option>
+                                    <option value="0.08" data-unit="cup">Potatoes (0.08 kg CO2e/cup)</option>
+                                    <option value="0.06" data-unit="cup">Apples / Bananas (0.06 kg CO2e/cup)</option>
+                                    <option value="0.06" data-unit="cup">Root Vegetables (0.06 kg CO2e/cup)</option>
                                 </optgroup>
 
                                 <optgroup label="5. Beverages and Discretionary Items">
-                                    <option value="22.0" data-unit="kg">Coffee (22.0 kg CO2e/kg)</option>
-                                    <option value="19.0" data-unit="kg">Dark Chocolate (19.0 kg CO2e/kg)</option>
-                                    <option value="3.2" data-unit="liter">Milk (Bovine) (3.2 kg CO2e/liter)</option>
-                                    <option value="1.0" data-unit="liter">Soy Milk (1.0 kg CO2e/liter)</option>
+                                    <option value="2.64" data-unit="cup">Coffee (2.64 kg CO2e/cup)</option>
+                                    <option value="2.85" data-unit="cup">Dark Chocolate (2.85 kg CO2e/cup)</option>
+                                    <option value="0.77" data-unit="cup">Milk (Bovine) (0.77 kg CO2e/cup)</option>
+                                    <option value="0.24" data-unit="cup">Soy Milk (0.24 kg CO2e/cup)</option>
                                 </optgroup>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="foodServings">Amount / Weight (Grams or Liters)</label>
-                            <input type="number" id="foodServings" placeholder="e.g., 150 (grams) or 1 (liter)" step="0.01">
+                            <label for="foodServings">Amount (Cups)</label>
+                            <input type="number" id="foodServings" placeholder="e.g., 1, 1.5" step="0.1" min="0.1">
                         </div>
                         <button type="button" class="btn-add" onclick="addFood()">Add Emission</button>
                     </div>
@@ -682,19 +770,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <input type="hidden" id="foodConsumedAt" name="food_consumed_at" value="">
 
                     <div class="list-card">
-                        <h3 style="color: var(--accent-green); margin-bottom: 20px;">Your Carbon Emission & Activity List</h3>
-                        <div class="list-grid">
-                            <div class="list-column" id="colTransport">
-                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Transportation (CO2e Emissions)</h4>
-                            </div>
-                            <div class="list-column" id="colOffice">
-                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Office Resource</h4>
-                            </div>
-                            <div class="list-column" id="colFood">
-                                <h4 style="color: var(--accent-green); text-align: center; border-bottom: 2px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px;">Food Consumption</h4>
-                            </div>
+                        <h3 style="color: var(--accent-green); margin-bottom: 4px;">Your Added Activities</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Review the activities you have recorded for today.</p>
+                        
+                        <div id="activityCardContainer" class="activity-card-list">
+                            <?php if (!empty($today_records)): ?>
+                                <?php foreach ($today_records as $rec): ?>
+                                    <?php if (!empty($rec['transport_item'])): ?>
+                                        <div class="activity-card-item">
+                                            <div class="activity-icon-box transport"><i class="fa-solid fa-car"></i></div>
+                                            <div class="activity-details">
+                                                <div class="activity-title"><?= htmlspecialchars($rec['transport_item']) ?></div>
+                                                <div class="activity-subtext">Transportation · <?= number_format($rec['transportation'], 2) ?> kg CO₂e</div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($rec['office_item'])): ?>
+                                        <div class="activity-card-item">
+                                            <div class="activity-icon-box office"><i class="fa-solid fa-laptop"></i></div>
+                                            <div class="activity-details">
+                                                <div class="activity-title"><?= htmlspecialchars($rec['office_item']) ?></div>
+                                                <div class="activity-subtext">Office Resource · <?= number_format($rec['electricity'], 2) ?> kg CO₂e</div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($rec['food_item'])): ?>
+                                        <div class="activity-card-item">
+                                            <div class="activity-icon-box food"><i class="fa-solid fa-utensils"></i></div>
+                                            <div class="activity-details">
+                                                <div class="activity-title"><?= htmlspecialchars($rec['food_item']) ?></div>
+                                                <div class="activity-subtext">Food Consumption · <?= number_format($rec['food'], 2) ?> kg CO₂e</div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
-                        <button type="submit" class="btn-calculate">Calculate my emission</button>
+
+                        <button type="submit" class="btn-calculate">Calculate my Carbon Emissions</button>
                     </div>
                 </form>
             </div>
@@ -732,7 +847,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
 
-        // Updated confirmLogout to match Dashboard copy and design while maintaining sidebar width fixes
         function confirmLogout() {
             let activeTheme = localStorage.getItem('theme') || 'light';
             let popupBg = activeTheme === 'dark' ? '#121A16' : '#ffffff';
@@ -1040,7 +1154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             document.getElementById('hiddenTransport').value = totals.transport.toFixed(4);
 
             let routeSummary = `${startText.split(' (')[0]} → ${endText.split(' (')[0]}`;
-            createListItem('colTransport', 'transport', calculatedEmission, routeSummary, `${calculatedEmission.toFixed(2)} kg CO2e (${kmDistance} km)`);
+            createListItem('activityCardContainer', 'transport', calculatedEmission, routeSummary, `${calculatedEmission.toFixed(2)} kg CO₂e (${kmDistance} km)`);
             
             document.getElementById('transportItem').value = vehicleLabel;
 
@@ -1059,7 +1173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             Swal.fire({
                 title: 'Route Added!',
-                text: 'Your trip route has been added to your emission summary. Click "Calculate my emission" to save and finish.',
+                text: 'Your trip route has been added to your emission summary. Click "Calculate my Carbon Emissions" to save and finish.',
                 icon: 'success',
                 confirmButtonColor: '#2D6A4F',
                 background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
@@ -1089,7 +1203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             let calculatedValue = (parseFloat(typeSel.value) * parseFloat(hoursInp.value) / 1000) * GHG_ELECTRICITY_FACTOR;
             totals.office += calculatedValue;
             document.getElementById('hiddenOffice').value = totals.office.toFixed(4);
-            createListItem('colOffice', 'office', calculatedValue, `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg CO2e`);
+            createListItem('activityCardContainer', 'office', calculatedValue, `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg CO₂e`);
             
             document.getElementById('officeItem').value = itemText;
 
@@ -1097,6 +1211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             updateGreenPointsUI();
         }
 
+        // JavaScript Function for Food Emissions
         function addFood() {
             const mealPeriodSel = document.getElementById('foodMealPeriodSelect');
             const typeSel = document.getElementById('foodType');
@@ -1118,7 +1233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!typeSel.value || !servingsInp.value || parseFloat(servingsInp.value) <= 0) {
                 Swal.fire({
                     title: 'Missing Details',
-                    text: 'Please pick a food type and enter the quantity/weight consumed.',
+                    text: 'Please pick a food type and enter the number of cups consumed.',
                     icon: 'warning',
                     confirmButtonColor: '#52B788',
                     background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
@@ -1129,28 +1244,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             let mealText = mealPeriodSel.value;
             let foodText = typeSel.options[typeSel.selectedIndex].text.split(' (')[0];
-            let selectedOption = typeSel.options[typeSel.selectedIndex];
-            let unitType = selectedOption.getAttribute('data-unit'); // 'kg' or 'liter'
             
-            let rawQuantity = parseFloat(servingsInp.value);
-            let emissionFactor = parseFloat(typeSel.value);
-            let consumedAmountInBaseUnit = 0;
-            let unitDisplay = "";
-
-            if (unitType === 'kg') {
-                consumedAmountInBaseUnit = rawQuantity > 10 ? (rawQuantity / 1000) : rawQuantity;
-                unitDisplay = `${rawQuantity > 10 ? rawQuantity + 'g' : consumedAmountInBaseUnit + 'kg'}`;
-            } else {
-                consumedAmountInBaseUnit = rawQuantity;
-                unitDisplay = `${rawQuantity}L`;
-            }
-
-            let calculatedValue = consumedAmountInBaseUnit * emissionFactor;
+            let cupsCount = parseFloat(servingsInp.value);
+            let emissionFactorPerCup = parseFloat(typeSel.value);
+            
+            // Direct computation: Cups x Emission Factor per Cup
+            let calculatedValue = cupsCount * emissionFactorPerCup;
+            let unitDisplay = `${cupsCount} cup${cupsCount > 1 ? 's' : ''}`;
 
             totals.food += calculatedValue;
             document.getElementById('hiddenFood').value = totals.food.toFixed(4);
             
-            createListItem('colFood', 'food', calculatedValue, `[${mealText}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO2e`);
+            createListItem('activityCardContainer', 'food', calculatedValue, `[${mealText}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO₂e`);
             
             document.getElementById('foodItem').value = foodText;
             document.getElementById('foodMealPeriod').value = mealText;
@@ -1161,13 +1266,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             updateGreenPointsUI();
         }
 
-        function createListItem(columnId, category, value, labelText, numericalText) {
-            const container = document.getElementById(columnId);
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.className = 'logged-item';
-            wrapperDiv.innerHTML = `<span>${labelText}</span><span class="logged-item-value">${numericalText}</span><button type="button" class="btn-delete-item"><i class="fa-solid fa-xmark"></i></button>`;
+        // Single-Column Activity Card Renderer Function
+        function createListItem(containerId, category, value, labelText, numericalText) {
+            const container = document.getElementById(containerId);
             
-            wrapperDiv.querySelector('.btn-delete-item').addEventListener('click', function() {
+            let iconClass = 'fa-car';
+            let categoryTitle = 'Transportation';
+            
+            if (category === 'office') {
+                iconClass = 'fa-laptop';
+                categoryTitle = 'Office Resource';
+            } else if (category === 'food') {
+                iconClass = 'fa-utensils';
+                categoryTitle = 'Food Consumption';
+            }
+
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'activity-card-item';
+            cardDiv.innerHTML = `
+                <div class="activity-icon-box ${category}">
+                    <i class="fa-solid ${iconClass}"></i>
+                </div>
+                <div class="activity-details">
+                    <div class="activity-title">${labelText}</div>
+                    <div class="activity-subtext">${categoryTitle} · ${numericalText}</div>
+                </div>
+                <button type="button" class="btn-delete-card"><i class="fa-solid fa-xmark"></i></button>
+            `;
+
+            cardDiv.querySelector('.btn-delete-card').addEventListener('click', function() {
                 totals[category] = Math.max(0, totals[category] - value);
                 document.getElementById('hidden' + category.charAt(0).toUpperCase() + category.slice(1)).value = totals[category].toFixed(4);
                 
@@ -1177,10 +1304,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     applyAttemptLayout();
                 }
 
-                wrapperDiv.remove();
+                cardDiv.remove();
                 updateGreenPointsUI();
             });
-            container.appendChild(wrapperDiv);
+
+            container.prepend(cardDiv);
         }
 
         function handleFormSubmission(event) {

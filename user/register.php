@@ -176,7 +176,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $current_time        = date('Y-m-d H:i:s');
 
                 // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE ---
-                // Clean schema insert: omitting confirm_password, unescaping updated_at, using sr_code
                 $insert_sql = "INSERT INTO users 
                     (name, email, password, role, sr_code, campus, year_level, department, faculty_type, office, status, remember_token, created_at, updated_at) 
                     VALUES 
@@ -295,15 +294,165 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .terms-container input[type="checkbox"] {
             width: 18px;
             height: 18px;
-            accent-color: #2D6A4F;
+            accent-color: #3AA76D;
             cursor: pointer;
         }
         .terms-container a {
-            color: #2D6A4F;
+            color: #3AA76D;
             text-decoration: underline;
         }
         .terms-container a:hover {
-            color: #1B4332;
+            color: #2D6A4F;
+        }
+
+        /* Terms Modal Styling */
+        .terms-modal-container {
+            text-align: left;
+            font-family: inherit;
+        }
+        .terms-header-bg {
+            background-color: #EAF6EE;
+            padding: 24px 20px;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            text-align: center;
+            margin: -20px -24px 15px -24px;
+        }
+        .terms-icon-circle {
+            width: 56px;
+            height: 56px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px auto;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .terms-icon-circle i {
+            color: #3AA76D;
+            font-size: 26px;
+        }
+        .terms-header-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1F2933;
+            margin: 0 0 4px 0;
+        }
+        .terms-header-subtitle {
+            font-size: 13px;
+            color: #666;
+            margin: 0;
+        }
+        .terms-scroll-body {
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-bottom: 15px;
+        }
+        .terms-section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1F2933;
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+        .terms-title-indicator {
+            width: 4px;
+            height: 16px;
+            background-color: #3AA76D;
+            border-radius: 2px;
+            display: inline-block;
+        }
+        .terms-body-text {
+            font-size: 13px;
+            line-height: 1.55;
+            color: #4B5563;
+            margin: 0 0 8px 0;
+        }
+        .terms-bullet-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #4B5563;
+            margin-bottom: 6px;
+        }
+        .terms-bullet-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #3AA76D;
+            border-radius: 50%;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+        .terms-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0 0 0;
+            border-top: 1px solid #E5E7EB;
+            cursor: pointer;
+            user-select: none;
+        }
+        .terms-checkbox-row input {
+            width: 20px;
+            height: 20px;
+            accent-color: #3AA76D;
+            cursor: pointer;
+        }
+        .terms-checkbox-row label {
+            font-size: 13px;
+            color: #1F2933;
+            cursor: pointer;
+            margin: 0;
+            line-height: 1.3;
+        }
+        .swal2-popup.terms-swal-popup {
+            border-radius: 24px !important;
+            padding: 20px 24px !important;
+            width: 480px !important;
+            max-width: 90vw !important;
+        }
+        .swal2-actions.terms-swal-actions {
+            width: 100%;
+            display: flex;
+            gap: 12px;
+            margin-top: 15px !important;
+            padding: 0;
+        }
+        .terms-btn-cancel {
+            flex: 1;
+            background-color: #ffffff !important;
+            color: #6B7280 !important;
+            border: 1.5px solid #D1D5DB !important;
+            border-radius: 12px !important;
+            height: 46px;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+        }
+        .terms-btn-agree {
+            flex: 2;
+            background-color: #3AA76D !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 12px !important;
+            height: 46px;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+        }
+        .terms-btn-agree:disabled {
+            background-color: rgba(58, 167, 109, 0.35) !important;
+            color: rgba(255, 255, 255, 0.7) !important;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -439,21 +588,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label>Office</label>
                         <select name="office" id="officeField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
                             <option value="">Choose Office</option>
-                            
-                            <!-- Office of the Chancellor & Direct Reporting Units -->
                             <option value="Office of the Chancellor" <?= (isset($_POST['office']) && $_POST['office'] === 'Office of the Chancellor') ? 'selected' : '' ?>>Office of the Chancellor</option>
                             <option value="Internal Audit" <?= (isset($_POST['office']) && $_POST['office'] === 'Internal Audit') ? 'selected' : '' ?>>Internal Audit</option>
                             <option value="Quality Assurance Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Quality Assurance Management') ? 'selected' : '' ?>>Quality Assurance Management</option>
                             <option value="Sustainable Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Sustainable Development') ? 'selected' : '' ?>>Sustainable Development</option>
-                            
-                            <!-- Development and External Affairs -->
                             <option value="Vice Chancellor for Development and External Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Development and External Affairs') ? 'selected' : '' ?>>Vice Chancellor for Development and External Affairs</option>
                             <option value="Planning and Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Planning and Development') ? 'selected' : '' ?>>Planning and Development</option>
                             <option value="External Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'External Affairs') ? 'selected' : '' ?>>External Affairs</option>
                             <option value="Resource Generation" <?= (isset($_POST['office']) && $_POST['office'] === 'Resource Generation') ? 'selected' : '' ?>>Resource Generation</option>
                             <option value="ICT Services" <?= (isset($_POST['office']) && $_POST['office'] === 'ICT Services') ? 'selected' : '' ?>>ICT Services</option>
-                            
-                            <!-- Academic Affairs & Academic Colleges -->
                             <option value="Vice Chancellor for Academic Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Academic Affairs') ? 'selected' : '' ?>>Vice Chancellor for Academic Affairs</option>
                             <option value="College of Arts and Sciences" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Arts and Sciences') ? 'selected' : '' ?>>College of Arts and Sciences</option>
                             <option value="College of Accountancy, Business and Economics" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Accountancy, Business and Economics') ? 'selected' : '' ?>>College of Accountancy, Business and Economics</option>
@@ -461,8 +604,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="College of Engineering Technology" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Engineering Technology') ? 'selected' : '' ?>>College of Engineering Technology</option>
                             <option value="College of Teacher Education" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Teacher Education') ? 'selected' : '' ?>>College of Teacher Education</option>
                             <option value="College of Engineering" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Engineering') ? 'selected' : '' ?>>College of Engineering</option>
-                            
-                            <!-- Student & Support Services -->
                             <option value="Culture and Arts" <?= (isset($_POST['office']) && $_POST['office'] === 'Culture and Arts') ? 'selected' : '' ?>>Culture and Arts</option>
                             <option value="Testing and Admission" <?= (isset($_POST['office']) && $_POST['office'] === 'Testing and Admission') ? 'selected' : '' ?>>Testing and Admission</option>
                             <option value="Registration Services" <?= (isset($_POST['office']) && $_POST['office'] === 'Registration Services') ? 'selected' : '' ?>>Registration Services</option>
@@ -474,8 +615,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="Sports and Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Sports and Development') ? 'selected' : '' ?>>Sports and Development</option>
                             <option value="OJT" <?= (isset($_POST['office']) && $_POST['office'] === 'OJT') ? 'selected' : '' ?>>OJT</option>
                             <option value="National Service Training Program" <?= (isset($_POST['office']) && $_POST['office'] === 'National Service Training Program') ? 'selected' : '' ?>>National Service Training Program</option>
-                            
-                            <!-- Administration and Finance -->
                             <option value="Vice Chancellor for Administration and Finance" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Administration and Finance') ? 'selected' : '' ?>>Vice Chancellor for Administration and Finance</option>
                             <option value="Human Resource Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Human Resource Management') ? 'selected' : '' ?>>Human Resource Management</option>
                             <option value="Records Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Records Management') ? 'selected' : '' ?>>Records Management</option>
@@ -487,8 +626,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="Environment Management Unit" <?= (isset($_POST['office']) && $_POST['office'] === 'Environment Management Unit') ? 'selected' : '' ?>>Environment Management Unit</option>
                             <option value="Property and Supply Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Property and Supply Management') ? 'selected' : '' ?>>Property and Supply Management</option>
                             <option value="General Services" <?= (isset($_POST['office']) && $_POST['office'] === 'General Services') ? 'selected' : '' ?>>General Services</option>
-                            
-                            <!-- Research, Development and Extension Services -->
                             <option value="Vice Chancellor for Research, Development and Extension Services" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Research, Development and Extension Services') ? 'selected' : '' ?>>Vice Chancellor for Research, Development and Extension Services</option>
                             <option value="Extension" <?= (isset($_POST['office']) && $_POST['office'] === 'Extension') ? 'selected' : '' ?>>Extension</option>
                             <option value="Research" <?= (isset($_POST['office']) && $_POST['office'] === 'Research') ? 'selected' : '' ?>>Research</option>
@@ -523,17 +660,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script>
         function showTermsModal(e) {
-            e.preventDefault();
+            if (e) e.preventDefault();
+            
+            const termsCheckbox = document.getElementById('termsCheckbox');
+            const isInitiallyChecked = termsCheckbox ? termsCheckbox.checked : false;
+
             Swal.fire({
-                title: 'Terms and Conditions',
-                html: '<div style="text-align: left; max-height: 250px; overflow-y: auto; font-size: 0.85rem; color: #555; padding: 0 10px;">' +
-                      '<p><strong>1. Acceptance of Terms:</strong> By registering for CarbonWise, you agree to comply with and be bound by these terms.</p><br>' +
-                      '<p><strong>2. Account Security:</strong> You are responsible for maintaining the confidentiality of your institutional password and account details.</p><br>' +
-                      '<p><strong>3. Data Usage:</strong> Carbon data, transport footprints, and resource consumption logged into this platform are utilized for institutional sustainability evaluations and carbon accounting metrics.</p><br>' +
-                      '<p><strong>4. Code of Conduct:</strong> Users must provide accurate records regarding their campus routines and resource logs.</p>' +
-                      '</div>',
-                confirmButtonColor: '#098a38',
-                confirmButtonText: 'Close'
+                html: `
+                    <div class="terms-modal-container">
+                        <!-- HEADER -->
+                        <div class="terms-header-bg">
+                            <div class="terms-icon-circle">
+                                <i class="fa-solid fa-file-lines"></i>
+                            </div>
+                            <h3 class="terms-header-title">Terms & Conditions</h3>
+                            <p class="terms-header-subtitle">Please read carefully before continuing.</p>
+                        </div>
+
+                        <!-- SCROLLABLE CONTENT -->
+                        <div class="terms-scroll-body">
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                Welcome to CarbonWise
+                            </div>
+                            <p class="terms-body-text">By creating an account, you agree to the terms below. CarbonWise helps you track your carbon footprint, compare with peers, and access personalized insights.</p>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                Your Responsibilities
+                            </div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Provide accurate personal information.</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Use the platform responsibly and ethically.</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Keep your login credentials secure.</span></div>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                Data We Collect
+                            </div>
+                            <p class="terms-body-text">CarbonWise collects the following information:</p>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Name</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Student Number / SR-Code</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>G-Suite Email</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Department & Campus</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Profile Picture (optional)</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Carbon Emission Records</span></div>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                How Your Data Is Used
+                            </div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Carbon emission tracking</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>CarbonWise score computation</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Rankings and comparisons</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Reports and analytics</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>AI-based forecasting</span></div>
+                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Academic research</span></div>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                Data Privacy
+                            </div>
+                            <p class="terms-body-text">Your personal information will not be shared with unauthorized third parties. All data is stored securely and handled according to applicable privacy regulations.</p>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                AI Forecast Disclaimer
+                            </div>
+                            <p class="terms-body-text">Carbon forecasts generated by the AI are estimates based on historical patterns. They should be used as guidance only, not as professional advice.</p>
+
+                            <div class="terms-section-title">
+                                <span class="terms-title-indicator"></span>
+                                Acknowledgement
+                            </div>
+                            <p class="terms-body-text">By continuing, you acknowledge that you have read, understood, and accepted these Terms and Conditions.</p>
+                        </div>
+
+                        <!-- FOOTER (CHECKBOX) -->
+                        <div class="terms-checkbox-row" id="modalCheckboxRow">
+                            <input type="checkbox" id="modalAgreedCheckbox" ${isInitiallyChecked ? 'checked' : ''}>
+                            <label for="modalAgreedCheckbox">I have read and agree to the Terms & Conditions</label>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'I Agree',
+                cancelButtonText: 'Cancel',
+                buttonsStyling: false,
+                customClass: {
+                    popup: 'terms-swal-popup',
+                    actions: 'terms-swal-actions',
+                    confirmButton: 'terms-btn-agree',
+                    cancelButton: 'terms-btn-cancel'
+                },
+                didOpen: () => {
+                    const confirmBtn = Swal.getConfirmButton();
+                    const modalCheckbox = document.getElementById('modalAgreedCheckbox');
+                    const modalCheckboxRow = document.getElementById('modalCheckboxRow');
+
+                    confirmBtn.disabled = !modalCheckbox.checked;
+
+                    modalCheckbox.addEventListener('change', () => {
+                        confirmBtn.disabled = !modalCheckbox.checked;
+                    });
+
+                    modalCheckboxRow.addEventListener('click', (e) => {
+                        if (e.target !== modalCheckbox) {
+                            modalCheckbox.checked = !modalCheckbox.checked;
+                            confirmBtn.disabled = !modalCheckbox.checked;
+                        }
+                    });
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    if (termsCheckbox) termsCheckbox.checked = true;
+                }
             });
         }
 
