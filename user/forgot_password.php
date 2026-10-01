@@ -252,6 +252,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Base Reset & Layout Constraints */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .navbar {
+            padding: 12px 24px;
+        }
+
+        .page-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1;
+            padding-top: 120px;
+            padding-bottom: 40px;
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        .form-group input {
+            width: 100%;
+        }
+
+        /* Responsive Adapters */
+        @media screen and (max-width: 768px) {
+            .page-container {
+                padding-top: 100px;
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .navbar {
+                padding: 10px 16px;
+            }
+
+            .navbar img {
+                height: 34px !important;
+            }
+
+            .logo-text {
+                font-size: 1.1rem;
+            }
+
+            .auth-card {
+                padding: 20px 16px;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -262,7 +331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <div class="page-container" style="padding-top: 120px;">
+    <div class="page-container">
         <div class="auth-card">
             <h2>Reset Password</h2>
             <p class="auth-subtitle">Enter your SR-Code or email address to reset your password</p>

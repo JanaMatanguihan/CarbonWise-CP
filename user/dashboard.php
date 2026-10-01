@@ -371,16 +371,17 @@ function time_elapsed_string($datetime, $full = false) {
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
-        body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
+        body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; position: relative; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; height: 100%; border-right: 1px solid var(--border-color); }
+        /* Sidebar Styling */
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; height: 100%; border-right: 1px solid var(--border-color); z-index: 1050; transition: transform 0.3s ease, left 0.3s ease; }
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
         
         .brand-logo-container { width: 32px; height: 32px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
         .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; }
         
-        .menu-items { flex: 1; display: flex; flex-direction: column; }
+        .menu-items { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; }
         .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; }
         .menu-item:hover, .menu-item.active, .theme-toggle-item:hover { background-color: var(--bg-sidebar-hover); color: #ffffff; }
@@ -389,9 +390,16 @@ function time_elapsed_string($datetime, $full = false) {
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; }
         .sidebar-divider { height: 1px; background-color: var(--sidebar-divider); margin: 10px 25px; }
         
-        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        /* Sidebar Overlay for Mobile */
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 1040; opacity: 0; transition: opacity 0.3s ease; }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+
+        /* Main Workspace Styling */
+        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; width: 100%; }
         .top-navbar { height: 75px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); }
         
+        .mobile-nav-toggle { display: none; background: none; border: none; font-size: 1.25rem; color: var(--text-main); cursor: pointer; margin-right: 15px; }
+
         .header-title-area h2 { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
         .header-title-area p { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
         
@@ -413,15 +421,15 @@ function time_elapsed_string($datetime, $full = false) {
         .no-notifications { padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 
         .profile-card { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--border-color); padding-left: 25px; }
-        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); }
+        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); flex-shrink: 0; }
         .avatar-circle-nav img { width: 100%; height: 100%; object-fit: cover; }
         .user-info-text h4 { font-size: 0.95rem; color: var(--text-main); font-weight: 700; }
         .user-info-text p { font-size: 0.8rem; color: var(--text-muted); }
 
         .dashboard-content { padding: 35px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 25px; }
         .cards-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
-        .ranking-card { background: var(--bg-card); padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.02); border: 1px solid var(--border-color); }
-        .ranking-card h3 { font-size: 0.95rem; color: var(--text-main); text-align: left; margin-bottom: 10px; font-weight: 700; }
+        .ranking-card { background: var(--bg-card); padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.02); border: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+        .ranking-card h3 { font-size: 0.95rem; color: var(--text-main); text-align: left; width: 100%; margin-bottom: 10px; font-weight: 700; }
         .card-icon { font-size: 2.8rem; color: var(--accent-green); margin: 15px 0 10px 0; }
         .sub-text { font-size: 0.75rem; color: var(--accent-green); margin-bottom: 5px; font-style: italic; font-weight: 500; }
         .metric-value { font-size: 2.8rem; font-weight: 800; color: var(--text-metric-label); margin-bottom: 10px; }
@@ -433,11 +441,47 @@ function time_elapsed_string($datetime, $full = false) {
         .chart-header h3 { font-size: 0.95rem; color: var(--text-main); font-weight: 700; }
         .chart-header select { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; outline: none; background-color: var(--input-bg); color: var(--text-main); cursor: pointer; }
         .chart-container { position: relative; width: 100%; height: 260px; }
+
+        /* Dynamic Responsive Layout Rules */
+        @media screen and (max-width: 1200px) {
+            .cards-row { grid-template-columns: repeat(3, 1fr); gap: 15px; }
+            .charts-row { grid-template-columns: 1fr 1fr; gap: 15px; }
+            .top-navbar { padding: 0 25px; }
+            .dashboard-content { padding: 25px; }
+        }
+
+        @media screen and (max-width: 992px) {
+            .cards-row { grid-template-columns: 1fr; gap: 20px; }
+            .charts-row { grid-template-columns: 1fr; gap: 20px; }
+            
+            .sidebar { position: fixed; top: 0; left: -260px; height: 100vh; }
+            .sidebar.open { transform: translateX(260px); }
+            
+            .mobile-nav-toggle { display: block; }
+            .top-navbar { padding: 0 20px; }
+            .user-nav-profile { gap: 15px; }
+            .profile-card { padding-left: 15px; }
+        }
+
+        @media screen and (max-width: 576px) {
+            .top-navbar { padding: 0 15px; height: 65px; }
+            .header-title-area h2 { font-size: 1.15rem; }
+            .header-title-area p { font-size: 0.75rem; }
+            .user-info-text { display: none; }
+            .profile-card { border-left: none; padding-left: 0; }
+            .dashboard-content { padding: 15px; gap: 15px; }
+            .ranking-card, .chart-card { padding: 18px; }
+            .metric-value { font-size: 2.2rem; }
+            .card-icon { font-size: 2.2rem; margin: 10px 0 5px 0; }
+            .notification-dropdown { width: calc(100vw - 30px); right: -60px; }
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar" id="appSidebar">
         <div class="logo-section">
             <div class="brand-logo-container">
                 <img src="logo.png" alt="CarbonWise Logo">
@@ -463,9 +507,14 @@ function time_elapsed_string($datetime, $full = false) {
 
     <div class="main-workspace">
         <div class="top-navbar">
-            <div class="header-title-area">
-                <h2>Dashboard</h2>
-                <p>Welcome Back, <?= htmlspecialchars($full_name) ?>!</p>
+            <div style="display: flex; align-items: center;">
+                <button class="mobile-nav-toggle" id="mobileSidebarBtn" aria-label="Toggle Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-title-area">
+                    <h2>Dashboard</h2>
+                    <p>Welcome Back, <?= htmlspecialchars($full_name) ?>!</p>
+                </div>
             </div>
             
             <div class="user-nav-profile">
@@ -561,20 +610,20 @@ function time_elapsed_string($datetime, $full = false) {
                 </div>
 
                 <div class="ranking-card">
-         <h3>Campus Ranking</h3>
-          <div class="card-icon"><i class="fa-solid fa-building-user"></i></div>
-          <p class="sub-text">Your campus currently ranks</p>
-          <div class="metric-value"><?= htmlspecialchars($campus_rank) ?></div>
-                   <p class="desc-text">
-                  <?php if ($user_campus === 'Unassigned'): ?>
-                      Please configure your institutional campus inside your user account profile layout.
-                           <?php elseif ($campus_rank === 'N/A' OR $total_campuses === 0): ?>
-                          Emissions tracking data is currently processing for your campus community view.
-                            <?php else: ?>
-                             Outstanding achievement! The <strong><?= htmlspecialchars($user_campus) ?></strong> campus ranks <strong><?= htmlspecialchars($campus_rank) ?></strong> out of <?= (int)$total_campuses; ?> tracked active university campuses for sustainable low footprints.
-                         <?php endif; ?>
-                         </p>
-                    </div>
+                    <h3>Campus Ranking</h3>
+                    <div class="card-icon"><i class="fa-solid fa-building-user"></i></div>
+                    <p class="sub-text">Your campus currently ranks</p>
+                    <div class="metric-value"><?= htmlspecialchars($campus_rank) ?></div>
+                    <p class="desc-text">
+                        <?php if ($user_campus === 'Unassigned'): ?>
+                            Please configure your institutional campus inside your user account profile layout.
+                        <?php elseif ($campus_rank === 'N/A' OR$total_campuses === 0): ?>
+                            Emissions tracking data is currently processing for your campus community view.
+                        <?php else: ?>
+                            Outstanding achievement! The <strong><?= htmlspecialchars($user_campus) ?></strong> campus ranks <strong><?= htmlspecialchars($campus_rank) ?></strong> out of <?= (int)$total_campuses; ?> tracked active university campuses for sustainable low footprints.
+                        <?php endif; ?>
+                    </p>
+                </div>
             </div>
 
             <div class="charts-row">
@@ -608,6 +657,23 @@ function time_elapsed_string($datetime, $full = false) {
     </div>
 
     <script>
+        // Sidebar Responsive Toggle Controls
+        const mobileSidebarBtn = document.getElementById('mobileSidebarBtn');
+        const appSidebar = document.getElementById('appSidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() {
+            appSidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('active');
+        }
+
+        if (mobileSidebarBtn) {
+            mobileSidebarBtn.addEventListener('click', toggleSidebar);
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', toggleSidebar);
+        }
+
         const themeToggleBtn = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
         const themeText = document.getElementById('themeText');
@@ -676,7 +742,6 @@ function time_elapsed_string($datetime, $full = false) {
                 }
             });
         }
-
 
         const bellBtn = document.getElementById('bellBtn');
         const notificationMenu = document.getElementById('notificationMenu');

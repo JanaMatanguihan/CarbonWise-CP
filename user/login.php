@@ -121,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .password-wrapper input {
             width: 100%;
             padding-right: 40px;
+            box-sizing: border-box;
         }
         .toggle-password-btn {
             position: absolute;
@@ -144,6 +145,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .forgot-password-link:hover {
             text-decoration: underline;
         }
+
+        /* --- RESPONSIVE LAYOUT ADJUSTMENTS --- */
+        .page-container {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 100px 20px 40px;
+            box-sizing: border-box;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        /* Responsive Scaling for Mobile Screens */
+        @media screen and (max-width: 600px) {
+            .page-container {
+                padding: 80px 15px 30px;
+                align-items: flex-start;
+            }
+
+            .navbar {
+                padding: 10px 15px;
+            }
+
+            .auth-card {
+                padding: 20px 15px;
+            }
+
+            .auth-card h2 {
+                font-size: 1.5rem;
+            }
+
+            .forgot-password-link {
+                font-size: 0.78rem;
+            }
+        }
+
+        /* Adjustments for Larger Screens / Laptops */
+        @media screen and (min-width: 1024px) {
+            .auth-card {
+                max-width: 480px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -155,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <div class="page-container" style="padding-top: 120px;">
+    <div class="page-container">
         <div class="auth-card">
             <h2>Welcome Back to CarbonWise</h2>
             <p class="auth-subtitle">Sign in to access your sustainability portal</p>
@@ -163,11 +212,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form action="login.php" method="POST">
                 <div class="form-group">
                     <label>SR-Code or Email</label>
-                    <input type="text" name="username_or_email" placeholder="2x-xxxxx or email@domain.com" value="<?= isset($_POST['username_or_email']) ? htmlspecialchars($_POST['username_or_email'], ENT_QUOTES, 'UTF-8') : '' ?>" required>
+                    <input type="text" name="username_or_email" placeholder="2x-xxxxx or email@domain.com" value="<?= isset($_POST['username_or_email']) ? htmlspecialchars($_POST['username_or_email'], ENT_QUOTES, 'UTF-8') : '' ?>" required style="width: 100%; box-sizing: border-box;">
                 </div>
 
                 <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
                         <label style="margin-bottom: 0;">Password</label>
                         <a href="forgot_password.php" class="forgot-password-link">Forgot password?</a>
                     </div>
@@ -177,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <button type="submit" class="submit-btn">Login</button>
+                <button type="submit" class="submit-btn" style="width: 100%; box-sizing: border-box;">Login</button>
             </form>
             <p class="switch-route-text" style="margin-top: 15px;">Don't have an account? <a href="register.php">Create one here.</a></p>
         </div>

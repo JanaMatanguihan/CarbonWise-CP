@@ -260,7 +260,7 @@ function time_elapsed_string($datetime, $full = false) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CarbonWise - Reports</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -300,22 +300,61 @@ function time_elapsed_string($datetime, $full = false) {
             --sidebar-divider: rgba(118, 200, 147, 0.2);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
-        body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Inter', sans-serif; 
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s; 
+        }
 
-        /* Lock Sidebar Dimensions to Prevent Collapsing/Text Truncation on Modal Open */
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+        }
+
+        body { 
+            display: flex; 
+            position: relative; 
+        }
+
+        /* Overlay for mobile navigation drawer */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.show {
+            display: block;
+            opacity: 1;
+        }
+
+        /* Sidebar Responsive Styling */
         .sidebar { 
-            width: 260px !important; 
-            min-width: 260px !important;
-            max-width: 260px !important;
+            width: 260px; 
+            min-width: 260px;
             background-color: var(--bg-sidebar); 
             color: white; 
             display: flex; 
             flex-direction: column; 
             padding: 20px 0; 
-            flex-shrink: 0 !important; 
-            height: 100%; 
+            flex-shrink: 0; 
+            height: 100vh; 
             border-right: 1px solid var(--border-color); 
+            z-index: 999;
+            transition: transform 0.3s ease, background-color 0.3s, border-color 0.3s;
+            position: sticky;
+            top: 0;
         }
 
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
@@ -323,7 +362,7 @@ function time_elapsed_string($datetime, $full = false) {
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
         .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; white-space: nowrap; }
         
-        .menu-items { flex: 1; display: flex; flex-direction: column; }
+        .menu-items { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; white-space: nowrap; }
         .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; flex-shrink: 0; }
         .menu-item:hover, .menu-item.active, .theme-toggle-item:hover { background-color: var(--bg-sidebar-hover); color: #ffffff; }
@@ -332,9 +371,45 @@ function time_elapsed_string($datetime, $full = false) {
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; }
         .sidebar-divider { height: 1px; background-color: var(--sidebar-divider); margin: 10px 25px; }
         
-        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .top-navbar { height: 75px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); }
+        .main-workspace { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            min-width: 0; 
+            height: 100vh;
+            overflow-y: auto; 
+        }
+
+        .top-navbar { 
+            height: 75px; 
+            background: var(--bg-card); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 40px; 
+            flex-shrink: 0; 
+            border-bottom: 1px solid var(--border-color); 
+            gap: 15px; 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
         
+        .mobile-nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 8px;
+            margin-right: 10px;
+            border-radius: 6px;
+        }
+        .mobile-nav-toggle:hover {
+            background-color: var(--input-bg);
+        }
+
         .header-title-area h2 { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
         .header-title-area p { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
         
@@ -356,30 +431,35 @@ function time_elapsed_string($datetime, $full = false) {
         .no-notifications { padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 
         .profile-card { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--border-color); padding-left: 25px; }
-        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); }
+        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); flex-shrink: 0; }
         .avatar-circle-nav img { width: 100%; height: 100%; object-fit: cover; }
         .user-info-text h4 { font-size: 0.95rem; color: var(--text-main); font-weight: 700; }
         .user-info-text p { font-size: 0.8rem; color: var(--text-muted); }
 
-        .reports-content { padding: 35px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 25px; }
+        .reports-content { padding: 35px; flex: 1; display: flex; flex-direction: column; gap: 25px; }
         
         .progress-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.01); }
         .progress-header { font-weight: 700; font-size: 0.95rem; margin-bottom: 12px; font-style: italic; color: var(--text-main); }
         .progress-bar-wrapper { width: 100%; background: var(--input-bg); height: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
         .progress-bar-fill { height: 100%; background: <?= $progress_bar_color ?>; width: <?= (int)$green_points ?>%; transition: width 0.5s ease, background-color 0.5s ease; }
 
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        /* Grid Layouts with Auto-Fit Fluid Responsiveness */
+        .metrics-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+            gap: 20px; 
+        }
         .metric-card { background: var(--bg-card); padding: 22px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.01); }
         .metric-card h3 { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 10px; }
-        .metric-value { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 5px; }
+        .metric-value { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 5px; word-break: break-word; }
         .metric-subtext { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
         .text-green { color: var(--accent-green) !important; font-weight: 600; }
 
         .charts-grid { display: grid; grid-template-columns: 6fr 4fr; gap: 25px; }
-        .chart-box { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.01); }
-        .chart-title-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .chart-box { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.01); width: 100%; }
+        .chart-title-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
         .chart-title-bar h3 { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
-        .chart-title-bar select { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; cursor: pointer; outline: none; }
+        .chart-title-bar select { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; cursor: pointer; outline: none; }
         .canvas-container { position: relative; width: 100%; height: 280px; }
 
         .chart-empty-overlay {
@@ -388,11 +468,82 @@ function time_elapsed_string($datetime, $full = false) {
             font-size: 0.9rem; color: var(--text-muted); font-weight: 500;
             pointer-events: none; display: none;
         }
+
+        /* MEDIA QUERIES FOR LAPTOPS, TABLETS, AND MOBILE */
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+                box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            .mobile-nav-toggle {
+                display: block;
+            }
+            .top-navbar {
+                padding: 0 20px;
+            }
+            .reports-content {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .top-navbar {
+                height: auto;
+                padding: 12px 16px;
+            }
+            .header-title-area h2 {
+                font-size: 1.15rem;
+            }
+            .header-title-area p {
+                font-size: 0.75rem;
+            }
+            .user-nav-profile {
+                gap: 12px;
+            }
+            .profile-card {
+                padding-left: 12px;
+            }
+            .user-info-text {
+                display: none;
+            }
+            .notification-dropdown {
+                right: -40px;
+                width: calc(100vw - 32px);
+                max-width: 320px;
+            }
+            .metric-value {
+                font-size: 1.75rem;
+            }
+            .chart-box {
+                padding: 15px;
+            }
+            .canvas-container {
+                height: 220px;
+            }
+            .reports-content {
+                padding: 15px;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="logo-section">
             <div class="brand-logo-container">
                 <img src="logo.png" alt="CarbonWise Logo">
@@ -418,9 +569,14 @@ function time_elapsed_string($datetime, $full = false) {
 
     <div class="main-workspace">
         <div class="top-navbar">
-            <div class="header-title-area">
-                <h2>Reports</h2>
-                <p>View your summaries, trends, and historical performance</p>
+            <div style="display: flex; align-items: center;">
+                <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-title-area">
+                    <h2>Reports</h2>
+                    <p>View your summaries, trends, and historical performance</p>
+                </div>
             </div>
             
             <div class="user-nav-profile">
@@ -549,7 +705,7 @@ function time_elapsed_string($datetime, $full = false) {
                         </p>
                     </div>
                 </div>
-                <div class="canvas-container" style="height: 280px; position: relative;">
+                <div class="canvas-container">
                     <canvas id="forecastChart"></canvas>
                 </div>
             </div>
@@ -557,6 +713,22 @@ function time_elapsed_string($datetime, $full = false) {
     </div>
 
     <script>
+        const mobileNavToggle = document.getElementById('mobileNavToggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('show');
+            sidebarOverlay.classList.toggle('show');
+        }
+
+        if (mobileNavToggle) {
+            mobileNavToggle.addEventListener('click', toggleSidebar);
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', toggleSidebar);
+        }
+
         const themeToggleBtn = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
         const themeText = document.getElementById('themeText');
@@ -623,7 +795,6 @@ function time_elapsed_string($datetime, $full = false) {
                 }
             });
         }
-
 
         const bellBtn = document.getElementById('bellBtn');
         const notificationMenu = document.getElementById('notificationMenu');
@@ -843,6 +1014,13 @@ function time_elapsed_string($datetime, $full = false) {
             forecastChart.update();
         }
         updateChartThemeColors(currentTheme);
+
+        // Handle window resizing automatically for Chart.js canvases
+        window.addEventListener('resize', () => {
+            overTimeChart.resize();
+            bySourceChart.resize();
+            forecastChart.resize();
+        });
     </script>
 </body>
 </html>

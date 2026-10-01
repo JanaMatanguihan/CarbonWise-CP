@@ -158,17 +158,208 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2D6A4F;
+            --primary-hover: #1B4332;
+            --bg-body: #F4F6F6;
+            --card-bg: #FFFFFF;
+            --text-dark: #1A202C;
+            --text-muted: #718096;
+            --border-color: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 5%;
+            z-index: 1000;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-container img {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            letter-spacing: 0.5px;
+        }
+
+        .page-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 90px 20px 40px 20px;
+        }
+
+        .auth-card {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 440px;
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        }
+
+        .auth-card h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .auth-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #FAFAFA;
+        }
+
+        .form-group input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
+            background-color: #FFFFFF;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .switch-route-text {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.875rem;
+        }
+
+        .switch-route-text a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .switch-route-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 600px) {
+            .navbar {
+                padding: 0 16px;
+                height: 60px;
+            }
+
+            .logo-container img {
+                height: 32px;
+            }
+
+            .logo-text {
+                font-size: 1.1rem;
+            }
+
+            .page-container {
+                padding: 75px 16px 20px 16px;
+            }
+
+            .auth-card {
+                padding: 24px 20px;
+                border-radius: 12px;
+            }
+
+            .auth-card h2 {
+                font-size: 1.3rem;
+            }
+
+            .auth-subtitle {
+                font-size: 0.8rem;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-    <div class="navbar" style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; box-sizing: border-box;">
-        <div class="logo-container" style="display: flex; align-items: center; gap: 12px;">
-            <img src="logo.png" alt="CarbonWise Logo" style="height: 42px; width: auto; object-fit: contain;">
+    <div class="navbar">
+        <div class="logo-container">
+            <img src="logo.png" alt="CarbonWise Logo">
             <span class="logo-text">CarbonWise</span>
         </div>
     </div>
 
-    <div class="page-container" style="padding-top: 120px;">
+    <div class="page-container">
         <div class="auth-card">
             <h2>Set New Password</h2>
             <p class="auth-subtitle">Please enter and confirm your new password</p>
@@ -186,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
 
                 <button type="submit" class="submit-btn">Reset Password</button>
             </form>
-            <p class="switch-route-text" style="margin-top: 15px;"><a href="login.php">Back to Login</a></p>
+            <p class="switch-route-text"><a href="login.php">Back to Login</a></p>
         </div>
     </div>
 

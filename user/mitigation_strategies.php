@@ -215,7 +215,9 @@ if (!$api_success) {
     if ($grand_total > 0) {
         $ai_insight_summary = "Based on your current activity logs totaling <strong>" . number_format($grand_total, 2) . " kg CO2</strong> across {$record_count} entries, your primary driver is <strong>{$highest_emission_category}</strong>. Transport accounts for {$pct_transport}%, Office/Electricity for {$pct_electricity}%, and Food for {$pct_food}% of your carbon impact.";
 
-        if ($total_transport > 0) {$target_reduction = round($total_transport * 0.22, 2);$strategies[] = [
+        if ($total_transport > 0) {
+            $target_reduction = round($total_transport * 0.22, 2);
+            $strategies[] = [
                 'title'       => 'Reduce ' . number_format($total_transport, 1) . ' kg CO2 Transport Footprint',
                 'description' => 'Your transport footprint makes up ' . $pct_transport . '% of your total emissions. Shifting 20% of trips to public transit or carpooling can lower your carbon output.',
                 'category'    => 'Transport',
@@ -227,19 +229,23 @@ if (!$api_success) {
             ];
         }
 
-        if ($total_electricity > 0) {$target_reduction = round($total_electricity * 0.18, 2);$strategies[] = [
+        if ($total_electricity > 0) {
+            $target_reduction = round($total_electricity * 0.18, 2);
+            $strategies[] = [
                 'title'       => 'Optimize Office & Energy Use (' . number_format($total_electricity, 1) . ' kg CO2)',
                 'description' => 'Energy use accounts for ' . $pct_electricity . '% of your logged activities. Utilizing energy-saving power strips and adjusting thermostat controls can cut power waste.',
                 'category'    => 'Office Resource Usage',
                 'frequency'   => 'Daily',
                 'impact'      => $target_reduction,
                 'unit'        => 'kg CO2 / day',
-                'icon'        => '💡',
+                'icon'        => '⚡',
                 'priority'    => ($highest_emission_category === 'Office Resource Usage')
             ];
         }
 
-        if ($total_food > 0) {$target_reduction = round($total_food * 0.25, 2);$strategies[] = [
+        if ($total_food > 0) {
+            $target_reduction = round($total_food * 0.25, 2);
+            $strategies[] = [
                 'title'       => 'Lower Food Footprint of ' . number_format($total_food, 1) . ' kg CO2',
                 'description' => 'Dietary emissions represent ' . $pct_food . '% of your footprint. Substituting plant-based options for high-emission meals twice a week reduces impact significantly.',
                 'category'    => 'Food Consumption',
@@ -260,7 +266,7 @@ if (!$api_success) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CarbonWise - Mitigation Strategies</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -306,22 +312,61 @@ if (!$api_success) {
             --banner-text: #52B788;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
-        body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Inter', sans-serif; 
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s; 
+        }
 
-        /* Fixed Lock Sidebar to avoid layout shrink and text truncation on modal popups */
+        html, body { 
+            width: 100%; 
+            height: 100%; 
+            overflow-x: hidden; 
+            background-color: var(--bg-body); 
+            color: var(--text-main); 
+        }
+
+        body { 
+            display: flex; 
+            position: relative;
+        }
+
+        /* Sidebar Overlay for Mobile/Tablet Screens */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1040;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        /* Fluid Sidebar setup */
         .sidebar { 
-            width: 260px !important; 
-            min-width: 260px !important; 
-            max-width: 260px !important; 
+            width: 260px; 
+            min-width: 260px; 
             background-color: var(--bg-sidebar); 
             color: white; 
             display: flex; 
             flex-direction: column; 
             padding: 20px 0; 
-            flex-shrink: 0 !important; 
-            height: 100%;
+            flex-shrink: 0; 
+            height: 100vh;
             border-right: 1px solid var(--border-color); 
+            z-index: 1050;
+            transition: transform 0.3s ease, background-color 0.3s, border-color 0.3s;
+            position: sticky;
+            top: 0;
         }
 
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
@@ -329,69 +374,182 @@ if (!$api_success) {
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
         .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; color: #ffffff; white-space: nowrap; }
         
-        .menu-items { flex: 1; display: flex; flex-direction: column; }
+        .menu-items { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .menu-item, .theme-toggle-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; background: none; border: none; width: 100%; text-align: left; cursor: pointer; white-space: nowrap; }
         .menu-item i, .theme-toggle-item i { margin-right: 15px; width: 20px; text-align: center; flex-shrink: 0; }
         .menu-item:hover, .menu-item.active, .theme-toggle-item:hover { background-color: var(--bg-sidebar-hover); color: #ffffff; }
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; }
         .sidebar-divider { height: 1px; background-color: var(--sidebar-divider); margin: 10px 25px; }
 
-        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .top-navbar { height: 75px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); }
+        /* Main Workspace Layout */
+        .main-workspace { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            min-width: 0; 
+            overflow-y: auto; 
+        }
+
+        .top-navbar { 
+            height: 75px; 
+            background: var(--bg-card); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 40px; 
+            flex-shrink: 0; 
+            border-bottom: 1px solid var(--border-color); 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 15px;
+        }
+
+        .mobile-nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 8px;
+            margin-right: 10px;
+            border-radius: 6px;
+        }
+        .mobile-nav-toggle:hover {
+            background-color: var(--input-bg);
+        }
         
         .header-title-area h2 { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
         .header-title-area p { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
 
         .user-nav-profile { display: flex; align-items: center; gap: 25px; }
         .profile-card { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--border-color); padding-left: 25px; }
-        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); }
+        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); flex-shrink: 0; }
         .avatar-circle-nav img { width: 100%; height: 100%; object-fit: cover; }
         .user-info-text h4 { font-size: 0.95rem; color: var(--text-main); font-weight: 700; }
         .user-info-text p { font-size: 0.8rem; color: var(--text-muted); }
 
-        .strategies-content { padding: 35px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 25px; }
+        .strategies-content { padding: 35px; flex: 1; display: flex; flex-direction: column; gap: 25px; }
         
         .insights-action-banner { background-color: var(--banner-insights); color: var(--banner-text); padding: 20px; border-radius: 12px; border-left: 5px solid var(--accent-green); display: flex; align-items: center; gap: 20px; }
-        .insights-action-banner i { font-size: 28px; }
+        .insights-action-banner i { font-size: 28px; flex-shrink: 0; }
         .insights-content-block h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
         .insights-content-block p { font-size: 0.88rem; font-weight: 500; opacity: 0.9; line-height: 1.4; }
 
-        .strategies-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+        .strategies-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.01); }
         
-        .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border-color); gap: 15px; background-color: var(--input-bg); }
-        .table-search { display: flex; align-items: center; border: 1px solid var(--input-border); border-radius: 6px; padding: 8px 12px; width: 250px; background: var(--bg-card); }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border-color); gap: 15px; background-color: var(--input-bg); flex-wrap: wrap; }
+        .table-search { display: flex; align-items: center; border: 1px solid var(--input-border); border-radius: 6px; padding: 8px 12px; width: 280px; background: var(--bg-card); }
         .table-search input { border: none; outline: none; margin-left: 8px; width: 100%; font-size: 0.88rem; background: transparent; color: var(--text-main); }
         
         .filters-group { display: flex; align-items: center; gap: 12px; }
         .filters-group select { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--input-border); background-color: var(--bg-card); color: var(--text-main); font-size: 0.88rem; cursor: pointer; outline: none; }
 
-        .strategies-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .strategies-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 600px; }
         .strategies-table th { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); padding: 14px 20px; border-bottom: 1px solid var(--border-color); font-weight: 600; background: var(--input-bg); }
         .strategies-table td { padding: 18px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-card); }
         
         .strategy-info-cell { display: flex; align-items: center; gap: 15px; }
-        .strategy-icon { width: 40px; height: 40px; border-radius: 50%; background-color: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .strategy-icon { width: 40px; height: 40px; border-radius: 50%; background-color: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
         .strategy-details .title { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
         .strategy-details .description { font-size: 0.83rem; color: var(--text-muted); margin-top: 2px; }
 
-        .badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background-color: #d8f3dc; color: #1b4332; }
+        .badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background-color: #d8f3dc; color: #1b4332; white-space: nowrap; }
         .badge.frequency-badge { background-color: #e1f0fe; color: #1e62a3; }
         .badge.priority-badge { background-color: #ffddd2; color: #e63946; border: 1px dashed #e63946; margin-left: 8px; font-size: 0.72rem; padding: 2px 8px; }
-        .impact-value { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
+        .impact-value { font-size: 0.95rem; font-weight: 800; color: var(--text-main); white-space: nowrap; }
 
         .notification-container { position: relative; display: inline-block; }
-        .notification-bell { background: var(--bell-bg); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--accent-green); font-size: 18px; width: 40px; height: 40px; }
+        .notification-bell { background: var(--bell-bg); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--accent-green); font-size: 18px; width: 40px; height: 40px; flex-shrink: 0; }
         .notification-bell:hover { opacity: 0.85; }
         .notification-badge { position: absolute; top: -2px; right: -2px; background-color: #BA181B; color: white; font-size: 10px; font-weight: 700; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-card); pointer-events: none; }
         .notification-dropdown { position: absolute; top: 50px; right: 0; width: 320px; background: var(--bg-card); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid var(--border-color); display: none; z-index: 1000; overflow: hidden; }
         .notification-dropdown.show { display: block; }
         .dropdown-header { padding: 15px; font-weight: 700; font-size: 0.9rem; border-bottom: 1px solid var(--border-color); color: var(--text-main); background: var(--input-bg); }
         #notificationList { max-height: 280px; overflow-y: auto; }
+
+        /* Responsive Breakpoints for Desktop, Laptops, Tablets, and Mobile Devices */
+        @media (max-width: 992px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+                box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .mobile-nav-toggle {
+                display: block;
+            }
+            .top-navbar {
+                padding: 0 20px;
+            }
+            .strategies-content {
+                padding: 20px;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .top-navbar {
+                height: auto;
+                padding: 12px 16px;
+            }
+            .header-title-area h2 {
+                font-size: 1.15rem;
+            }
+            .header-title-area p {
+                font-size: 0.75rem;
+            }
+            .user-nav-profile {
+                gap: 12px;
+            }
+            .profile-card {
+                padding-left: 10px;
+            }
+            .user-info-text {
+                display: none;
+            }
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .table-search {
+                width: 100%;
+            }
+            .filters-group {
+                width: 100%;
+            }
+            .filters-group select {
+                width: 100%;
+            }
+            .insights-action-banner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .notification-dropdown {
+                right: -40px;
+                width: calc(100vw - 32px);
+                max-width: 320px;
+            }
+            .strategies-content {
+                padding: 15px;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="logo-section">
             <div class="brand-logo-container">
                 <img src="logo.png" alt="CarbonWise Logo">
@@ -417,10 +575,16 @@ if (!$api_success) {
 
     <div class="main-workspace">
         <div class="top-navbar">
-            <div class="header-title-area">
-                <h2>Mitigation Strategies</h2>
-                <p>Discover actionable reduction blueprints</p>
+            <div style="display: flex; align-items: center;">
+                <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-title-area">
+                    <h2>Mitigation Strategies</h2>
+                    <p>Discover actionable reduction blueprints</p>
+                </div>
             </div>
+
             <div class="user-nav-profile">
                 <div class="notification-container">
                     <div class="notification-bell" id="bellBtn">
@@ -478,47 +642,49 @@ if (!$api_success) {
                     </div>
                 </div>
 
-                <table class="strategies-table">
-                    <thead>
-                        <tr>
-                            <th>Strategy</th>
-                            <th>Category</th>
-                            <th>Frequency</th>
-                            <th>Impact Metric</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <?php if (!empty($strategies)): ?>
-                            <?php foreach ($strategies as$strategy): ?>
-                                <tr class="strategy-row" data-category="<?= htmlspecialchars($strategy['category']) ?>" data-title="<?= strtolower(htmlspecialchars($strategy['title'])) ?>">
-                                    <td>
-                                        <div class="strategy-info-cell">
-                                            <div class="strategy-icon"><?= htmlspecialchars($strategy['icon'] ?? '💡') ?></div>
-                                            <div class="strategy-details">
-                                                <div class="title">
-                                                    <?= htmlspecialchars($strategy['title']) ?>
-                                                    <?php if(!empty($strategy['priority'])): ?>
-                                                        <span class="badge priority-badge"><i class="fa-solid fa-star"></i> Priority</span>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="description"><?= htmlspecialchars($strategy['description']) ?></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><span class="badge"><?= htmlspecialchars($strategy['category']) ?></span></td>
-                                    <td><span class="badge frequency-badge"><?= htmlspecialchars($strategy['frequency']) ?></span></td>
-                                    <td><span class="impact-value"><?= htmlspecialchars($strategy['impact']) ?> <?= htmlspecialchars($strategy['unit']) ?></span></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
+                <div class="table-responsive">
+                    <table class="strategies-table">
+                        <thead>
                             <tr>
-                                <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                                    No mitigation strategies available. Please log your activities in Activity Input to see customized insights.
-                                </td>
+                                <th>Strategy</th>
+                                <th>Category</th>
+                                <th>Frequency</th>
+                                <th>Impact Metric</th>
                             </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody id="tableBody">
+                            <?php if (!empty($strategies)): ?>
+                                <?php foreach ($strategies as$strategy): ?>
+                                    <tr class="strategy-row" data-category="<?= htmlspecialchars($strategy['category']) ?>" data-title="<?= strtolower(htmlspecialchars($strategy['title'])) ?>">
+                                        <td>
+                                            <div class="strategy-info-cell">
+                                                <div class="strategy-icon"><?= htmlspecialchars($strategy['icon'] ?? '⚡') ?></div>
+                                                <div class="strategy-details">
+                                                    <div class="title">
+                                                        <?= htmlspecialchars($strategy['title']) ?>
+                                                        <?php if(!empty($strategy['priority'])): ?>
+                                                            <span class="badge priority-badge"><i class="fa-solid fa-star"></i> Priority</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="description"><?= htmlspecialchars($strategy['description']) ?></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge"><?= htmlspecialchars($strategy['category']) ?></span></td>
+                                        <td><span class="badge frequency-badge"><?= htmlspecialchars($strategy['frequency']) ?></span></td>
+                                        <td><span class="impact-value"><?= htmlspecialchars($strategy['impact']) ?> <?= htmlspecialchars($strategy['unit']) ?></span></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                        No mitigation strategies available. Please log your activities in Activity Input to see customized insights.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
@@ -548,6 +714,23 @@ if (!$api_success) {
                 themeIcon.className = 'fa-solid fa-moon';
                 themeText.textContent = 'Dark Mode';
             }
+        }
+
+        // Responsive Off-canvas Mobile/Tablet Navigation Drawer Handler
+        const mobileNavToggle = document.getElementById('mobileNavToggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            sidebarOverlay.classList.toggle('active');
+        }
+
+        if (mobileNavToggle) {
+            mobileNavToggle.addEventListener('click', toggleSidebar);
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', toggleSidebar);
         }
 
         function filterTable() {

@@ -261,6 +261,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        /* CSS Reset & Global Layout Rules */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 12px 24px;
+        }
+
+        .page-container {
+            width: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 90px 16px 40px 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .auth-card {
+            width: 100%;
+        }
+
         .password-wrapper {
             position: relative;
             display: flex;
@@ -296,6 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 18px;
             accent-color: #3AA76D;
             cursor: pointer;
+            flex-shrink: 0;
         }
         .terms-container a {
             color: #3AA76D;
@@ -404,6 +443,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 20px;
             accent-color: #3AA76D;
             cursor: pointer;
+            flex-shrink: 0;
         }
         .terms-checkbox-row label {
             font-size: 13px;
@@ -416,7 +456,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-radius: 24px !important;
             padding: 20px 24px !important;
             width: 480px !important;
-            max-width: 90vw !important;
+            max-width: 92vw !important;
         }
         .swal2-actions.terms-swal-actions {
             width: 100%;
@@ -454,18 +494,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: rgba(255, 255, 255, 0.7) !important;
             cursor: not-allowed;
         }
+
+        /* Responsive Breakpoints & Adapters */
+        @media screen and (max-width: 768px) {
+            .page-container {
+                padding-top: 80px;
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+            .terms-header-bg {
+                padding: 18px 14px;
+                margin: -20px -24px 12px -24px;
+            }
+            .terms-scroll-body {
+                max-height: 280px;
+            }
+            .swal2-actions.terms-swal-actions {
+                flex-direction: column-reverse;
+                gap: 8px;
+            }
+            .terms-btn-cancel, .terms-btn-agree {
+                width: 100% !important;
+                flex: none;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .navbar img {
+                height: 34px !important;
+            }
+            .logo-text {
+                font-size: 1.1rem;
+            }
+            .terms-container {
+                font-size: 0.82rem;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="navbar" style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; box-sizing: border-box;">
+    <div class="navbar">
         <div class="logo-container" style="display: flex; align-items: center; gap: 12px;">
             <img src="logo.png" alt="CarbonWise Logo" style="height: 42px; width: auto; object-fit: contain;">
             <span class="logo-text">CarbonWise</span>
         </div>
     </div>
 
-    <div class="page-container" style="padding-top: 100px;">
+    <div class="page-container">
         <div class="auth-card">
             <h2>Get Started with CarbonWise</h2>
             <p class="auth-subtitle">Create your account and start your journey today!</p>

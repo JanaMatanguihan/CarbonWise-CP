@@ -275,7 +275,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
         body { display: flex; height: 100vh; width: 100vw; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; border-right: 1px solid var(--border-color); z-index: 100; }
+        /* Mobile Sidebar Overlay Mask */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+        }
+
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; border-right: 1px solid var(--border-color); z-index: 100; transition: transform 0.3s ease; }
         .logo-section { display: flex; align-items: center; padding: 10px 25px; margin-bottom: 30px; gap: 12px; }
         .brand-logo-container { width: 32px; height: 32px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
@@ -289,9 +301,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; }
         .sidebar-divider { height: 1px; background-color: var(--sidebar-divider); margin: 10px 25px 15px 25px; }
         
-        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .top-navbar { height: 75px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); }
+        .main-workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; width: 100%; }
+        .top-navbar { height: 75px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); gap: 15px; }
         
+        .mobile-toggle-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.3rem;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
         .header-title-area h2 { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
         .header-title-area p { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
         
@@ -307,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         #notificationList { display: flex; flex-direction: column; }
         
         .profile-card { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--border-color); padding-left: 25px; }
-        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); }
+        .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); flex-shrink: 0; }
         .avatar-circle-nav img { width: 100%; height: 100%; object-fit: cover; }
         .user-info-text h4 { font-size: 0.95rem; color: var(--text-main); font-weight: 700; }
         .user-info-text p { font-size: 0.8rem; color: var(--text-muted); }
@@ -320,6 +342,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .content-container { padding: 25px 40px; display: flex; flex-direction: column; gap: 20px; }
         
+        /* 2-Column Side-by-Side Transport Card Grid Layout */
+        .transport-grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 25px;
+            align-items: stretch;
+        }
+
+        .transport-controls-col {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .transport-map-col {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
         .input-card { 
             background: var(--bg-card); 
             padding: 25px; 
@@ -330,6 +372,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .form-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; position: relative; z-index: 15; }
+        .form-row.vertical-stack { flex-direction: column; align-items: stretch; gap: 15px; }
         
         .form-group { 
             flex: 1; 
@@ -359,19 +402,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         .form-group select:disabled { opacity: 0.65; cursor: not-allowed; }
         
-        .route-labels-box { display: flex; gap: 15px; margin: 15px 0; padding: 12px; border-radius: 8px; background: var(--input-bg); border: 1px solid var(--border-color); font-size: 0.9rem; position: relative; z-index: 5; }
-        .route-label-item { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .route-labels-box { display: flex; gap: 15px; margin: 0; padding: 12px; border-radius: 8px; background: var(--input-bg); border: 1px solid var(--border-color); font-size: 0.9rem; position: relative; z-index: 5; flex-wrap: wrap; }
+        .route-label-item { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 4px; }
         .route-label-title { font-weight: 700; font-size: 0.8rem; color: var(--accent-green); text-transform: uppercase; }
         .route-label-value { font-weight: 600; color: var(--text-main); }
 
         .btn-add { background-color: var(--accent-green); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; height: 45px; position: relative; z-index: 20; }
+        .btn-add.full-width { width: 100%; margin-top: 5px; }
         .btn-add:hover { background-color: var(--accent-green-hover); }
         .btn-add:disabled { background-color: #9CA3AF; cursor: not-allowed; }
 
-        .map-section-wrapper { width: 100%; display: block; clear: both; margin-top: 15px; position: relative; z-index: 1; }
+        .map-section-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; z-index: 1; }
         
         .leaflet-container { z-index: 1 !important; }
-        #map { height: 350px; width: 100%; border-radius: 8px; border: 1px solid var(--border-color); z-index: 1; display: block; }
+        #map { flex: 1; min-height: 320px; width: 100%; border-radius: 8px; border: 1px solid var(--border-color); z-index: 1; display: block; }
         .leaflet-routing-container { display: none !important; }
 
         .list-card { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); }
@@ -430,6 +474,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             display: flex;
             flex-direction: column;
             gap: 4px;
+            word-break: break-word;
         }
 
         .activity-title {
@@ -452,6 +497,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             font-size: 1rem;
             padding: 6px;
             border-radius: 50%;
+            flex-shrink: 0;
         }
         .btn-delete-card:hover { background-color: rgba(186, 24, 27, 0.1); }
         
@@ -468,11 +514,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             width: 100vw !important;
             height: 100vh !important;
         }
+
+        /* RESPONSIVE DISPLAY STYLES */
+        @media (max-width: 992px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+                z-index: 1000;
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .sidebar-overlay.active {
+                display: block;
+            }
+            .mobile-toggle-btn {
+                display: block;
+            }
+            .top-navbar {
+                padding: 0 20px;
+            }
+            .progress-wrapper {
+                padding: 20px 20px 0 20px;
+            }
+            .content-container {
+                padding: 20px;
+            }
+            .transport-grid-layout {
+                grid-template-columns: 1fr;
+            }
+            #map {
+                height: 350px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .top-navbar {
+                height: auto;
+                padding: 15px;
+            }
+            .header-title-area h2 {
+                font-size: 1.2rem;
+            }
+            .user-info-text p {
+                display: none;
+            }
+            .profile-card {
+                padding-left: 12px;
+                gap: 8px;
+            }
+            .user-nav-profile {
+                gap: 12px;
+            }
+            .notification-dropdown {
+                width: 280px;
+                right: -50px;
+            }
+            .form-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .btn-add {
+                width: 100%;
+            }
+            #map {
+                height: 280px;
+            }
+            .activity-card-item {
+                padding: 12px 15px;
+                gap: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .user-info-text h4 {
+                display: none;
+            }
+            .notification-dropdown {
+                position: fixed;
+                left: 15px;
+                right: 15px;
+                width: auto;
+                top: 65px;
+            }
+            .input-card, .list-card {
+                padding: 15px;
+            }
+            .route-labels-box {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="logo-section">
             <div class="brand-logo-container">
                 <img src="logo.png" alt="CarbonWise Logo">
@@ -498,9 +639,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     <div class="main-workspace">
         <div class="top-navbar">
-            <div class="header-title-area">
-                <h2>Activity Input</h2>
-                <p>Record and manage operational data</p>
+            <div style="display: flex; align-items: center;">
+                <button class="mobile-toggle-btn" onclick="toggleMobileSidebar()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-title-area">
+                    <h2>Activity Input</h2>
+                    <p>Record and manage operational data</p>
+                </div>
             </div>
             
             <div class="user-nav-profile">
@@ -546,61 +692,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <div class="content-container">
                 <div class="input-card">
-                    <h3 id="transportCardTitle" style="color: var(--accent-green);">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
-                    <div class="form-row">
-                        <div class="form-group" id="primarySelectorGroup">
-                            <label id="campusLabel" for="campusSelect">BSU Campus (Destination)</label>
-                            <select id="campusSelect" name="campus_select" onchange="handleCampusSelection()">
-                                <option value="" selected disabled>Select Campus</option>
-                                <option value="13.9575,121.1610">Lipa Campus</option>
-                                <option value="13.7542,121.0547">Pablo Borbon Campus</option>
-                                <option value="13.7745,121.0772">Alangilan Campus</option>
-                                <option value="14.0498,121.1292">LIMA Campus</option>
-                                <option value="14.0670,120.6260">ARASOF Nasugbu Campus</option>
-                                <option value="14.0450,121.1575">JPLPC Malvar Campus</option>
-                                <option value="13.8821,120.9168">Lemery Campus</option>
-                                <option value="13.8456,121.2038">Rosario Campus</option>
-                                <option value="13.8248,121.3283">San Juan Campus</option>
-                                <option value="13.9372,120.7325">Balayan Campus</option>
-                                <option value="13.6415,121.1922">Lobo Campus</option>
-                                <option value="13.7502,120.9405">Mabini Campus</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="vehicleType">Vehicle Used</label>
-                            <select id="vehicleType" onchange="calculateRouteIfPossible()">
-                                <option value="" selected disabled>Select Vehicle Type</option>
-                                <option value="0.103">Motorcycle (0.103 kg CO2e/km)</option>
-                                <option value="0.095">Tricycle (0.095 kg CO2e/km)</option>
-                                <option value="0.035">Modern Jeepney (0.035 kg CO2e/km)</option>
-                                <option value="0.171">Private Car (Gasoline) (0.171 kg CO2e/km)</option>
-                                <option value="0.080">Public Jeepney (0.08 kg CO2e/km)</option>
-                                <option value="0.050">Public Bus (0.05 kg CO2e/km)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="transportDistance">Point-to-Point Distance (KM)</label>
-                            <input type="number" id="transportDistance" step="0.01" placeholder="Auto-calculates or enter manually">
-                        </div>
-                        <button type="button" class="btn-add" id="addTransportBtn" onclick="addTransport()">Add Route</button>
-                    </div>
-
-                    <div class="route-labels-box">
-                        <div class="route-label-item">
-                            <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point (Home)</div>
-                            <div id="startLabel" class="route-label-value">Click Map to Pin Home</div>
-                        </div>
-                        <div class="route-label-item">
-                            <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-building-flag"></i> Destination Campus</div>
-                            <div id="endLabel" class="route-label-value">Select Campus Dropdown</div>
-                        </div>
-                    </div>
+                    <h3 id="transportCardTitle" style="color: var(--accent-green); margin-bottom: 20px;">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
                     
-                    <div class="map-section-wrapper">
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;" id="mapInstructions">
-                            <i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 1 Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home position on the map.
-                        </p>
-                        <div id="map"></div>
+                    <div class="transport-grid-layout">
+                        <!-- Left Column: Controls & Dynamic Route Labels -->
+                        <div class="transport-controls-col">
+                            <div class="form-row vertical-stack">
+                                <div class="form-group" id="primarySelectorGroup">
+                                    <label id="campusLabel" for="campusSelect">BSU Campus (Destination)</label>
+                                    <select id="campusSelect" name="campus_select" onchange="handleCampusSelection()">
+                                        <option value="" selected disabled>Select Campus</option>
+                                        <option value="13.9575,121.1610">Lipa Campus</option>
+                                        <option value="13.7542,121.0547">Pablo Borbon Campus</option>
+                                        <option value="13.7745,121.0772">Alangilan Campus</option>
+                                        <option value="14.0498,121.1292">LIMA Campus</option>
+                                        <option value="14.0670,120.6260">ARASOF Nasugbu Campus</option>
+                                        <option value="14.0450,121.1575">JPLPC Malvar Campus</option>
+                                        <option value="13.8821,120.9168">Lemery Campus</option>
+                                        <option value="13.8456,121.2038">Rosario Campus</option>
+                                        <option value="13.8248,121.3283">San Juan Campus</option>
+                                        <option value="13.9372,120.7325">Balayan Campus</option>
+                                        <option value="13.6415,121.1922">Lobo Campus</option>
+                                        <option value="13.7502,120.9405">Mabini Campus</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="vehicleType">Vehicle Used</label>
+                                    <select id="vehicleType" onchange="calculateRouteIfPossible()">
+                                        <option value="" selected disabled>Select Vehicle Type</option>
+                                        <option value="0.103">Motorcycle (0.103 kg CO2e/km)</option>
+                                        <option value="0.095">Tricycle (0.095 kg CO2e/km)</option>
+                                        <option value="0.035">Modern Jeepney (0.035 kg CO2e/km)</option>
+                                        <option value="0.171">Private Car (Gasoline) (0.171 kg CO2e/km)</option>
+                                        <option value="0.080">Public Jeepney (0.08 kg CO2e/km)</option>
+                                        <option value="0.050">Public Bus (0.05 kg CO2e/km)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="transportDistance">Point-to-Point Distance (KM)</label>
+                                    <input type="number" id="transportDistance" step="0.01" placeholder="Auto-calculates or enter manually">
+                                </div>
+                            </div>
+
+                            <div class="route-labels-box">
+                                <div class="route-label-item">
+                                    <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point (Home)</div>
+                                    <div id="startLabel" class="route-label-value">Click Map to Pin Home</div>
+                                </div>
+                                <div class="route-label-item">
+                                    <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-building-flag"></i> Destination Campus</div>
+                                    <div id="endLabel" class="route-label-value">Select Campus Dropdown</div>
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn-add full-width" id="addTransportBtn" onclick="addTransport()">Add Route</button>
+                        </div>
+
+                        <!-- Right Column: Map & Instructions -->
+                        <div class="transport-map-col">
+                            <div class="map-section-wrapper">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;" id="mapInstructions">
+                                    <i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 1 Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home position on the map.
+                                </p>
+                                <div id="map"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -820,6 +976,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         const existingDatabaseCount = <?= (int)$today_transport_count ?>;
         let selectedCampusCoords = null; 
         let selectedCampusName = "";
+
+        function toggleMobileSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebarOverlay').classList.toggle('active');
+        }
 
         const themeToggleBtn = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
@@ -1431,6 +1592,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             loadNotifications();
             setInterval(loadNotifications, 60000);
 
+            setTimeout(function() {
+                map.invalidateSize();
+            }, 200);
+        });
+
+        window.addEventListener('resize', function() {
             setTimeout(function() {
                 map.invalidateSize();
             }, 200);

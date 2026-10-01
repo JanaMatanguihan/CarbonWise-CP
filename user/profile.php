@@ -234,10 +234,8 @@ if ($pdo) {
 
         // --- DYNAMIC TREND TEXT CALCULATION ---
         if ($total_records_count === 0) {
-            // New user with 0 logged activities
             $trend_text = "Starting your green track!";
         } else {
-            // Existing user with logged activities
             if ($last_week_score > 0) {
                 if ($current_week_score < $last_week_score) {
                     $percentage = round((($last_week_score - $current_week_score) / $last_week_score) * 100);
@@ -249,7 +247,6 @@ if ($pdo) {
                     $trend_text = "Same emissions as last week";
                 }
             } else {
-                // Existing user logging activity for their first week
                 $trend_text = "1st week of tracking logged!";
             }
         }
@@ -471,13 +468,13 @@ if (empty($avatar_url)) {
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { display: flex; height: 100vh; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; transition: background-color 0.3s, color 0.3s; }
 
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 25px 0; flex-shrink: 0; transition: background-color 0.3s; }
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 25px 0; flex-shrink: 0; transition: all 0.3s ease; z-index: 1050; }
         .logo-section { display: flex; align-items: center; padding: 0 25px; margin-bottom: 40px; gap: 12px; }
-        .brand-logo-container { width: 38px; height: 38px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .brand-logo-container { width: 38px; height: 38px; border-radius: 50%; background-color: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .brand-logo-container img { width: 85%; height: 85%; object-fit: contain; }
         .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.5px; color: #ffffff; }
         
-        .menu-items { flex: 1; display: flex; flex-direction: column; }
+        .menu-items { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .menu-item { display: flex; align-items: center; padding: 14px 25px; color: var(--text-sidebar-menu); text-decoration: none; font-size: 0.95rem; font-weight: 500; cursor: pointer; gap: 15px; transition: background-color 0.3s, color 0.3s; }
         .menu-item i { width: 20px; font-size: 1.1rem; text-align: center; }
         .menu-item:hover, .menu-item.active { background-color: var(--bg-sidebar-hover); color: #ffffff; }
@@ -486,8 +483,12 @@ if (empty($avatar_url)) {
         .sidebar-footer { margin-top: auto; }
         .sidebar-divider { height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 15px 25px; }
 
-        .main-workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .top-navbar { height: 85px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; transition: background-color 0.3s, border-color 0.3s; }
+        .main-workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; width: 100%; }
+        .top-navbar { height: 85px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; transition: background-color 0.3s, border-color 0.3s; gap: 15px; }
+        
+        .menu-toggle-btn { display: none; background: transparent; border: none; font-size: 1.4rem; color: var(--text-title); cursor: pointer; padding: 5px; }
+        .nav-left-wrapper { display: flex; align-items: center; gap: 15px; }
+
         .page-heading h2 { font-size: 1.5rem; font-weight: 700; color: var(--text-title); }
         .page-heading p { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
 
@@ -508,7 +509,7 @@ if (empty($avatar_url)) {
         .noti-empty-state { padding: 15px 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; }
 
         .header-profile-box { display: flex; align-items: center; gap: 12px; border-left: 2px solid var(--border-color); padding-left: 25px; transition: border-left 0.3s; }
-        .nav-avatar { width: 44px; height: 44px; background: #E2E8F0; color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; overflow: hidden; }
+        .nav-avatar { width: 44px; height: 44px; background: #E2E8F0; color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; overflow: hidden; flex-shrink: 0; }
         .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
         .workspace-body { flex: 1; overflow-y: auto; padding: 30px 40px; display: flex; flex-direction: column; gap: 20px; }
@@ -518,14 +519,14 @@ if (empty($avatar_url)) {
         .card-link { font-size: 0.85rem; color: var(--accent-green); text-decoration: none; font-weight: 600; }
 
         .profile-main-box { display: flex; align-items: center; gap: 20px; }
-        .avatar-uploader { position: relative; cursor: pointer; border-radius: 50%; width: 75px; height: 75px; overflow: hidden; background: #EDF2F7; border: 3px solid var(--accent-green); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; color: var(--accent-green); }
+        .avatar-uploader { position: relative; cursor: pointer; border-radius: 50%; width: 75px; height: 75px; overflow: hidden; background: #EDF2F7; border: 3px solid var(--accent-green); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; color: var(--accent-green); flex-shrink: 0; }
         .avatar-uploader img { width: 100%; height: 100%; object-fit: cover; }
         .avatar-overlay { position: absolute; inset: 0; background: rgba(45, 106, 79, 0.8); display: flex; align-items: center; justify-content: center; color: white; opacity: 0; transition: opacity 0.2s; font-size: 1rem; }
         .avatar-uploader:hover .avatar-overlay { opacity: 1; }
         
-        .profile-text-details h3 { font-size: 1.25rem; font-weight: 700; color: var(--text-title); }
+        .profile-text-details h3 { font-size: 1.25rem; font-weight: 700; color: var(--text-title); word-break: break-word; }
         .profile-text-details .role-tag { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
-        .profile-text-details .sub-details { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; }
+        .profile-text-details .sub-details { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; word-break: break-word; }
 
         /* --- SUSTAINABILITY CONTAINER --- */
         .sustainability-wrapper {
@@ -650,6 +651,7 @@ if (empty($avatar_url)) {
             display: flex;
             align-items: baseline;
             gap: 5px;
+            flex-wrap: wrap;
         }
 
         .carbon-score-num {
@@ -708,25 +710,32 @@ if (empty($avatar_url)) {
             color: #718096;
         }
 
-        .breakdown-tabs { display: flex; gap: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; }
-        .tab-item { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; text-decoration: none; padding-bottom: 8px; }
+        .breakdown-tabs { display: flex; gap: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; overflow-x: auto; white-space: nowrap; }
+        .tab-item { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; text-decoration: none; padding-bottom: 8px; flex-shrink: 0; }
         .tab-item.active { color: var(--accent-green); border-bottom: 3px solid var(--accent-green); }
 
         .breakdown-body { display: flex; justify-content: space-between; align-items: center; min-height: 90px; }
 
-        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 20px; width: 100%; min-width: 0; }
         .single-column-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 
         /* --- HORIZONTALLY SCROLLABLE ACHIEVEMENTS CARD CONTAINER --- */
+        .dash-card.achievements-card {
+            overflow: hidden; /* Keeps the card header static */
+        }
+
         .achievements-scroll-wrapper {
             display: flex;
             gap: 12px;
             overflow-x: auto;
-            padding-bottom: 6px;
+            overflow-y: hidden;
+            width: 100%;
+            padding-bottom: 8px;
             scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
         .achievements-scroll-wrapper::-webkit-scrollbar {
-            height: 5px;
+            height: 6px;
         }
         .achievements-scroll-wrapper::-webkit-scrollbar-track {
             background: rgba(0,0,0,0.03);
@@ -739,6 +748,7 @@ if (empty($avatar_url)) {
 
         .achieve-card-item {
             min-width: 180px;
+            width: 180px;
             max-width: 180px;
             height: 140px;
             border: 1px solid var(--border-color);
@@ -805,13 +815,105 @@ if (empty($avatar_url)) {
         }
 
         .timeline-box { display: flex; flex-direction: column; gap: 12px; }
-        .timeline-item { display: flex; gap: 12px; position: relative; font-size: 0.82rem; }
+        .timeline-item { display: flex; gap: 12px; position: relative; font-size: 0.82rem; align-items: center; }
         .timeline-icon { width: 30px; height: 30px; background: var(--bell-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-green); z-index: 2; flex-shrink: 0; font-size: 0.85rem; }
-        .timeline-details { flex: 1; }
-        .timeline-details h5 { font-weight: 700; font-size: 0.82rem; color: var(--text-title); }
-        .timeline-details p { color: var(--text-muted); font-size: 0.72rem; }
-        .timeline-right { text-align: right; font-weight: 700; color: var(--text-title); font-size: 0.82rem; }
+        .timeline-details { flex: 1; min-width: 0; }
+        .timeline-details h5 { font-weight: 700; font-size: 0.82rem; color: var(--text-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timeline-details p { color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timeline-right { text-align: right; font-weight: 700; color: var(--text-title); font-size: 0.82rem; flex-shrink: 0; }
         .timeline-right span { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 400; }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1040;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 1024px) {
+            .top-navbar { padding: 0 25px; }
+            .workspace-body { padding: 25px; }
+        }
+
+        @media (max-width: 850px) {
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                top: 0;
+                bottom: 0;
+                box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+            }
+            .sidebar.active {
+                left: 0;
+            }
+            .sidebar-overlay.active {
+                display: block;
+                opacity: 1;
+            }
+            .menu-toggle-btn {
+                display: block;
+            }
+            .top-navbar {
+                height: 70px;
+                padding: 0 20px;
+            }
+            .workspace-body {
+                padding: 20px;
+            }
+            .header-profile-box div {
+                display: none;
+            }
+            .header-profile-box {
+                padding-left: 10px;
+                border-left: none;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .top-navbar {
+                padding: 0 15px;
+            }
+            .page-heading h2 {
+                font-size: 1.2rem;
+            }
+            .page-heading p {
+                display: none;
+            }
+            .workspace-body {
+                padding: 15px;
+                gap: 15px;
+            }
+            .profile-main-box {
+                flex-direction: column;
+                text-align: center;
+                gap: 12px;
+            }
+            .notification-dropdown {
+                right: -60px;
+                width: 300px;
+            }
+            .sustainability-item {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            .dash-card {
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .notification-dropdown {
+                right: -100px;
+                width: 280px;
+            }
+            .timeline-item {
+                gap: 8px;
+            }
+        }
     </style>
     <script>
         (function() {
@@ -827,7 +929,9 @@ if (empty($avatar_url)) {
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar" id="appSidebar">
         <div class="logo-section">
             <div class="brand-logo-container">
                 <img src="logo.png" alt="CarbonWise Logo">
@@ -854,9 +958,14 @@ if (empty($avatar_url)) {
 
     <div class="main-workspace">
         <div class="top-navbar">
-            <div class="page-heading">
-                <h2>View Profile</h2>
-                <p>Update your personal details and organization info</p>
+            <div class="nav-left-wrapper">
+                <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="Toggle Navigation">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="page-heading">
+                    <h2>View Profile</h2>
+                    <p>Update your personal details and organization info</p>
+                </div>
             </div>
             <div class="user-nav-profile">
                 <div class="notification-container">
@@ -968,7 +1077,7 @@ if (empty($avatar_url)) {
 
             <!-- ACHIEVEMENTS SECTION -->
             <div class="dashboard-grid">
-                <div class="dash-card">
+                <div class="dash-card achievements-card">
                     <div class="dash-card-title" style="font-size: 0.7rem; font-weight: 800; letter-spacing: 1.1px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px;">
                         Achievements
                     </div>
@@ -1083,6 +1192,19 @@ if (empty($avatar_url)) {
 
         const notiBellTrigger = document.getElementById('notiBellTrigger');
         const notiDropdownMenu = document.getElementById('notiDropdownMenu');
+
+        const menuToggleBtn = document.getElementById('menuToggleBtn');
+        const appSidebar = document.getElementById('appSidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        // Sidebar drawer toggles
+        function toggleSidebar() {
+            appSidebar.classList.toggle('active');
+            sidebarOverlay.classList.toggle('active');
+        }
+
+        if (menuToggleBtn) menuToggleBtn.addEventListener('click', toggleSidebar);
+        if (sidebarOverlay) sidebarOverlay.addEventListener('click', toggleSidebar);
 
         notiBellTrigger.addEventListener('click', (e) => {
             e.stopPropagation();

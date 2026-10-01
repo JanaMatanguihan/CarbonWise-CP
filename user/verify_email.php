@@ -105,18 +105,84 @@ if (empty($token)) {
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Base Reset & Box Sizing */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 12px 24px;
+            box-sizing: border-box;
+        }
+
+        .page-container {
+            width: 100%;
+            padding-top: 120px;
+            padding-bottom: 40px;
+            padding-left: 16px;
+            padding-right: 16px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        /* Responsive Breakpoints */
+        @media screen and (max-width: 768px) {
+            .page-container {
+                padding-top: 100px;
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .navbar img {
+                height: 34px !important;
+            }
+            .logo-text {
+                font-size: 1.1rem;
+            }
+            .auth-card {
+                padding: 20px 16px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-    <div class="navbar" style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; box-sizing: border-box;">
+    <div class="navbar">
         <div class="logo-container" style="display: flex; align-items: center; gap: 12px;">
             <img src="logo.png" alt="CarbonWise Logo" style="height: 42px; width: auto; object-fit: contain;">
             <span class="logo-text">CarbonWise</span>
         </div>
     </div>
 
-    <div class="page-container" style="padding-top: 120px; text-align: center;">
-        <div class="auth-card" style="max-width: 450px; margin: 0 auto;">
+    <div class="page-container">
+        <div class="auth-card">
             <h2>Email Verification</h2>
             <p style="color: #666; margin: 15px 0;">Processing your account verification, please wait...</p>
             <a href="login.php" class="submit-btn" style="display: block; text-decoration: none; line-height: 40px; margin-top: 20px;">Go to Login</a>
