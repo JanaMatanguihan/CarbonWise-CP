@@ -520,13 +520,18 @@ class ApiService {
         .post(
           Uri.parse('$baseUrl/api/notifications'),
           headers: _headers,
-          body: jsonEncode({'title': title, 'message': message, 'type': type}),
+          body: jsonEncode({
+            'email': email,
+            'title': title,
+            'message': message,
+            'type': type,
+          }),
         )
         .timeout(const Duration(seconds: 30));
 
     final data = _decodeResponse(response);
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
+    if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(data['message'] ?? 'Failed to add notification.');
     }
   }

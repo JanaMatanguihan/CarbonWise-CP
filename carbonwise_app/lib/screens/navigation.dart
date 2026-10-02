@@ -128,17 +128,45 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   }
 
   // LOAD NOTIFICATIONS
+
   Future<void> loadNotifications() async {
     try {
-      final data = await _apiService.getNotifications();
+      print("🔔 DEBUG: Requesting notifications from API...");
+      final dynamic response = await _apiService.getNotifications();
+      print("🔔 DEBUG: Raw API Response received: $response");
 
       if (!mounted) return;
 
       setState(() {
-        notifications = List<Map<String, dynamic>>.from(data);
+        List<Map<String, dynamic>> tempNotifications = [];
+
+        if (response is Map) {
+          if (response.containsKey('notifications')) {
+            final rawList = response['notifications'];
+            if (rawList is List) {
+              for (var item in rawList) {
+                if (item is Map) {
+                  tempNotifications.add(Map<String, dynamic>.from(item));
+                }
+              }
+            }
+          }
+        } else if (response is List) {
+          for (var item in response) {
+            if (item is Map) {
+              tempNotifications.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+
+        notifications = tempNotifications;
       });
+
+      print(
+        "🔔 DEBUG: Successfully loaded ${notifications.length} notifications into state.",
+      );
     } catch (e) {
-      print("Error loading notifications: $e");
+      print("❌ ERROR loading notifications: $e");
     }
   }
 
