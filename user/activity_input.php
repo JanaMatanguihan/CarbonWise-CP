@@ -53,7 +53,7 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 } catch (\PDOException $e) {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' || (isset($_GET['action']) && $_GET['action'] === 'fetch_notifications')) {
         header('Content-Type: application/json');
         echo json_encode([
             "status"  => "error",
@@ -61,6 +61,48 @@ try {
         ]);
         exit;
     }
+}
+
+// --- NOTIFICATION AJAX ENDPOINTS ---
+if (isset($_GET['action']) && $_GET['action'] === 'fetch_notifications') {
+    header('Content-Type: application/json');
+    if (empty($user_id) || !isset($pdo)) {
+        echo json_encode([]);
+        exit;
+    }
+    try {
+        $notifStmt = $pdo->prepare("
+            SELECT id, title, message, is_read, 
+                   TO_CHAR(created_at, 'Mon DD, HH:MI AM') as created_at 
+            FROM notifications 
+            WHERE user_id = :user_id 
+            ORDER BY created_at DESC 
+            LIMIT 20
+        ");
+        $notifStmt->execute([':user_id' => $user_id]);
+        $notifications = $notifStmt->fetchAll();
+        echo json_encode($notifications ?: []);
+    } catch (\PDOException $e) {
+        echo json_encode([]);
+    }
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mark_notification_read') {
+    header('Content-Type: application/json');
+    $notif_id = (int)($_POST['id'] ?? 0);
+    if (!empty($user_id) && !empty($notif_id) && isset($pdo)) {
+        try {
+            $updateStmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE id = :id AND user_id = :user_id");
+            $updateStmt->execute([':id' => $notif_id, ':user_id' => $user_id]);
+            echo json_encode(["status" => "success"]);
+        } catch (\PDOException $e) {
+            echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(["status" => "error", "message" => "Invalid notification request."]);
+    }
+    exit;
 }
 
 // FETCH AVATAR FROM THE users TABLE (profile_picture column)
@@ -328,6 +370,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         #notificationListWrapper { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; }
         #notificationList { display: flex; flex-direction: column; }
         
+        /* Notification item hover/unread styles */
+        .notif-item { transition: background-color 0.2s ease; }
+        .notif-item:hover { background: var(--bg-sidebar-hover) !important; color: #ffffff !important; }
+        .notif-item:hover p, .notif-item:hover div, .notif-item:hover span { color: #ffffff !important; }
+        .notif-item.unread { background: var(--input-bg); font-weight: 600; }
+        .notif-item.unread::before { content: ''; display: inline-block; width: 8px; height: 8px; background-color: var(--accent-green); border-radius: 50%; margin-right: 8px; }
+
         .profile-card { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--border-color); padding-left: 25px; }
         .avatar-circle-nav { width: 40px; height: 40px; background: var(--input-bg); color: var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; overflow: hidden; border: 1px solid var(--accent-green); flex-shrink: 0; }
         .avatar-circle-nav img { width: 100%; height: 100%; object-fit: cover; }
@@ -1538,53 +1587,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             });
         }
 
+        // --- CONNECTED NOTIFICATION SYSTEM ---
         const bellBtn = document.getElementById('bellBtn');
         const notificationMenu = document.getElementById('notificationMenu');
         const badge = document.getElementById('notificationBadge');
         const list = document.getElementById('notificationList');
 
         if (bellBtn && notificationMenu) {
-            bellBtn.addEventListener('click', (e) => { e.stopPropagation(); notificationMenu.classList.toggle('show'); });
+            bellBtn.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                notificationMenu.classList.toggle('show'); 
+            });
             document.addEventListener('click', () => notificationMenu.classList.remove('show'));
         }
 
         function loadNotifications() {
             if (!list || !badge) return;
-            fetch('get_notifications.php')
+
+            fetch('activity_input.php?action=fetch_notifications')
                 .then(res => res.json())
                 .then(data => {
-                    if (!data || data.length === 0) {
-                        list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">No updates found</div>`;
+                    if (!Array.isArray(data) || data.length === 0) {
+                        list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No updates found</div>`;
                         badge.style.display = 'none';
                         return;
                     }
-                    let unread = data.filter(n => !n.is_read).length;
-                    badge.style.display = unread > 0 ? 'block' : 'none';
-                    badge.innerText = unread;
+                    
+                    let unreadCount = data.filter(n => !n.is_read).length;
+                    if (unreadCount > 0) {
+                        badge.style.display = 'flex';
+                        badge.innerText = unreadCount;
+                    } else {
+                        badge.style.display = 'none';
+                    }
 
                     list.innerHTML = data.map(n => `
-                        <div class="notif-item" data-id="${n.id}" onclick="markAsRead(${n.id}, this)" style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); background: ${n.is_read ? 'transparent' : 'var(--input-bg)'}; cursor: pointer;">
-                            <span style="font-weight: 700; color: var(--text-main);"><?php echo '<span style="color: green;">green</span>'; ?></span>
-                            <p style="margin: 0; color: var(--text-muted); font-size: 0.8rem;">${n.message}</p>
+                        <div class="notif-item ${!n.is_read ? 'unread' : ''}" 
+                             data-id="${n.id}" 
+                             onclick="markAsRead(${n.id}, this)" 
+                             style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-weight: 700; color: var(--accent-green); font-size: 0.85rem;">${n.title || 'Notification'}</span>
+                                ${n.created_at ? `<span style="font-size: 0.75rem; color: var(--text-muted);">${n.created_at}</span>` : ''}
+                            </div>
+                            <p style="margin: 0; color: var(--text-main); font-size: 0.8rem; line-height: 1.3;">${n.message}</p>
                         </div>
                     `).join('');
                 })
                 .catch(() => {
-                    list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">Updates temporarily unavailable</div>`;
+                    list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Updates temporarily unavailable</div>`;
                 });
         }
 
         function markAsRead(id, element) {
             let formData = new FormData();
+            formData.append('action', 'mark_notification_read');
             formData.append('id', id);
-            fetch('update_notification.php', { method: 'POST', body: formData })
+
+            fetch('activity_input.php', { method: 'POST', body: formData })
                 .then(res => res.json())
                 .then(data => {
-                    if(data.status === 'success') {
-                        element.style.background = 'transparent';
+                    if (data.status === 'success') {
+                        element.classList.remove('unread');
                         loadNotifications();
                     }
-                });
+                })
+                .catch(err => console.error("Error updating notification status:", err));
         }
 
         document.addEventListener("DOMContentLoaded", function() {

@@ -80,21 +80,35 @@ if (empty($avatar_url)) {
 
 $user_email = $_SESSION['user_email'] ?? ($user_data['email'] ?? 'unknown@g.batstate-u.edu.ph');
 
-// Fetch notifications from Neon database
+// ==========================================================================
+// FETCH NOTIFICATIONS FROM NEON POSTGRESQL DATABASE
+// ==========================================================================
 $dynamic_notifications = [];
-try {
-    $stmt_notif = $pdo->prepare("SELECT * FROM notifications WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 10");
-    $stmt_notif->execute([':user_id' => $user_id]);
-    $dynamic_notifications = $stmt_notif->fetchAll();
-} catch (PDOException $e) {
-    $dynamic_notifications = [];
+if ($user_id) {
+    try {
+        $stmt_notif = $pdo->prepare("
+            SELECT id, user_id, title, message, type, is_read, created_at, updated_at 
+            FROM notifications 
+            WHERE user_id = :user_id 
+            ORDER BY created_at DESC 
+            LIMIT 10
+        ");
+        $stmt_notif->execute([':user_id' => $user_id]);
+        $dynamic_notifications = $stmt_notif->fetchAll();
+    } catch (PDOException $e) {
+        $dynamic_notifications = [];
+    }
 }
 
+// Calculate unread count (supports PostgreSQL boolean, integer, or string representations)
 $unread_count = 0;
 if (is_array($dynamic_notifications)) {
     foreach ($dynamic_notifications as $notification) {
-        if (isset($notification['is_read']) && $notification['is_read'] == false) {
-            $unread_count++;
+        if (isset($notification['is_read'])) {
+            $isRead = $notification['is_read'];
+            if ($isRead === false || $isRead === 'f' || $isRead === 0 || $isRead === '0') {
+                $unread_count++;
+            }
         }
     }
 }
@@ -572,10 +586,8 @@ function time_elapsed_string($datetime, $full = false) {
                 <div class="notification-container">
                     <div class="notification-bell" id="bellBtn">
                         <i class="fa-regular fa-bell"></i>
+                        <span class="notification-badge" id="navBadgeCount" style="display: <?= ($unread_count > 0) ? 'flex' : 'none'; ?>;"><?= $unread_count ?></span>
                     </div>
-                    <?php if ($unread_count > 0): ?>
-                        <span class="notification-badge" id="navBadgeCount"><?= $unread_count ?></span>
-                    <?php endif; ?>
 
                     <div class="notification-dropdown" id="notificationMenu">
                         <div class="dropdown-header">Notifications</div>
@@ -585,10 +597,11 @@ function time_elapsed_string($datetime, $full = false) {
                         <?php else: ?>
                             <?php foreach ($dynamic_notifications as $notif): 
                                 if (!isset($notif['id'])) continue;
-                                $is_unread = !($notif['is_read'] ?? true);
-                                $type = strtolower($notif['type'] ?? 'info');
-                                $icon = ($type === 'success') ? 'fa-circle-check' : 'fa-circle-info';
-                                $icon_color = ($type === 'success') ? '#2D6A4F' : '#0074d9';
+                                $raw_is_read = $notif['is_read'] ?? true;
+                                $is_unread   = ($raw_is_read === false || $raw_is_read === 'f' || $raw_is_read === 0 || $raw_is_read === '0');
+                                $type        = strtolower($notif['type'] ?? 'info');
+                                $icon        = ($type === 'success') ? 'fa-circle-check' : 'fa-circle-info';
+                                $icon_color  = ($type === 'success') ? '#2D6A4F' : '#0074d9';
                             ?>
                                 <div class="notification-item <?= $is_unread ? 'unread' : '' ?>" onclick="markAsReadDashboard(<?= intval($notif['id']) ?>, this)">
                                     <i class="fa-solid <?= $icon ?>" style="color: <?= $icon_color ?>; margin-top: 3px; font-size: 1.1rem; flex-shrink: 0;"></i>
@@ -820,12 +833,68 @@ function time_elapsed_string($datetime, $full = false) {
                         let badge = document.getElementById('navBadgeCount');
                         if (badge) {
                             let count = parseInt(badge.innerText) - 1;
-                            if (count <= 0) badge.remove();
-                            else badge.innerText = count;
+                            if (count <= 0) {
+                                badge.style.display = 'none';
+                                badge.innerText = 0;
+                            } else {
+                                badge.innerText = count;
+                            }
                         }
                     }
                 });
         }
+
+        // Real-Time Notification Polling Connection
+        function fetchDashboardNotifications() {
+            fetch('get_notifications.php')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const container = document.getElementById('dashboardNotifContainer');
+                        const badge = document.getElementById('navBadgeCount');
+                        
+                        if (data.unread_count > 0) {
+                            badge.innerText = data.unread_count;
+                            badge.style.display = 'flex';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+
+                        if (!data.notifications || data.notifications.length === 0) {
+                            container.innerHTML = '<div class="no-notifications">No new updates at this time.</div>';
+                            return;
+                        }
+
+                        let html = '';
+                        data.notifications.forEach(notif => {
+                            const isUnread = (!notif.is_read || notif.is_read === 'f' || notif.is_read === '0' || notif.is_read === 0);
+                            const type = (notif.type || 'info').toLowerCase();
+                            const icon = (type === 'success') ? 'fa-circle-check' : 'fa-circle-info';
+                            const iconColor = (type === 'success') ? '#2D6A4F' : '#0074d9';
+
+                            html += `
+                                <div class="notification-item ${isUnread ? 'unread' : ''}" onclick="markAsReadDashboard(${parseInt(notif.id)}, this)">
+                                    <i class="fa-solid ${icon}" style="color: ${iconColor}; margin-top: 3px; font-size: 1.1rem; flex-shrink: 0;"></i>
+                                    <div style="flex: 1;">
+                                        <strong style="display: block; font-size: 0.85rem; margin-bottom: 2px; color: var(--text-main);">
+                                            ${notif.title || 'System Update'}
+                                        </strong>
+                                        <span style="display: block; font-size: 0.8rem; color: var(--text-muted); line-height: 1.35;">
+                                            ${notif.message || ''}
+                                        </span>
+                                        <span class="time"><i class="fa-regular fa-clock" style="font-size: 0.65rem; margin-right: 4px;"></i>${notif.time_ago || 'just now'}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        container.innerHTML = html;
+                    }
+                })
+                .catch(err => console.error('Notification Polling Error:', err));
+        }
+
+        // Poll for notifications every 10 seconds
+        setInterval(fetchDashboardNotifications, 10000);
 
         const individualDatasets = {
             week: [<?= (float)$week_data['transportation']; ?>, <?= (float)$week_data['electricity']; ?>, <?= (float)$week_data['food']; ?>],
