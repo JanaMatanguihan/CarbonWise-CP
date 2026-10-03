@@ -102,8 +102,9 @@ if (is_array($dynamic_notifications)) {
 // ==========================================================================
 // 1. DYNAMIC INDIVIDUAL STATUS FROM NEON (`carbon_records`)
 // ==========================================================================
-$week_data  = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
-$month_data = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+$week_data       = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+$month_data      = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+$last_month_data = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
 
 if ($user_id) {
     // Exact 7 days aggregation
@@ -133,6 +134,7 @@ if ($user_id) {
         FROM carbon_records
         WHERE user_id = :user_id 
           AND record_date >= DATE_TRUNC('month', CURRENT_DATE)
+          AND record_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
     ");
     $stmt_ind_m->execute([':user_id' => $user_id]);
     $res_m = $stmt_ind_m->fetch();
@@ -141,14 +143,34 @@ if ($user_id) {
         $month_data['electricity']    = (float)$res_m['total_elec'];
         $month_data['food']           = (float)$res_m['total_food'];
     }
+
+    // Last Calendar Month aggregation
+    $stmt_ind_lm = $pdo->prepare("
+        SELECT 
+            COALESCE(SUM(transportation), 0) as total_trans,
+            COALESCE(SUM(electricity), 0) as total_elec,
+            COALESCE(SUM(food), 0) as total_food
+        FROM carbon_records
+        WHERE user_id = :user_id 
+          AND record_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+          AND record_date < DATE_TRUNC('month', CURRENT_DATE)
+    ");
+    $stmt_ind_lm->execute([':user_id' => $user_id]);
+    $res_lm = $stmt_ind_lm->fetch();
+    if ($res_lm) {
+        $last_month_data['transportation'] = (float)$res_lm['total_trans'];
+        $last_month_data['electricity']    = (float)$res_lm['total_elec'];
+        $last_month_data['food']           = (float)$res_lm['total_food'];
+    }
 }
 
 // ==========================================================================
 // 2. MASTER USER RELATIONS & DEPT/CAMPUS EMISSIONS
 // ==========================================================================
-$dept_week_emissions   = [];
-$dept_month_emissions  = [];
-$campus_week_emissions = [];
+$dept_week_emissions       = [];
+$dept_month_emissions      = [];
+$dept_last_month_emissions = [];
+$campus_week_emissions     = [];
 
 try {
     // Department & Campus Emissions (This Week - Last 7 Days)
@@ -176,13 +198,14 @@ try {
         $campus_week_emissions[$camp] += $emissions;
     }
 
-    // Department Emissions (This Month - Calendar Month)
+    // Department Emissions (Current Calendar Month)
     $stmt_dept_m = $pdo->prepare("
         SELECT COALESCE(u.department, 'Unassigned') as department, 
                SUM(cr.total_emission) as total_emission
         FROM carbon_records cr
         JOIN users u ON cr.user_id = u.id
         WHERE cr.record_date >= DATE_TRUNC('month', CURRENT_DATE)
+          AND cr.record_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
         GROUP BY u.department
     ");
     $stmt_dept_m->execute();
@@ -195,13 +218,41 @@ try {
         if (!isset($dept_month_emissions[$dept])) { $dept_month_emissions[$dept] = 0.0; }
         $dept_month_emissions[$dept] += $emissions;
     }
+
+    // Department Emissions (Last Calendar Month)
+    $stmt_dept_lm = $pdo->prepare("
+        SELECT COALESCE(u.department, 'Unassigned') as department, 
+               SUM(cr.total_emission) as total_emission
+        FROM carbon_records cr
+        JOIN users u ON cr.user_id = u.id
+        WHERE cr.record_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+          AND cr.record_date < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY u.department
+    ");
+    $stmt_dept_lm->execute();
+    $records_last_month = $stmt_dept_lm->fetchAll();
+
+    foreach ($records_last_month as $rec) {
+        $dept = $rec['department'];
+        $emissions = (float)$rec['total_emission'];
+
+        if (!isset($dept_last_month_emissions[$dept])) { $dept_last_month_emissions[$dept] = 0.0; }
+        $dept_last_month_emissions[$dept] += $emissions;
+    }
 } catch (PDOException $e) {
     // Exception logged quietly
 }
 
-arsort($dept_week_emissions);
-arsort($dept_month_emissions);
-unset($dept_week_emissions['Others'], $dept_month_emissions['Others'], $dept_week_emissions['Unassigned'], $dept_month_emissions['Unassigned']);
+// Sort departments from lowest footprint to highest footprint for eco ranking
+asort($dept_week_emissions);
+asort($dept_month_emissions);
+asort($dept_last_month_emissions);
+
+unset(
+    $dept_week_emissions['Others'], $dept_week_emissions['Unassigned'],
+    $dept_month_emissions['Others'], $dept_month_emissions['Unassigned'],
+    $dept_last_month_emissions['Others'], $dept_last_month_emissions['Unassigned']
+);
 
 // ==========================================================================
 // 3. INDIVIDUAL PERCENTILE RANKING CALCULATION
@@ -617,7 +668,7 @@ function time_elapsed_string($datetime, $full = false) {
                     <p class="desc-text">
                         <?php if ($user_campus === 'Unassigned'): ?>
                             Please configure your institutional campus inside your user account profile layout.
-                        <?php elseif ($campus_rank === 'N/A' OR$total_campuses === 0): ?>
+                        <?php elseif ($campus_rank === 'N/A' OR $total_campuses === 0): ?>
                             Emissions tracking data is currently processing for your campus community view.
                         <?php else: ?>
                             Outstanding achievement! The <strong><?= htmlspecialchars($user_campus) ?></strong> campus ranks <strong><?= htmlspecialchars($campus_rank) ?></strong> out of <?= (int)$total_campuses; ?> tracked active university campuses for sustainable low footprints.
@@ -633,6 +684,7 @@ function time_elapsed_string($datetime, $full = false) {
                         <select id="individualTimeframe">
                             <option value="week">This Week</option>
                             <option value="month">This Month</option>
+                            <option value="last_month">Last Month</option>
                         </select>
                     </div>
                     <div class="chart-container">
@@ -646,6 +698,7 @@ function time_elapsed_string($datetime, $full = false) {
                         <select id="departmentTimeframe">
                             <option value="week">This Week</option>
                             <option value="month">This Month</option>
+                            <option value="last_month">Last Month</option>
                         </select>
                     </div>
                     <div class="chart-container">
@@ -776,7 +829,8 @@ function time_elapsed_string($datetime, $full = false) {
 
         const individualDatasets = {
             week: [<?= (float)$week_data['transportation']; ?>, <?= (float)$week_data['electricity']; ?>, <?= (float)$week_data['food']; ?>],
-            month: [<?= (float)$month_data['transportation']; ?>, <?= (float)$month_data['electricity']; ?>, <?= (float)$month_data['food']; ?>]
+            month: [<?= (float)$month_data['transportation']; ?>, <?= (float)$month_data['electricity']; ?>, <?= (float)$month_data['food']; ?>],
+            last_month: [<?= (float)$last_month_data['transportation']; ?>, <?= (float)$last_month_data['electricity']; ?>, <?= (float)$last_month_data['food']; ?>]
         };
 
         const departmentDatasets = {
@@ -787,6 +841,10 @@ function time_elapsed_string($datetime, $full = false) {
             month: {
                 labels: <?= json_encode(array_keys($dept_month_emissions)); ?>,
                 data: <?= json_encode(array_values($dept_month_emissions)); ?>
+            },
+            last_month: {
+                labels: <?= json_encode(array_keys($dept_last_month_emissions)); ?>,
+                data: <?= json_encode(array_values($dept_last_month_emissions)); ?>
             }
         };
 
@@ -817,6 +875,32 @@ function time_elapsed_string($datetime, $full = false) {
             }
         });
 
+        // Custom plugin to draw Crown, 1st, 2nd, and 3rd rank icons on top of bars
+        const topRankIconsPlugin = {
+            id: 'topRankIcons',
+            afterDraw(chart) {
+                const { ctx } = chart;
+                const meta = chart.getDatasetMeta(0);
+                if (!meta || !meta.data) return;
+
+                // Crown for 1st place, Medals for 1st, 2nd, 3rd places
+                const rankIcons = ['👑 1st', '🥈 2nd', '🥉 3rd'];
+
+                meta.data.forEach((bar, index) => {
+                    if (index < rankIcons.length) {
+                        const { x, y } = bar.tooltipPosition();
+                        ctx.save();
+                        ctx.font = 'bold 12px Inter, sans-serif';
+                        ctx.fillStyle = index === 0 ? '#D4AF37' : (index === 1 ? '#A8A8A8' : '#CD7F32');
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(rankIcons[index], x, y - 6);
+                        ctx.restore();
+                    }
+                });
+            }
+        };
+
         const ctxDept = document.getElementById('departmentChart').getContext('2d');
         const departmentChart = new Chart(ctxDept, {
             type: 'bar',
@@ -833,12 +917,16 @@ function time_elapsed_string($datetime, $full = false) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 25 }
+                },
                 scales: {
                     y: { beginAtZero: true, grid: { color: getGridColor(currentTheme) }, ticks: { color: getLabelColor(currentTheme) } },
                     x: { grid: { display: false }, ticks: { color: getLabelColor(currentTheme) } }
                 },
                 plugins: { legend: { display: false } }
-            }
+            },
+            plugins: [topRankIconsPlugin]
         });
 
         document.getElementById('individualTimeframe').addEventListener('change', function() {

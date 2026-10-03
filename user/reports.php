@@ -100,20 +100,31 @@ if (is_array($dynamic_notifications)) {
 // ==========================================================================
 // METRIC & CHART CALCULATIONS FROM NEON DB (`carbon_records`)
 // ==========================================================================
-$one_week_ago   = date('Y-m-d', strtotime('-7 days'));
-$one_month_ago  = date('Y-m-d', strtotime('-30 days'));
-$prev_month_ago = date('Y-m-d', strtotime('-60 days'));
+$one_week_ago      = date('Y-m-d', strtotime('-7 days'));
+$current_month_key = date('Y-m');
+$prev_month_key    = date('Y-m', strtotime('-1 month'));
 
 $total_all_time   = 0.0;
 $total_this_week  = 0.0;
 $total_this_month = 0.0;
 $total_prev_month = 0.0;
 
-$weekly_trend_data  = ['Mon' => 0.0, 'Tue' => 0.0, 'Wed' => 0.0, 'Thu' => 0.0, 'Fri' => 0.0, 'Sat' => 0.0, 'Sun' => 0.0];
-$source_totals_week = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+// Datasets grouped by timeframe keys
+$timeframe_over_time = []; 
+$timeframe_by_source = []; 
 
-$monthly_trend_data  = [];
-$source_totals_month = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+// Default timeframe options
+$timeframe_options = [
+    'this_week'  => 'This Week',
+    'this_month' => 'This Month',
+    'last_month' => 'Last Month'
+];
+
+// Initialize default timeframe structure
+foreach (array_keys($timeframe_options) as $tf_key) {
+    $timeframe_over_time[$tf_key] = [];
+    $timeframe_by_source[$tf_key] = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+}
 
 if ($user_id) {
     try {
@@ -123,7 +134,7 @@ if ($user_id) {
         $life_row = $stmt_life->fetch();
         $total_all_time = (float)($life_row['total'] ?? 0.0);
 
-        // 2. Fetch all user records
+        // 2. Fetch all user records ordered by date
         $stmt_rec = $pdo->prepare("
             SELECT transportation, electricity, food, total_emission, record_date 
             FROM carbon_records 
@@ -143,39 +154,78 @@ if ($user_id) {
             $r_date     = $r_date_raw ? substr($r_date_raw, 0, 10) : null;
 
             if ($r_date) {
-                // Growth comparison data
-                if ($r_date >= $one_month_ago) {
-                    $total_this_month += $total_rec;
-                    $source_totals_month['transportation'] += $t;
-                    $source_totals_month['electricity']    += $e;
-                    $source_totals_month['food']           += $f;
+                $month_key = date('Y-m', strtotime($r_date));
+                $day_label = date('M d', strtotime($r_date));
 
-                    $month_label = date('M d', strtotime($r_date));
-                    if (!isset($monthly_trend_data[$month_label])) {
-                        $monthly_trend_data[$month_label] = 0.0;
-                    }
-                    $monthly_trend_data[$month_label] += $total_rec;
-                } elseif ($r_date >= $prev_month_ago) {
-                    $total_prev_month += $total_rec;
-                }
-
-                // Weekly trend data
+                // A. Check if within "This Week" (last 7 days)
                 if ($r_date >= $one_week_ago) {
                     $total_this_week += $total_rec;
-                    $source_totals_week['transportation'] += $t;
-                    $source_totals_week['electricity']    += $e;
-                    $source_totals_week['food']           += $f;
 
-                    $day_name = date('D', strtotime($r_date));
-                    if (array_key_exists($day_name, $weekly_trend_data)) {
-                        $weekly_trend_data[$day_name] += $total_rec;
+                    if (!isset($timeframe_over_time['this_week'][$day_label])) {
+                        $timeframe_over_time['this_week'][$day_label] = 0.0;
                     }
+                    $timeframe_over_time['this_week'][$day_label] += $total_rec;
+                    $timeframe_by_source['this_week']['transportation'] += $t;
+                    $timeframe_by_source['this_week']['electricity']    += $e;
+                    $timeframe_by_source['this_week']['food']           += $f;
+                }
+
+                // B. Check if within "This Month"
+                if ($month_key === $current_month_key) {
+                    $total_this_month += $total_rec;
+
+                    if (!isset($timeframe_over_time['this_month'][$day_label])) {
+                        $timeframe_over_time['this_month'][$day_label] = 0.0;
+                    }
+                    $timeframe_over_time['this_month'][$day_label] += $total_rec;
+                    $timeframe_by_source['this_month']['transportation'] += $t;
+                    $timeframe_by_source['this_month']['electricity']    += $e;
+                    $timeframe_by_source['this_month']['food']           += $f;
+                }
+
+                // C. Check if within "Last Month"
+                if ($month_key === $prev_month_key) {
+                    $total_prev_month += $total_rec;
+
+                    if (!isset($timeframe_over_time['last_month'][$day_label])) {
+                        $timeframe_over_time['last_month'][$day_label] = 0.0;
+                    }
+                    $timeframe_over_time['last_month'][$day_label] += $total_rec;
+                    $timeframe_by_source['last_month']['transportation'] += $t;
+                    $timeframe_by_source['last_month']['electricity']    += $e;
+                    $timeframe_by_source['last_month']['food']           += $f;
+                }
+
+                // D. Aggregate older dynamic months if needed
+                if ($month_key !== $current_month_key && $month_key !== $prev_month_key) {
+                    if (!isset($timeframe_options[$month_key])) {
+                        $timeframe_options[$month_key] = date('M Y', strtotime($r_date));
+                        $timeframe_over_time[$month_key] = [];
+                        $timeframe_by_source[$month_key] = ['transportation' => 0.0, 'electricity' => 0.0, 'food' => 0.0];
+                    }
+
+                    if (!isset($timeframe_over_time[$month_key][$day_label])) {
+                        $timeframe_over_time[$month_key][$day_label] = 0.0;
+                    }
+                    $timeframe_over_time[$month_key][$day_label] += $total_rec;
+                    $timeframe_by_source[$month_key]['transportation'] += $t;
+                    $timeframe_by_source[$month_key]['electricity']    += $e;
+                    $timeframe_by_source[$month_key]['food']           += $f;
                 }
             }
         }
     } catch (PDOException $e) {
         // Query error handling
     }
+}
+
+// Format time datasets for JavaScript consumption
+$formatted_time_datasets = [];
+foreach ($timeframe_over_time as $tf_key => $dates) {
+    $formatted_time_datasets[$tf_key] = [
+        'labels' => array_keys($dates),
+        'data'   => array_values($dates)
+    ];
 }
 
 // ==========================================================================
@@ -185,7 +235,6 @@ $forecast_labels = [];
 $forecast_data   = [];
 
 try {
-    // Attempt 1: Fetch from database (user-specific or recent)
     $stmt_fore = $pdo->prepare("
         SELECT forecast_date, predicted_emission 
         FROM forecast_records 
@@ -203,7 +252,6 @@ try {
     $forecast_rows = [];
 }
 
-// Attempt 2: Dynamic Forecast Fallback if table is empty
 if (empty($forecast_data)) {
     $base_emission = ($total_this_week > 0) ? ($total_this_week / 7) : 12.5;
     
@@ -211,7 +259,6 @@ if (empty($forecast_data)) {
         $future_date = date('Y-m-d', strtotime("+$i days"));
         $forecast_labels[] = date('n/j', strtotime($future_date));
         
-        // Dynamic curve based on recent activity baseline
         $variation = sin($i / 3) * 2.5 + (rand(-10, 10) / 10.0);
         $predicted_val = max(1.5, round($base_emission + $variation, 2));
         $forecast_data[] = $predicted_val;
@@ -321,7 +368,6 @@ function time_elapsed_string($datetime, $full = false) {
             position: relative; 
         }
 
-        /* Overlay for mobile navigation drawer */
         .sidebar-overlay {
             display: none;
             position: fixed;
@@ -339,7 +385,6 @@ function time_elapsed_string($datetime, $full = false) {
             opacity: 1;
         }
 
-        /* Sidebar Responsive Styling */
         .sidebar { 
             width: 260px; 
             min-width: 260px;
@@ -443,7 +488,6 @@ function time_elapsed_string($datetime, $full = false) {
         .progress-bar-wrapper { width: 100%; background: var(--input-bg); height: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
         .progress-bar-fill { height: 100%; background: <?= $progress_bar_color ?>; width: <?= (int)$green_points ?>%; transition: width 0.5s ease, background-color 0.5s ease; }
 
-        /* Grid Layouts with Auto-Fit Fluid Responsiveness */
         .metrics-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
@@ -469,11 +513,8 @@ function time_elapsed_string($datetime, $full = false) {
             pointer-events: none; display: none;
         }
 
-        /* MEDIA QUERIES FOR LAPTOPS, TABLETS, AND MOBILE */
         @media (max-width: 1200px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
+            .charts-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 992px) {
@@ -484,58 +525,24 @@ function time_elapsed_string($datetime, $full = false) {
                 transform: translateX(-100%);
                 box-shadow: 5px 0 15px rgba(0,0,0,0.2);
             }
-            .sidebar.show {
-                transform: translateX(0);
-            }
-            .mobile-nav-toggle {
-                display: block;
-            }
-            .top-navbar {
-                padding: 0 20px;
-            }
-            .reports-content {
-                padding: 20px;
-            }
+            .sidebar.show { transform: translateX(0); }
+            .mobile-nav-toggle { display: block; }
+            .top-navbar { padding: 0 20px; }
+            .reports-content { padding: 20px; }
         }
 
         @media (max-width: 640px) {
-            .top-navbar {
-                height: auto;
-                padding: 12px 16px;
-            }
-            .header-title-area h2 {
-                font-size: 1.15rem;
-            }
-            .header-title-area p {
-                font-size: 0.75rem;
-            }
-            .user-nav-profile {
-                gap: 12px;
-            }
-            .profile-card {
-                padding-left: 12px;
-            }
-            .user-info-text {
-                display: none;
-            }
-            .notification-dropdown {
-                right: -40px;
-                width: calc(100vw - 32px);
-                max-width: 320px;
-            }
-            .metric-value {
-                font-size: 1.75rem;
-            }
-            .chart-box {
-                padding: 15px;
-            }
-            .canvas-container {
-                height: 220px;
-            }
-            .reports-content {
-                padding: 15px;
-                gap: 15px;
-            }
+            .top-navbar { height: auto; padding: 12px 16px; }
+            .header-title-area h2 { font-size: 1.15rem; }
+            .header-title-area p { font-size: 0.75rem; }
+            .user-nav-profile { gap: 12px; }
+            .profile-card { padding-left: 12px; }
+            .user-info-text { display: none; }
+            .notification-dropdown { right: -40px; width: calc(100vw - 32px); max-width: 320px; }
+            .metric-value { font-size: 1.75rem; }
+            .chart-box { padding: 15px; }
+            .canvas-container { height: 220px; }
+            .reports-content { padding: 15px; gap: 15px; }
         }
     </style>
 </head>
@@ -671,27 +678,34 @@ function time_elapsed_string($datetime, $full = false) {
                     <div class="chart-title-bar">
                         <h3>Emissions Over Time</h3>
                         <select id="timeframeSelect">
-                            <option value="week">By Day (Mon-Sun)</option>
-                            <option value="month">By Entry Date</option>
+                            <?php foreach ($timeframe_options as $tf_code => $tf_label): ?>
+                                <option value="<?= htmlspecialchars($tf_code) ?>" <?= $tf_code === 'this_month' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($tf_label) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="canvas-container">
                         <canvas id="overTimeChart"></canvas>
                     </div>
+                    <div class="chart-empty-overlay" id="overTimeChartEmpty">No logs recorded for this timeframe</div>
                 </div>
 
                 <div class="chart-box" id="sourceChartContainer">
                     <div class="chart-title-bar">
                         <h3>Emissions by Source</h3>
                         <select id="sourceTimeframeSelect">
-                            <option value="week">This Week</option>
-                            <option value="month">This Month</option>
+                            <?php foreach ($timeframe_options as $tf_code => $tf_label): ?>
+                                <option value="<?= htmlspecialchars($tf_code) ?>" <?= $tf_code === 'this_month' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($tf_label) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="canvas-container">
                         <canvas id="bySourceChart"></canvas>
                     </div>
-                    <div class="chart-empty-overlay" id="sourceChartEmpty">No logs recorded for this period</div>
+                    <div class="chart-empty-overlay" id="sourceChartEmpty">No logs recorded for this timeframe</div>
                 </div>
             </div>
 
@@ -827,29 +841,8 @@ function time_elapsed_string($datetime, $full = false) {
                 });
         }
 
-        const timeDatasets = {
-            week: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                data: <?= json_encode(array_values($weekly_trend_data)); ?>
-            },
-            month: {
-                labels: <?= json_encode(array_keys($monthly_trend_data)); ?>,
-                data: <?= json_encode(array_values($monthly_trend_data)); ?>
-            }
-        };
-
-        const sourceDatasets = {
-            week: [
-                <?= (float)$source_totals_week['transportation'] ?>, 
-                <?= (float)$source_totals_week['electricity'] ?>, 
-                <?= (float)$source_totals_week['food'] ?>
-            ],
-            month: [
-                <?= (float)$source_totals_month['transportation'] ?>, 
-                <?= (float)$source_totals_month['electricity'] ?>, 
-                <?= (float)$source_totals_month['food'] ?>
-            ]
-        };
+        const timeDatasets = <?= json_encode($formatted_time_datasets); ?>;
+        const sourceDatasets = <?= json_encode($timeframe_by_source); ?>;
 
         const forecastLabels = <?= json_encode($forecast_labels); ?>;
         const forecastData   = <?= json_encode($forecast_data); ?>;
@@ -857,14 +850,19 @@ function time_elapsed_string($datetime, $full = false) {
         const getGridColor = (t) => t === 'dark' ? '#1B3A2B' : '#E5E7EB';
         const getLabelColor = (t) => t === 'dark' ? '#9CA3AF' : '#6B7280';
 
+        const initialKey = 'this_month';
+        const initialTimeData = timeDatasets[initialKey] || { labels: [], data: [] };
+        const initialSourceObj = sourceDatasets[initialKey] || { transportation: 0, electricity: 0, food: 0 };
+        const initialSourceData = [initialSourceObj.transportation, initialSourceObj.electricity, initialSourceObj.food];
+
         const ctxTime = document.getElementById('overTimeChart').getContext('2d');
         const overTimeChart = new Chart(ctxTime, {
             type: 'line',
             data: {
-                labels: timeDatasets.week.labels,
+                labels: initialTimeData.labels,
                 datasets: [{
                     label: 'Emissions (kg CO2)', 
-                    data: timeDatasets.week.data,
+                    data: initialTimeData.data,
                     borderColor: '#2D6A4F', 
                     backgroundColor: 'rgba(45, 106, 79, 0.1)',
                     tension: 0.25, 
@@ -890,7 +888,7 @@ function time_elapsed_string($datetime, $full = false) {
             data: {
                 labels: ['Transportation', 'Electricity Usage', 'Food Consumption'],
                 datasets: [{
-                    data: sourceDatasets.week,
+                    data: initialSourceData,
                     backgroundColor: ['#5ea3e3', '#e9c46a', '#76d7b6'],
                     borderWidth: 0
                 }]
@@ -921,7 +919,6 @@ function time_elapsed_string($datetime, $full = false) {
             }
         });
 
-        // Instantiate Forecast Chart
         const ctxForecast = document.getElementById('forecastChart').getContext('2d');
         const forecastGradient = ctxForecast.createLinearGradient(0, 0, 0, 280);
         forecastGradient.addColorStop(0, 'rgba(82, 183, 136, 0.35)');
@@ -967,9 +964,24 @@ function time_elapsed_string($datetime, $full = false) {
             }
         });
 
-        function checkSourceDataEmpty(timeframe) {
-            const data = sourceDatasets[timeframe];
-            const sum = data.reduce((a, b) => a + b, 0);
+        function checkOverTimeDataEmpty(key) {
+            const timeObj = timeDatasets[key] || { data: [] };
+            const sum = timeObj.data.reduce((a, b) => a + b, 0);
+            const overlay = document.getElementById('overTimeChartEmpty');
+            const canvas = document.getElementById('overTimeChart');
+
+            if (sum === 0 || timeObj.data.length === 0) {
+                overlay.style.display = 'flex';
+                canvas.style.opacity = '0.05';
+            } else {
+                overlay.style.display = 'none';
+                canvas.style.opacity = '1';
+            }
+        }
+
+        function checkSourceDataEmpty(key) {
+            const srcObj = sourceDatasets[key] || { transportation: 0, electricity: 0, food: 0 };
+            const sum = (srcObj.transportation || 0) + (srcObj.electricity || 0) + (srcObj.food || 0);
             const overlay = document.getElementById('sourceChartEmpty');
             const canvas = document.getElementById('bySourceChart');
             
@@ -982,18 +994,24 @@ function time_elapsed_string($datetime, $full = false) {
             }
         }
         
-        checkSourceDataEmpty('week');
+        checkOverTimeDataEmpty(initialKey);
+        checkSourceDataEmpty(initialKey);
 
         document.getElementById('timeframeSelect').addEventListener('change', function() {
-            overTimeChart.data.labels = timeDatasets[this.value].labels;
-            overTimeChart.data.datasets[0].data = timeDatasets[this.value].data;
+            const selectedKey = this.value;
+            const tfObj = timeDatasets[selectedKey] || { labels: [], data: [] };
+            overTimeChart.data.labels = tfObj.labels;
+            overTimeChart.data.datasets[0].data = tfObj.data;
             overTimeChart.update();
+            checkOverTimeDataEmpty(selectedKey);
         });
 
         document.getElementById('sourceTimeframeSelect').addEventListener('change', function() {
-            bySourceChart.data.datasets[0].data = sourceDatasets[this.value];
+            const selectedKey = this.value;
+            const srcObj = sourceDatasets[selectedKey] || { transportation: 0, electricity: 0, food: 0 };
+            bySourceChart.data.datasets[0].data = [srcObj.transportation, srcObj.electricity, srcObj.food];
             bySourceChart.update();
-            checkSourceDataEmpty(this.value);
+            checkSourceDataEmpty(selectedKey);
         });
 
         function updateChartThemeColors(theme) {
@@ -1015,7 +1033,6 @@ function time_elapsed_string($datetime, $full = false) {
         }
         updateChartThemeColors(currentTheme);
 
-        // Handle window resizing automatically for Chart.js canvases
         window.addEventListener('resize', () => {
             overTimeChart.resize();
             bySourceChart.resize();

@@ -710,18 +710,58 @@ if (empty($avatar_url)) {
             color: #718096;
         }
 
-        .breakdown-tabs { display: flex; gap: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; overflow-x: auto; white-space: nowrap; }
-        .tab-item { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; text-decoration: none; padding-bottom: 8px; flex-shrink: 0; }
-        .tab-item.active { color: var(--accent-green); border-bottom: 3px solid var(--accent-green); }
+        /* --- BREAKDOWN TABS & CONTENT (FIXED FULL FIT NO TRUNCATION) --- */
+        .breakdown-tabs { 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px; 
+            border-bottom: 2px solid var(--border-color); 
+            padding-bottom: 8px; 
+            margin-bottom: 16px; 
+            width: 100%;
+            overflow-x: auto; 
+            scrollbar-width: none; /* Hide scrollbar for seamless look */
+            -ms-overflow-style: none;
+        }
 
-        .breakdown-body { display: flex; justify-content: space-between; align-items: center; min-height: 90px; }
+        .breakdown-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-item { 
+            font-size: clamp(0.72rem, 2.2vw, 0.85rem); 
+            font-weight: 700; 
+            color: var(--text-muted); 
+            cursor: pointer; 
+            text-decoration: none; 
+            padding: 0 4px 8px 4px; 
+            white-space: nowrap;
+            text-align: center;
+            flex: 1 1 auto;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        
+        .tab-item.active { 
+            color: var(--accent-green); 
+            border-bottom: 3px solid var(--accent-green); 
+        }
+
+        .breakdown-body { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            flex-wrap: wrap; 
+            gap: 15px; 
+            min-height: auto; 
+        }
 
         .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 20px; width: 100%; min-width: 0; }
         .single-column-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 
         /* --- HORIZONTALLY SCROLLABLE ACHIEVEMENTS CARD CONTAINER --- */
         .dash-card.achievements-card {
-            overflow: hidden; /* Keeps the card header static */
+            overflow: hidden;
         }
 
         .achievements-scroll-wrapper {
@@ -902,6 +942,12 @@ if (empty($avatar_url)) {
             }
             .dash-card {
                 padding: 15px;
+            }
+            .breakdown-tabs {
+                justify-content: flex-start;
+            }
+            .tab-item {
+                padding: 0 8px 8px 8px;
             }
         }
 
@@ -1105,7 +1151,7 @@ if (empty($avatar_url)) {
                         <span class="tab-item" onclick="switchCategoryTab(this, 'food_consumption')">Food Consumption</span>
                     </div>
                     <div class="breakdown-body">
-                        <div>
+                        <div style="flex: 1; min-width: 0;">
                             <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Impact</div>
                             <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-title); margin: 3px 0;">
                                 <span id="tabWeeklyScore">
@@ -1118,10 +1164,10 @@ if (empty($avatar_url)) {
                             </div>
                             <div style="font-size: 0.72rem; color: var(--text-muted);">Total cumulative emissions impact</div>
                             
-                            <div style="margin-top: 16px; display: flex; align-items: center; gap: 10px;">
-                                <i id="tabActivityIcon" class="fa-solid fa-bus" style="color: var(--accent-green); font-size: 1.1rem; width: 20px; text-align: center;"></i>
-                                <div>
-                                    <div id="tabActivityName" style="font-size: 0.8rem; font-weight: 700; color: var(--text-title);"><?= htmlspecialchars($categories_data['transportation']['top_activity']) ?></div>
+                            <div style="margin-top: 16px; display: flex; align-items: center; gap: 10px; word-break: break-word;">
+                                <i id="tabActivityIcon" class="fa-solid fa-bus" style="color: var(--accent-green); font-size: 1.1rem; width: 20px; text-align: center; flex-shrink: 0;"></i>
+                                <div style="min-width: 0;">
+                                    <div id="tabActivityName" style="font-size: 0.8rem; font-weight: 700; color: var(--text-title); word-break: break-word;"><?= htmlspecialchars($categories_data['transportation']['top_activity']) ?></div>
                                     <div style="font-size: 0.68rem; color: var(--text-muted);">Contributing activity type</div>
                                 </div>
                             </div>
