@@ -63,46 +63,57 @@ try {
     }
 }
 
-// --- NOTIFICATION AJAX ENDPOINTS ---
-if (isset($_GET['action']) && $_GET['action'] === 'fetch_notifications') {
-    header('Content-Type: application/json');
-    if (empty($user_id) || !isset($pdo)) {
-        echo json_encode([]);
-        exit;
-    }
+// --- NOTIFICATION HELPER (writes to the same `notifications` table the bell reads from) ---
+function cw_push_notification($pdo, $user_id, $title, $message, $type = 'info') {
+    if (empty($pdo) || empty($user_id)) { return false; }
     try {
-        $notifStmt = $pdo->prepare("
-            SELECT id, title, message, is_read, 
-                   TO_CHAR(created_at, 'Mon DD, HH:MI AM') as created_at 
-            FROM notifications 
-            WHERE user_id = :user_id 
-            ORDER BY created_at DESC 
-            LIMIT 20
+        $stmt = $pdo->prepare("
+            INSERT INTO notifications (user_id, title, message, type, is_read, created_at, updated_at)
+            VALUES (:user_id, :title, :message, :type, FALSE, NOW(), NOW())
         ");
-        $notifStmt->execute([':user_id' => $user_id]);
-        $notifications = $notifStmt->fetchAll();
-        echo json_encode($notifications ?: []);
+        $stmt->execute([
+            ':user_id' => $user_id,
+            ':title'   => $title,
+            ':message' => $message,
+            ':type'    => $type
+        ]);
+        return true;
     } catch (\PDOException $e) {
-        echo json_encode([]);
+        return false;
     }
-    exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mark_notification_read') {
-    header('Content-Type: application/json');
-    $notif_id = (int)($_POST['id'] ?? 0);
-    if (!empty($user_id) && !empty($notif_id) && isset($pdo)) {
-        try {
-            $updateStmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE id = :id AND user_id = :user_id");
-            $updateStmt->execute([':id' => $notif_id, ':user_id' => $user_id]);
-            echo json_encode(["status" => "success"]);
-        } catch (\PDOException $e) {
-            echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+// Compares today's total with the recent daily average and files a notification
+function cw_notify_after_activity($pdo, $user_id, $today_date) {
+    try {
+        $t = $pdo->prepare("SELECT COALESCE(SUM(total_emission), 0) FROM carbon_records WHERE user_id = :u AND record_date = :d");
+        $t->execute([':u' => $user_id, ':d' => $today_date]);
+        $today_total = (float)$t->fetchColumn();
+
+        $since = date('Y-m-d', strtotime($today_date . ' -7 days'));
+        $a = $pdo->prepare("
+            SELECT AVG(day_total) FROM (
+                SELECT record_date, SUM(total_emission) AS day_total
+                FROM carbon_records
+                WHERE user_id = :u AND record_date >= :since AND record_date < :d
+                GROUP BY record_date
+            ) x
+        ");
+        $a->execute([':u' => $user_id, ':since' => $since, ':d' => $today_date]);
+        $avg = (float)$a->fetchColumn();
+
+        $pct = ($avg > 0) ? (int)round(abs($today_total - $avg) / $avg * 100) : 0;
+
+        if ($avg > 0 && $today_total < $avg && $pct > 0) {
+            cw_push_notification($pdo, $user_id, 'Great progress! 💚', "You emitted {$pct}% less than your recent average. Keep it up!", 'success');
+        } elseif ($avg > 0 && $today_total > $avg && $pct > 0) {
+            cw_push_notification($pdo, $user_id, 'Emissions above your average', "You emitted {$pct}% more than your recent average. Check Mitigation Strategies for ways to cut back.", 'warning');
+        } else {
+            cw_push_notification($pdo, $user_id, 'Activity logged', "Your footprint today is " . number_format($today_total, 2) . " kg CO₂e so far. Keep logging to see how you compare.", 'info');
         }
-    } else {
-        echo json_encode(["status" => "error", "message" => "Invalid notification request."]);
+    } catch (\PDOException $e) {
+        // Never break saving an activity because of a notification problem
     }
-    exit;
 }
 
 // FETCH AVATAR FROM THE users TABLE (profile_picture column)
@@ -134,26 +145,14 @@ if (empty($avatar_url)) {
     }
 }
 
-// Fetch existing daily transportation submissions for today
 $today_date = date('Y-m-d');
-$today_transport_count = 0;
-
-if (!empty($user_id) && isset($pdo)) {
-    try {
-        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM carbon_records WHERE user_id = :user_id AND record_date = :record_date AND transportation > 0");
-        $countStmt->execute([':user_id' => $user_id, ':record_date' => $today_date]);
-        $today_transport_count = (int)$countStmt->fetchColumn();
-    } catch (\PDOException $e) {
-        $today_transport_count = 0;
-    }
-}
 
 // Fetch today's logged activities for permanent daily persistence
 $today_records = [];
 if (!empty($user_id) && isset($pdo)) {
     try {
         $recStmt = $pdo->prepare("
-            SELECT id, transport_item, office_item, food_item, 
+            SELECT id, transport_item, office_item, food_item, food_consumed_at, 
                    transportation, electricity, food, total_emission, created_at 
             FROM carbon_records 
             WHERE user_id = :user_id AND record_date = :record_date
@@ -183,14 +182,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $food           = (float)($_POST['total_food'] ?? 0);
     $waste          = 0.00;
     $total_emission = $transportation + $electricity + $food + $waste;
-
-    if ($transportation > 0 && $today_transport_count >= 2) {
-        echo json_encode([
-            "status"  => "error",
-            "message" => "Daily limit reached. You can only record up to 2 transportation trips per day."
-        ]);
-        exit;
-    }
 
     $transport_item   = !empty($_POST['transport_item']) ? $_POST['transport_item'] : null;
     $office_item      = !empty($_POST['office_item']) ? $_POST['office_item'] : null;
@@ -247,6 +238,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ':food_meal_period'  => $food_meal_period,
             ':food_consumed_at'  => $food_consumed_at
         ]);
+
+        // Notify (shows in the bell on Dashboard, Reports, Mitigation Strategies and Profile too)
+        cw_notify_after_activity($pdo, $user_id, $today_date);
 
         echo json_encode(["status" => "success"]);
         exit;
@@ -656,6 +650,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 flex-direction: column;
             }
         }
+
+        /* ===== Activity cards (Office Resource / Food Consumption) – app style ===== */
+        :root { --cw-green: #3DA66B; --cw-mint: #DDF1E4; --cw-mint-hover: #CFE9D9; --cw-mint-text: #1E5B3A; --cw-field-border: #D5DBD8; --cw-pill-bg: #F3F5F4; }
+        [data-theme="dark"] { --cw-green: #52B788; --cw-mint: #16301F; --cw-mint-hover: #1C3B28; --cw-mint-text: #8FD9AE; --cw-field-border: #2D6A4F; --cw-pill-bg: #18241F; }
+
+        .cw-card { border-radius: 20px; padding: 22px; }
+        .cw-card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+        .cw-card-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--cw-mint); color: var(--cw-green); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+        .cw-card-title { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0 0 2px; }
+        .cw-card-sub { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+
+        .cw-form { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: end; }
+        .cw-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; z-index: 20; }
+        .cw-field > label:not(.cw-pill) { font-size: 0.8rem; font-weight: 700; color: var(--cw-green); }
+
+        .cw-select, .cw-input {
+            width: 100%; height: 50px; padding: 0 16px; font-size: 0.88rem; font-family: inherit;
+            border: 1px solid var(--cw-field-border); border-radius: 10px;
+            background-color: var(--bg-card); color: var(--text-main); outline: none;
+            -webkit-appearance: none; appearance: none; cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .cw-input { cursor: text; }
+        .cw-select {
+            padding-right: 44px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 16px center;
+        }
+        .cw-select:invalid { color: var(--text-muted); }
+        .cw-select option, .cw-select optgroup { color: var(--text-main); background: var(--bg-card); }
+        .cw-input::placeholder { color: var(--text-muted); opacity: 1; }
+        .cw-select:focus, .cw-input:focus { border-color: var(--cw-green); box-shadow: 0 0 0 3px rgba(61, 166, 107, 0.15); }
+
+        /* date + time pills */
+        .cw-field-dt { flex-direction: row; gap: 12px; }
+        .cw-pill { flex: 1; min-width: 0; height: 50px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.88rem; position: relative; white-space: nowrap; }
+        .cw-pill-date { background: var(--cw-pill-bg); border: 1px solid var(--border-color); color: var(--text-muted); cursor: default; }
+        .cw-pill-time { background: var(--bg-card); border: 1.5px solid var(--cw-green); color: var(--text-main); font-weight: 600; cursor: pointer; }
+        .cw-pill-time i { color: var(--cw-green); }
+        .cw-pill-time:focus-within { box-shadow: 0 0 0 3px rgba(61, 166, 107, 0.15); }
+        .cw-pill-time input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; }
+
+        .cw-btn-add {
+            grid-column: 1 / -1; width: 100%; height: 54px; border: none; border-radius: 14px;
+            background: var(--cw-mint); color: var(--cw-mint-text);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-size: 0.95rem; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s; position: relative; z-index: 20;
+        }
+        .cw-btn-add:hover { background: var(--cw-mint-hover); }
+        .cw-btn-add:active { transform: scale(0.99); }
+        .cw-btn-add:focus-visible { outline: 2px solid var(--cw-green); outline-offset: 2px; }
+
+
+        /* transport card – same look as Office / Food */
+        .cw-form.cw-form-stack { grid-template-columns: 1fr; }
+        .transport-controls-col { gap: 16px; }
+        .transport-controls-col .cw-form { gap: 16px; }
+        .transport-grid-layout .route-labels-box { background: var(--cw-pill-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; }
+        .transport-grid-layout .route-label-title { color: var(--cw-green); }
+        .transport-grid-layout #mapInstructions strong { color: var(--text-main); }
+        #map { border-radius: 16px; border: 1px solid var(--border-color); }
+        .cw-btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+        .cw-btn-add:disabled:hover { background: var(--cw-mint); }
+        .cw-select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        @media (min-width: 769px) {
+            .cw-form { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .cw-card { padding: 18px; }
+        }
+
+        /* ===== CarbonWise unified notification dropdown (same on every page) ===== */
+        .notification-container { position: relative; display: inline-block; }
+        .notification-bell { cursor: pointer; user-select: none; }
+        .notification-badge { z-index: 2; }
+        .cwn-dropdown { position: absolute; top: calc(100% + 12px); right: 0; width: 380px; max-width: calc(100vw - 24px); background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #E2E8F0); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); display: none; flex-direction: column; overflow: hidden; z-index: 2000; }
+        .cwn-dropdown.show { display: flex; }
+        .cwn-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; }
+        .cwn-title { font-size: 1.05rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-markall { background: none; border: none; color: var(--accent-green, #2D6A4F); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 5px 8px; border-radius: 6px; font-family: inherit; }
+        .cwn-markall:hover { background: var(--input-bg, #F3F4F6); }
+        .cwn-markall[hidden], .cwn-footer[hidden] { display: none; }
+        .cwn-list { overflow-y: auto; padding: 0 20px; }
+        .cwn-dropdown.expanded .cwn-list { max-height: 360px; }
+        .cwn-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border-color, #E2E8F0); cursor: pointer; }
+        .cwn-item.read { cursor: default; }
+        .cwn-icon { flex-shrink: 0; font-size: 1.35rem; margin-top: 1px; color: #B7DFC8; }
+        .cwn-item.unread .cwn-icon { color: #2D6A4F; }
+        .cwn-item.t-warning .cwn-icon { color: #F2C14E; }
+        .cwn-item.t-warning.unread .cwn-icon { color: #E09F1F; }
+        .cwn-item.t-error .cwn-icon { color: #F0A5A9; }
+        .cwn-item.t-error.unread .cwn-icon { color: #BA181B; }
+        .cwn-item.t-info .cwn-icon { color: #A9CDEB; }
+        .cwn-item.t-info.unread .cwn-icon { color: #0074d9; }
+        .cwn-body { flex: 1; min-width: 0; }
+        .cwn-item-title { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-dot { width: 8px; height: 8px; border-radius: 50%; background: #E63946; flex-shrink: 0; }
+        .cwn-msg { font-size: 0.85rem; color: var(--text-muted, #8E8E93); line-height: 1.4; margin-top: 3px; word-wrap: break-word; }
+        .cwn-time { font-size: 0.72rem; color: var(--text-muted, #8E8E93); margin-top: 5px; opacity: 0.85; }
+        .cwn-empty { padding: 28px 0; text-align: center; font-size: 0.85rem; color: var(--text-muted, #8E8E93); }
+        .cwn-footer { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border-color, #E2E8F0); padding: 14px; text-align: center; font-size: 0.9rem; font-weight: 600; color: var(--accent-green, #2D6A4F); cursor: pointer; font-family: inherit; }
+        .cwn-footer:hover { background: var(--input-bg, #F9FAFB); }
+        @media (max-width: 600px) {
+            .cwn-dropdown { position: fixed; top: 76px; left: 12px; right: 12px; width: auto; max-width: none; }
+        }
     </style>
 </head>
 <body>
@@ -700,18 +801,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             <div class="user-nav-profile">
                 <div class="notification-container">
-                    <div class="notification-bell" id="bellBtn">
+                    <div class="notification-bell" id="bellBtn" role="button" tabindex="0" aria-label="Notifications" aria-haspopup="true">
                         <i class="fa-regular fa-bell"></i>
                     </div>
-                    <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                    <span class="notification-badge" id="cwnBadge" style="display: none;">0</span>
 
-                    <div class="notification-dropdown" id="notificationMenu">
-                        <div class="dropdown-header">Notifications</div>
-                        <div id="notificationListWrapper">
-                            <div id="notificationList">
-                                <div style="padding: 20px; text-align: center; color: var(--text-muted);">Loading updates...</div>
-                            </div>
+                    <div class="cwn-dropdown" id="cwnMenu">
+                        <div class="cwn-header">
+                            <span class="cwn-title">Notifications</span>
+                            <button type="button" class="cwn-markall" id="cwnMarkAll" hidden>Mark all as read</button>
                         </div>
+                        <div class="cwn-list" id="cwnList">
+                            <div class="cwn-empty">Loading notifications...</div>
+                        </div>
+                        <button type="button" class="cwn-footer" id="cwnFooter" hidden>Show all notifications</button>
                     </div>
                 </div>
 
@@ -740,16 +843,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
 
             <div class="content-container">
-                <div class="input-card">
-                    <h3 id="transportCardTitle" style="color: var(--accent-green); margin-bottom: 20px;">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
+                <div class="input-card cw-card">
+                    <div class="cw-card-head">
+                        <span class="cw-card-icon"><i class="fa-solid fa-car"></i></span>
+                        <div class="cw-card-titles">
+                            <h3 id="transportCardTitle" class="cw-card-title">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
+                            <p class="cw-card-sub">Record the trips you made today.</p>
+                        </div>
+                    </div>
                     
                     <div class="transport-grid-layout">
                         <!-- Left Column: Controls & Dynamic Route Labels -->
                         <div class="transport-controls-col">
-                            <div class="form-row vertical-stack">
-                                <div class="form-group" id="primarySelectorGroup">
+                            <div class="cw-form cw-form-stack">
+                                <div class="cw-field" id="primarySelectorGroup">
                                     <label id="campusLabel" for="campusSelect">BSU Campus (Destination)</label>
-                                    <select id="campusSelect" name="campus_select" onchange="handleCampusSelection()">
+                                    <select id="campusSelect" class="cw-select" required name="campus_select" onchange="handleCampusSelection()">
                                         <option value="" selected disabled>Select Campus</option>
                                         <option value="13.9575,121.1610">Lipa Campus</option>
                                         <option value="13.7542,121.0547">Pablo Borbon Campus</option>
@@ -765,9 +874,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                         <option value="13.7502,120.9405">Mabini Campus</option>
                                     </select>
                                 </div>
-                                <div class="form-group">
+                                <div class="cw-field">
                                     <label for="vehicleType">Vehicle Used</label>
-                                    <select id="vehicleType" onchange="calculateRouteIfPossible()">
+                                    <select id="vehicleType" class="cw-select" required onchange="calculateRouteIfPossible()">
                                         <option value="" selected disabled>Select Vehicle Type</option>
                                         <option value="0.103">Motorcycle (0.103 kg CO2e/km)</option>
                                         <option value="0.095">Tricycle (0.095 kg CO2e/km)</option>
@@ -777,9 +886,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                         <option value="0.050">Public Bus (0.05 kg CO2e/km)</option>
                                     </select>
                                 </div>
-                                <div class="form-group">
+                                <div class="cw-field">
                                     <label for="transportDistance">Point-to-Point Distance (KM)</label>
-                                    <input type="number" id="transportDistance" step="0.01" placeholder="Auto-calculates or enter manually">
+                                    <input type="number" id="transportDistance" class="cw-input" step="0.01" placeholder="Auto-calculates or enter manually">
                                 </div>
                             </div>
 
@@ -794,7 +903,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </div>
                             </div>
 
-                            <button type="button" class="btn-add full-width" id="addTransportBtn" onclick="addTransport()">Add Route</button>
+                            <button type="button" class="cw-btn-add" id="addTransportBtn" onclick="addTransport()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span>Add Activity</span></button>
                         </div>
 
                         <!-- Right Column: Map & Instructions -->
@@ -809,12 +918,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     </div>
                 </div>
 
-                <div class="input-card">
-                    <h3 style="color: var(--accent-green);">Office Resource</h3>
-                    <div class="form-row">
-                        <div class="form-group">
+                <!-- Office Resource Card -->
+                <div class="input-card cw-card">
+                    <div class="cw-card-head">
+                        <span class="cw-card-icon"><i class="fa-solid fa-laptop"></i></span>
+                        <div class="cw-card-titles">
+                            <h3 class="cw-card-title">Office Resource</h3>
+                            <p class="cw-card-sub">Record the office equipment you used today.</p>
+                        </div>
+                    </div>
+                    <div class="cw-form">
+                        <div class="cw-field">
                             <label for="officeType">Office Resource / Appliance</label>
-                            <select id="officeType">
+                            <select id="officeType" class="cw-select" required>
                                 <option value="" selected disabled>Select Appliance/Hardware</option>
                                 <optgroup label="Laptops">
                                     <option value="40">Ultra-light / Netbook (40W)</option>
@@ -890,31 +1006,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </optgroup>
                             </select>
                         </div>
-                        <div class="form-group">
+                        <div class="cw-field">
                             <label for="officeUsageUnits">Duration of Usage (Hours)</label>
-                            <input type="number" id="officeUsageUnits" placeholder="Input total active hours" step="0.1">
+                            <input type="number" id="officeUsageUnits" class="cw-input" placeholder="e.g., 2.5" step="0.1" min="0.1">
                         </div>
-                        <button type="button" class="btn-add" onclick="addOffice()">Add Emission</button>
+                        <button type="button" class="cw-btn-add" onclick="addOffice()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span>Add Activity</span></button>
                     </div>
                 </div>
 
-                <!-- HTML Food Consumption Card -->
-                <div class="input-card">
-                    <h3 style="color: var(--accent-green);">Food Consumption</h3>
-                    <div class="form-row">
-                        <div class="form-group">
+                <!-- Food Consumption Card -->
+                <div class="input-card cw-card">
+                    <div class="cw-card-head">
+                        <span class="cw-card-icon"><i class="fa-solid fa-utensils"></i></span>
+                        <div class="cw-card-titles">
+                            <h3 class="cw-card-title">Food Consumption</h3>
+                            <p class="cw-card-sub">Record what you consumed today.</p>
+                        </div>
+                    </div>
+                    <div class="cw-form">
+                        <div class="cw-field">
                             <label for="foodMealPeriodSelect">Meal Period</label>
-                            <select id="foodMealPeriodSelect">
-                                <option value="" selected disabled>Select Meal Time</option>
+                            <select id="foodMealPeriodSelect" class="cw-select" required>
+                                <option value="" selected disabled>Select meal period</option>
                                 <option value="Breakfast">Breakfast</option>
                                 <option value="Lunch">Lunch</option>
                                 <option value="Dinner">Dinner</option>
                                 <option value="Snack">Snack</option>
                             </select>
                         </div>
-                        <div class="form-group">
+                        <div class="cw-field">
                             <label for="foodType">Food Type</label>
-                            <select id="foodType">
+                            <select id="foodType" class="cw-select" required>
                                 <option value="" selected disabled>Select Food Item</option>
                                 
                                 <optgroup label="1. High-Impact Proteins (Red Meats)">
@@ -954,11 +1076,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </optgroup>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="foodServings">Amount (Cups)</label>
-                            <input type="number" id="foodServings" placeholder="e.g., 1, 1.5" step="0.1" min="0.1">
+                        <div class="cw-field cw-field-dt">
+                            <div class="cw-pill cw-pill-date" title="Entries are recorded for today">
+                                <i class="fa-regular fa-calendar"></i>
+                                <span><?= htmlspecialchars($today_date) ?></span>
+                            </div>
+                            <label class="cw-pill cw-pill-time" for="foodTime">
+                                <i class="fa-regular fa-clock"></i>
+                                <span id="foodTimeText">--:--</span>
+                                <input type="time" id="foodTime" aria-label="Time consumed">
+                            </label>
                         </div>
-                        <button type="button" class="btn-add" onclick="addFood()">Add Emission</button>
+                        <div class="cw-field">
+                            <label for="foodServings">Amount / Serving (Cups)</label>
+                            <input type="number" id="foodServings" class="cw-input" placeholder="e.g., 1 cup" step="0.1" min="0.1">
+                        </div>
+                        <button type="button" class="cw-btn-add" onclick="addFood()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span>Add Activity</span></button>
                     </div>
                 </div>
 
@@ -1006,7 +1139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                             <div class="activity-icon-box food"><i class="fa-solid fa-utensils"></i></div>
                                             <div class="activity-details">
                                                 <div class="activity-title"><?= htmlspecialchars($rec['food_item']) ?></div>
-                                                <div class="activity-subtext">Food Consumption · <?= number_format($rec['food'], 2) ?> kg CO₂e</div>
+                                                <div class="activity-subtext">Food Consumption<?= !empty($rec['food_consumed_at']) && strtotime($rec['food_consumed_at']) ? ' · ' . date('g:i A', strtotime($rec['food_consumed_at'])) : '' ?> · <?= number_format($rec['food'], 2) ?> kg CO₂e</div>
                                             </div>
                                         </div>
                                     <?php endif; ?>
@@ -1022,7 +1155,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
 
     <script>
-        const existingDatabaseCount = <?= (int)$today_transport_count ?>;
         let selectedCampusCoords = null; 
         let selectedCampusName = "";
 
@@ -1105,8 +1237,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         let mapMarkers = [];
         let routingControl = null;
         
-        let localTransportCount = 0; 
-        let transportAttemptCount = existingDatabaseCount + 1; 
+        // Trips are unlimited: odd trips go Home -> Campus, even trips go Campus -> Home
+        let transportAttemptCount = 1; 
+        const isOutboundTrip = () => transportAttemptCount % 2 === 1;
 
         function applyAttemptLayout() {
             const titleEl = document.getElementById('transportCardTitle');
@@ -1116,46 +1249,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const endLblTitle = document.getElementById('endLabelTitle');
             const campusSelect = document.getElementById('campusSelect');
             const addBtn = document.getElementById('addTransportBtn');
+            const tripNo = transportAttemptCount;
 
-            const totalCurrentAttempts = existingDatabaseCount + localTransportCount;
+            addBtn.disabled = false;
+            campusSelect.disabled = false;
+            campusSelect.value = "";
 
-            if (totalCurrentAttempts >= 2) {
-                titleEl.innerText = "Transport Distance Calculator (Daily Limit Reached)";
-                campusSelect.disabled = true;
-                addBtn.disabled = true;
-                mapInstEl.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color: #BA181B;"></i> <strong>Limit Reached:</strong> You have submitted the maximum allowed 2 transportation entries for today.';
-                return;
-            }
+            // start every trip with a clean map
+            if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
+            if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
+            mapMarkers = [];
+            if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+            selectedCampusCoords = null;
+            selectedCampusName = "";
+            document.getElementById('transportDistance').value = "";
 
-            if (transportAttemptCount === 1) {
-                titleEl.innerText = "Trip 1: Transport Calculator (Home to BSU Campus)";
+            if (isOutboundTrip()) {
+                titleEl.innerText = `Trip ${tripNo}: Transport Calculator (Home to BSU Campus)`;
                 campusLabelEl.innerText = "BSU Campus (Destination)";
-                campusSelect.disabled = false;
-                
+
                 startLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Starting Point (Home)';
                 endLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Destination Campus';
-                mapInstEl.innerHTML = '<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 1 Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home location on the map.';
+                mapInstEl.innerHTML = `<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip ${tripNo} Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home location on the map.`;
                 document.getElementById('startLabel').innerText = "Click Map to Pin Home";
-                document.getElementById('endLabel').innerText = selectedCampusName || "Select Campus Dropdown";
-            } else if (transportAttemptCount === 2) {
-                titleEl.innerText = "Trip 2: Transport Calculator (BSU Campus to Home)";
+                document.getElementById('endLabel').innerText = "Select Campus Dropdown";
+            } else {
+                titleEl.innerText = `Trip ${tripNo}: Transport Calculator (BSU Campus to Home)`;
                 campusLabelEl.innerText = "BSU Campus (Starting Point)";
-                
-                campusSelect.disabled = false; 
-                campusSelect.value = ""; 
 
                 startLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Starting Point (BSU Campus)';
                 endLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Destination (Pin Home on Map)';
-                mapInstEl.innerHTML = '<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 2 Setup:</strong> Select your starting BSU Campus from the dropdown, then click your Home location on the map.';
-                
+                mapInstEl.innerHTML = `<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip ${tripNo} Setup:</strong> Select your starting BSU Campus from the dropdown, then click your Home location on the map.`;
+
                 document.getElementById('startLabel').innerText = "Select Campus Dropdown";
                 document.getElementById('endLabel').innerText = "Click Map to Pin Home";
-
-                if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
-                if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
-                mapMarkers = [];
-                selectedCampusCoords = null;
-                selectedCampusName = "";
             }
         }
 
@@ -1174,7 +1301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 routingControl = null;
             }
 
-            if (transportAttemptCount === 1) {
+            if (isOutboundTrip()) {
                 if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
 
                 let campusMarker = L.marker(selectedCampusCoords, {
@@ -1192,7 +1319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 mapMarkers[1] = campusMarker; 
                 document.getElementById('endLabel').innerText = selectedCampusName;
 
-            } else if (transportAttemptCount === 2) {
+            } else {
                 if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
 
                 let campusMarker = L.marker(selectedCampusCoords, {
@@ -1216,11 +1343,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         map.on('click', function(e) {
-            if ((existingDatabaseCount + localTransportCount) >= 2) return;
-
             const latLngText = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
 
-            if (transportAttemptCount === 1) {
+            if (isOutboundTrip()) {
                 if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
                 if (routingControl) { map.removeControl(routingControl); routingControl = null; }
                 document.getElementById('transportDistance').value = '';
@@ -1238,7 +1363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 homeMarker.bindPopup("<b>Starting Point (Home)</b>").openPopup();
                 mapMarkers[0] = homeMarker; 
                 document.getElementById('startLabel').innerText = `Home (${latLngText})`;
-            } else if (transportAttemptCount === 2) {
+            } else {
                 if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
                 if (routingControl) { map.removeControl(routingControl); routingControl = null; }
                 document.getElementById('transportDistance').value = '';
@@ -1313,18 +1438,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         function addTransport() {
             let activeTheme = localStorage.getItem('theme') || 'light';
 
-            if ((existingDatabaseCount + localTransportCount) >= 2) {
-                Swal.fire({
-                    title: 'Limit Reached',
-                    text: 'You have reached the maximum daily limit of 2 transportation entries.',
-                    icon: 'warning',
-                    confirmButtonColor: '#52B788',
-                    background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
-                    color: activeTheme === 'dark' ? '#F3F4F6' : '#333333'
-                });
-                return;
-            }
-
             const vehicleSel = document.getElementById('vehicleType');
             const distInp = document.getElementById('transportDistance');
 
@@ -1370,13 +1483,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             distInp.value = "";
             vehicleSel.value = "";
+            document.getElementById('campusSelect').value = "";
 
             if (routingControl) {
                 map.removeControl(routingControl);
                 routingControl = null;
             }
 
-            localTransportCount++;
             transportAttemptCount++;
 
             applyAttemptLayout();
@@ -1418,6 +1531,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             document.getElementById('officeItem').value = itemText;
 
             hoursInp.value = "";
+            typeSel.value = "";
             updateGreenPointsUI();
         }
 
@@ -1452,6 +1566,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 return;
             }
 
+            const timeInp = document.getElementById('foodTime');
+            if (!timeInp.value) {
+                Swal.fire({
+                    title: 'Time Needed',
+                    text: 'Please set the time you consumed this food.',
+                    icon: 'warning',
+                    confirmButtonColor: '#52B788',
+                    background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
+                    color: activeTheme === 'dark' ? '#F3F4F6' : '#333333'
+                });
+                return;
+            }
+            const timeLabel = formatTime12(timeInp.value);
+
             let mealText = mealPeriodSel.value;
             let foodText = typeSel.options[typeSel.selectedIndex].text.split(' (')[0];
             
@@ -1465,16 +1593,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             totals.food += calculatedValue;
             document.getElementById('hiddenFood').value = totals.food.toFixed(4);
             
-            createListItem('activityCardContainer', 'food', calculatedValue, `[${mealText}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO₂e`);
+            createListItem('activityCardContainer', 'food', calculatedValue, `[${mealText} · ${timeLabel}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO₂e`);
             
             document.getElementById('foodItem').value = foodText;
             document.getElementById('foodMealPeriod').value = mealText;
+            document.getElementById('foodConsumedAt').value = FOOD_DATE + ' ' + timeInp.value + ':00';
 
             servingsInp.value = "";
             mealPeriodSel.value = "";
             typeSel.value = "";
+            setFoodTimeNow();
             updateGreenPointsUI();
         }
+
+        // ----- Food time picker helpers -----
+        const FOOD_DATE = <?= json_encode($today_date) ?>;
+
+        function formatTime12(hhmm) {
+            const parts = (hhmm || '').split(':');
+            if (parts.length < 2) return '--:--';
+            let h = parseInt(parts[0], 10);
+            const m = parts[1].slice(0, 2);
+            const suffix = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return h + ':' + m + ' ' + suffix;
+        }
+
+        function setFoodTimeNow() {
+            const d = new Date();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const inp = document.getElementById('foodTime');
+            inp.value = hh + ':' + mm;
+            document.getElementById('foodTimeText').textContent = formatTime12(inp.value);
+        }
+
+        (function initFoodTime() {
+            const inp = document.getElementById('foodTime');
+            const pill = inp.closest('.cw-pill-time');
+            inp.addEventListener('input', () => {
+                document.getElementById('foodTimeText').textContent = inp.value ? formatTime12(inp.value) : '--:--';
+            });
+            pill.addEventListener('click', (e) => {
+                if (e.target !== inp && typeof inp.showPicker === 'function') {
+                    try { inp.showPicker(); } catch (err) {}
+                }
+            });
+            setFoodTimeNow();
+        })();
 
         // Single-Column Activity Card Renderer Function
         function createListItem(containerId, category, value, labelText, numericalText) {
@@ -1509,7 +1675,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 document.getElementById('hidden' + category.charAt(0).toUpperCase() + category.slice(1)).value = totals[category].toFixed(4);
                 
                 if (category === 'transport') {
-                    localTransportCount = Math.max(0, localTransportCount - 1);
                     transportAttemptCount = Math.max(1, transportAttemptCount - 1);
                     applyAttemptLayout();
                 }
@@ -1558,6 +1723,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             })
             .then(data => {
                 if(data.status === 'success') {
+                    if (window.cwnRefresh) { window.cwnRefresh(); }
                     Swal.fire({
                         title: 'Success!',
                         text: 'Your carbon emission records have been saved.',
@@ -1587,78 +1753,168 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             });
         }
 
-        // --- CONNECTED NOTIFICATION SYSTEM ---
-        const bellBtn = document.getElementById('bellBtn');
-        const notificationMenu = document.getElementById('notificationMenu');
-        const badge = document.getElementById('notificationBadge');
-        const list = document.getElementById('notificationList');
+        // ===== CarbonWise unified notification dropdown (same on every page) =====
+        (function () {
+            var bell = document.getElementById('bellBtn');
+            var menu = document.getElementById('cwnMenu');
+            var badge = document.getElementById('cwnBadge');
+            var list = document.getElementById('cwnList');
+            var footer = document.getElementById('cwnFooter');
+            var markAllBtn = document.getElementById('cwnMarkAll');
+            if (!bell || !menu || !badge || !list || !footer || !markAllBtn) return;
 
-        if (bellBtn && notificationMenu) {
-            bellBtn.addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                notificationMenu.classList.toggle('show'); 
-            });
-            document.addEventListener('click', () => notificationMenu.classList.remove('show'));
-        }
+            var PREVIEW_COUNT = 3;
+            var POLL_MS = 15000;
+            var state = { items: [], unread: 0, expanded: false, loaded: false };
+            var channel = null;
+            try { channel = ('BroadcastChannel' in window) ? new BroadcastChannel('carbonwise-notifications') : null; } catch (e) { channel = null; }
 
-        function loadNotifications() {
-            if (!list || !badge) return;
-
-            fetch('activity_input.php?action=fetch_notifications')
-                .then(res => res.json())
-                .then(data => {
-                    if (!Array.isArray(data) || data.length === 0) {
-                        list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No updates found</div>`;
-                        badge.style.display = 'none';
-                        return;
-                    }
-                    
-                    let unreadCount = data.filter(n => !n.is_read).length;
-                    if (unreadCount > 0) {
-                        badge.style.display = 'flex';
-                        badge.innerText = unreadCount;
-                    } else {
-                        badge.style.display = 'none';
-                    }
-
-                    list.innerHTML = data.map(n => `
-                        <div class="notif-item ${!n.is_read ? 'unread' : ''}" 
-                             data-id="${n.id}" 
-                             onclick="markAsRead(${n.id}, this)" 
-                             style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-weight: 700; color: var(--accent-green); font-size: 0.85rem;">${n.title || 'Notification'}</span>
-                                ${n.created_at ? `<span style="font-size: 0.75rem; color: var(--text-muted);">${n.created_at}</span>` : ''}
-                            </div>
-                            <p style="margin: 0; color: var(--text-main); font-size: 0.8rem; line-height: 1.3;">${n.message}</p>
-                        </div>
-                    `).join('');
-                })
-                .catch(() => {
-                    list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Updates temporarily unavailable</div>`;
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
                 });
-        }
+            }
 
-        function markAsRead(id, element) {
-            let formData = new FormData();
-            formData.append('action', 'mark_notification_read');
-            formData.append('id', id);
+            function typeInfo(type) {
+                type = String(type || 'info').toLowerCase();
+                if (type === 'success' || type === 'achievement' || type === 'progress') return { cls: 't-success', icon: 'fa-circle-check' };
+                if (type === 'warning' || type === 'alert') return { cls: 't-warning', icon: 'fa-triangle-exclamation' };
+                if (type === 'error' || type === 'danger') return { cls: 't-error', icon: 'fa-circle-xmark' };
+                return { cls: 't-info', icon: 'fa-circle-info' };
+            }
 
-            fetch('activity_input.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        element.classList.remove('unread');
-                        loadNotifications();
-                    }
-                })
-                .catch(err => console.error("Error updating notification status:", err));
-        }
+            function renderBadge() {
+                if (state.unread > 0) {
+                    badge.textContent = state.unread > 99 ? '99+' : state.unread;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            function render() {
+                renderBadge();
+                menu.classList.toggle('expanded', state.expanded);
+
+                if (!state.items.length) {
+                    list.innerHTML = '<div class="cwn-empty">No notifications yet.</div>';
+                    footer.hidden = true;
+                    markAllBtn.hidden = true;
+                    return;
+                }
+
+                var visible = state.expanded ? state.items : state.items.slice(0, PREVIEW_COUNT);
+                list.innerHTML = visible.map(function (n) {
+                    var t = typeInfo(n.type);
+                    return '<div class="cwn-item ' + t.cls + ' ' + (n.is_read ? 'read' : 'unread') + '" data-id="' + parseInt(n.id, 10) + '" role="button" tabindex="0">' +
+                        '<i class="fa-solid ' + t.icon + ' cwn-icon"></i>' +
+                        '<div class="cwn-body">' +
+                            '<div class="cwn-item-title">' + esc(n.title || 'Notification') + (n.is_read ? '' : '<span class="cwn-dot"></span>') + '</div>' +
+                            '<div class="cwn-msg">' + esc(n.message) + '</div>' +
+                            '<div class="cwn-time">' + esc(n.time_ago || n.created_at || '') + '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+
+                if (state.items.length > PREVIEW_COUNT) {
+                    footer.hidden = false;
+                    footer.textContent = state.expanded ? 'Show less' : 'Show all notifications';
+                } else {
+                    footer.hidden = true;
+                }
+                markAllBtn.hidden = (state.unread === 0);
+            }
+
+            function load() {
+                return fetch('get_notifications.php', { credentials: 'same-origin', cache: 'no-store' })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data && data.status === 'success') {
+                            state.items = Array.isArray(data.notifications) ? data.notifications : [];
+                            state.unread = parseInt(data.unread_count, 10) || 0;
+                            state.loaded = true;
+                            render();
+                        } else if (!state.loaded) {
+                            list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
+                        }
+                    })
+                    .catch(function () {
+                        if (!state.loaded) list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
+                    });
+            }
+
+            function post(formData) {
+                return fetch('update_notifications.php', { method: 'POST', body: formData, credentials: 'same-origin' })
+                    .then(function (res) { return res.json(); });
+            }
+
+            function tellOtherTabs() {
+                try { if (channel) channel.postMessage('changed'); } catch (e) {}
+            }
+
+            function markOne(id) {
+                var item = state.items.find(function (n) { return parseInt(n.id, 10) === id; });
+                if (!item || item.is_read) return;
+                item.is_read = true;
+                state.unread = Math.max(0, state.unread - 1);
+                render();
+                var fd = new FormData();
+                fd.append('id', id);
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { state.unread = parseInt(data.unread_count, 10) || 0; render(); tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function markAll() {
+                state.items.forEach(function (n) { n.is_read = true; });
+                state.unread = 0;
+                render();
+                var fd = new FormData();
+                fd.append('action', 'mark_all');
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function openMenu() { menu.classList.add('show'); load(); }
+            function closeMenu() { menu.classList.remove('show'); }
+
+            bell.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (menu.classList.contains('show')) closeMenu(); else openMenu();
+            });
+            bell.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bell.click(); }
+            });
+            menu.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+            list.addEventListener('click', function (e) {
+                var el = e.target.closest('.cwn-item');
+                if (el) markOne(parseInt(el.getAttribute('data-id'), 10));
+            });
+            list.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                var el = e.target.closest('.cwn-item');
+                if (el) { e.preventDefault(); markOne(parseInt(el.getAttribute('data-id'), 10)); }
+            });
+            footer.addEventListener('click', function () { state.expanded = !state.expanded; render(); });
+            markAllBtn.addEventListener('click', markAll);
+
+            // Keep every open tab/page in sync
+            if (channel) channel.onmessage = function () { load(); };
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+            setInterval(function () { if (!document.hidden) load(); }, POLL_MS);
+            window.cwnRefresh = load;
+
+            load();
+        })();
 
         document.addEventListener("DOMContentLoaded", function() {
             applyAttemptLayout();
-            loadNotifications();
-            setInterval(loadNotifications, 60000);
 
             setTimeout(function() {
                 map.invalidateSize();

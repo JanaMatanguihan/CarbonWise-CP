@@ -543,6 +543,41 @@ if (!$api_success) {
                 gap: 15px;
             }
         }
+
+        /* ===== CarbonWise unified notification dropdown (same on every page) ===== */
+        .notification-container { position: relative; display: inline-block; }
+        .notification-bell { cursor: pointer; user-select: none; }
+        .notification-badge { z-index: 2; }
+        .cwn-dropdown { position: absolute; top: calc(100% + 12px); right: 0; width: 380px; max-width: calc(100vw - 24px); background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #E2E8F0); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); display: none; flex-direction: column; overflow: hidden; z-index: 2000; }
+        .cwn-dropdown.show { display: flex; }
+        .cwn-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; }
+        .cwn-title { font-size: 1.05rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-markall { background: none; border: none; color: var(--accent-green, #2D6A4F); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 5px 8px; border-radius: 6px; font-family: inherit; }
+        .cwn-markall:hover { background: var(--input-bg, #F3F4F6); }
+        .cwn-markall[hidden], .cwn-footer[hidden] { display: none; }
+        .cwn-list { overflow-y: auto; padding: 0 20px; }
+        .cwn-dropdown.expanded .cwn-list { max-height: 360px; }
+        .cwn-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border-color, #E2E8F0); cursor: pointer; }
+        .cwn-item.read { cursor: default; }
+        .cwn-icon { flex-shrink: 0; font-size: 1.35rem; margin-top: 1px; color: #B7DFC8; }
+        .cwn-item.unread .cwn-icon { color: #2D6A4F; }
+        .cwn-item.t-warning .cwn-icon { color: #F2C14E; }
+        .cwn-item.t-warning.unread .cwn-icon { color: #E09F1F; }
+        .cwn-item.t-error .cwn-icon { color: #F0A5A9; }
+        .cwn-item.t-error.unread .cwn-icon { color: #BA181B; }
+        .cwn-item.t-info .cwn-icon { color: #A9CDEB; }
+        .cwn-item.t-info.unread .cwn-icon { color: #0074d9; }
+        .cwn-body { flex: 1; min-width: 0; }
+        .cwn-item-title { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-dot { width: 8px; height: 8px; border-radius: 50%; background: #E63946; flex-shrink: 0; }
+        .cwn-msg { font-size: 0.85rem; color: var(--text-muted, #8E8E93); line-height: 1.4; margin-top: 3px; word-wrap: break-word; }
+        .cwn-time { font-size: 0.72rem; color: var(--text-muted, #8E8E93); margin-top: 5px; opacity: 0.85; }
+        .cwn-empty { padding: 28px 0; text-align: center; font-size: 0.85rem; color: var(--text-muted, #8E8E93); }
+        .cwn-footer { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border-color, #E2E8F0); padding: 14px; text-align: center; font-size: 0.9rem; font-weight: 600; color: var(--accent-green, #2D6A4F); cursor: pointer; font-family: inherit; }
+        .cwn-footer:hover { background: var(--input-bg, #F9FAFB); }
+        @media (max-width: 600px) {
+            .cwn-dropdown { position: fixed; top: 76px; left: 12px; right: 12px; width: auto; max-width: none; }
+        }
     </style>
 </head>
 <body>
@@ -587,16 +622,20 @@ if (!$api_success) {
 
             <div class="user-nav-profile">
                 <div class="notification-container">
-                    <div class="notification-bell" id="bellBtn">
+                    <div class="notification-bell" id="bellBtn" role="button" tabindex="0" aria-label="Notifications" aria-haspopup="true">
                         <i class="fa-regular fa-bell"></i>
                     </div>
-                    <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                    <span class="notification-badge" id="cwnBadge" style="display: none;">0</span>
 
-                    <div class="notification-dropdown" id="notificationMenu">
-                        <div class="dropdown-header">Notifications</div>
-                        <div id="notificationList">
-                            <div style="padding: 20px; text-align: center; color: var(--text-muted);">Loading updates...</div>
+                    <div class="cwn-dropdown" id="cwnMenu">
+                        <div class="cwn-header">
+                            <span class="cwn-title">Notifications</span>
+                            <button type="button" class="cwn-markall" id="cwnMarkAll" hidden>Mark all as read</button>
                         </div>
+                        <div class="cwn-list" id="cwnList">
+                            <div class="cwn-empty">Loading notifications...</div>
+                        </div>
+                        <button type="button" class="cwn-footer" id="cwnFooter" hidden>Show all notifications</button>
                     </div>
                 </div>
 
@@ -782,48 +821,165 @@ if (!$api_success) {
             });
         }
 
-        document.addEventListener("DOMContentLoaded", function() {
-            const bellBtn = document.getElementById('bellBtn');
-            const notificationMenu = document.getElementById('notificationMenu');
-            const badge = document.getElementById('notificationBadge');
-            const list = document.getElementById('notificationList');
+        // ===== CarbonWise unified notification dropdown (same on every page) =====
+        (function () {
+            var bell = document.getElementById('bellBtn');
+            var menu = document.getElementById('cwnMenu');
+            var badge = document.getElementById('cwnBadge');
+            var list = document.getElementById('cwnList');
+            var footer = document.getElementById('cwnFooter');
+            var markAllBtn = document.getElementById('cwnMarkAll');
+            if (!bell || !menu || !badge || !list || !footer || !markAllBtn) return;
 
-            if (bellBtn && notificationMenu) {
-                bellBtn.addEventListener('click', (e) => { 
-                    e.stopPropagation(); 
-                    notificationMenu.classList.toggle('show'); 
+            var PREVIEW_COUNT = 3;
+            var POLL_MS = 15000;
+            var state = { items: [], unread: 0, expanded: false, loaded: false };
+            var channel = null;
+            try { channel = ('BroadcastChannel' in window) ? new BroadcastChannel('carbonwise-notifications') : null; } catch (e) { channel = null; }
+
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
                 });
-                document.addEventListener('click', () => notificationMenu.classList.remove('show'));
             }
 
-            function loadNotifications() {
-                if(!list || !badge) return;
-                fetch('get_notifications.php')
-                    .then(res => res.json())
-                    .then(data => {
-                        if (!data || data.length === 0) {
-                            list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">No updates found</div>`;
-                            badge.style.display = 'none';
-                            return;
-                        }
-                        let unread = data.filter(n => !n.is_read).length;
-                        badge.style.display = unread > 0 ? 'block' : 'none';
-                        badge.innerText = unread;
+            function typeInfo(type) {
+                type = String(type || 'info').toLowerCase();
+                if (type === 'success' || type === 'achievement' || type === 'progress') return { cls: 't-success', icon: 'fa-circle-check' };
+                if (type === 'warning' || type === 'alert') return { cls: 't-warning', icon: 'fa-triangle-exclamation' };
+                if (type === 'error' || type === 'danger') return { cls: 't-error', icon: 'fa-circle-xmark' };
+                return { cls: 't-info', icon: 'fa-circle-info' };
+            }
 
-                        list.innerHTML = data.map(n => `
-                            <div class="notif-item" data-id="${n.id}" style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); background: ${n.is_read ? 'transparent' : 'var(--input-bg)'}; cursor: pointer;">
-                                <span style="font-weight: 700; color: var(--text-main);">${n.title}</span>
-                                <p style="margin: 0; color: var(--text-muted); font-size: 0.8rem;">${n.message}</p>
-                            </div>
-                        `).join('');
-                    }).catch(() => {
-                        list.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">Error loading notifications</div>`;
+            function renderBadge() {
+                if (state.unread > 0) {
+                    badge.textContent = state.unread > 99 ? '99+' : state.unread;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            function render() {
+                renderBadge();
+                menu.classList.toggle('expanded', state.expanded);
+
+                if (!state.items.length) {
+                    list.innerHTML = '<div class="cwn-empty">No notifications yet.</div>';
+                    footer.hidden = true;
+                    markAllBtn.hidden = true;
+                    return;
+                }
+
+                var visible = state.expanded ? state.items : state.items.slice(0, PREVIEW_COUNT);
+                list.innerHTML = visible.map(function (n) {
+                    var t = typeInfo(n.type);
+                    return '<div class="cwn-item ' + t.cls + ' ' + (n.is_read ? 'read' : 'unread') + '" data-id="' + parseInt(n.id, 10) + '" role="button" tabindex="0">' +
+                        '<i class="fa-solid ' + t.icon + ' cwn-icon"></i>' +
+                        '<div class="cwn-body">' +
+                            '<div class="cwn-item-title">' + esc(n.title || 'Notification') + (n.is_read ? '' : '<span class="cwn-dot"></span>') + '</div>' +
+                            '<div class="cwn-msg">' + esc(n.message) + '</div>' +
+                            '<div class="cwn-time">' + esc(n.time_ago || n.created_at || '') + '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+
+                if (state.items.length > PREVIEW_COUNT) {
+                    footer.hidden = false;
+                    footer.textContent = state.expanded ? 'Show less' : 'Show all notifications';
+                } else {
+                    footer.hidden = true;
+                }
+                markAllBtn.hidden = (state.unread === 0);
+            }
+
+            function load() {
+                return fetch('get_notifications.php', { credentials: 'same-origin', cache: 'no-store' })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data && data.status === 'success') {
+                            state.items = Array.isArray(data.notifications) ? data.notifications : [];
+                            state.unread = parseInt(data.unread_count, 10) || 0;
+                            state.loaded = true;
+                            render();
+                        } else if (!state.loaded) {
+                            list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
+                        }
+                    })
+                    .catch(function () {
+                        if (!state.loaded) list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
                     });
             }
 
-            loadNotifications();
-            setInterval(loadNotifications, 60000);
-        });
+            function post(formData) {
+                return fetch('update_notifications.php', { method: 'POST', body: formData, credentials: 'same-origin' })
+                    .then(function (res) { return res.json(); });
+            }
+
+            function tellOtherTabs() {
+                try { if (channel) channel.postMessage('changed'); } catch (e) {}
+            }
+
+            function markOne(id) {
+                var item = state.items.find(function (n) { return parseInt(n.id, 10) === id; });
+                if (!item || item.is_read) return;
+                item.is_read = true;
+                state.unread = Math.max(0, state.unread - 1);
+                render();
+                var fd = new FormData();
+                fd.append('id', id);
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { state.unread = parseInt(data.unread_count, 10) || 0; render(); tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function markAll() {
+                state.items.forEach(function (n) { n.is_read = true; });
+                state.unread = 0;
+                render();
+                var fd = new FormData();
+                fd.append('action', 'mark_all');
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function openMenu() { menu.classList.add('show'); load(); }
+            function closeMenu() { menu.classList.remove('show'); }
+
+            bell.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (menu.classList.contains('show')) closeMenu(); else openMenu();
+            });
+            bell.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bell.click(); }
+            });
+            menu.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+            list.addEventListener('click', function (e) {
+                var el = e.target.closest('.cwn-item');
+                if (el) markOne(parseInt(el.getAttribute('data-id'), 10));
+            });
+            list.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                var el = e.target.closest('.cwn-item');
+                if (el) { e.preventDefault(); markOne(parseInt(el.getAttribute('data-id'), 10)); }
+            });
+            footer.addEventListener('click', function () { state.expanded = !state.expanded; render(); });
+            markAllBtn.addEventListener('click', markAll);
+
+            // Keep every open tab/page in sync
+            if (channel) channel.onmessage = function () { load(); };
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+            setInterval(function () { if (!document.hidden) load(); }, POLL_MS);
+            window.cwnRefresh = load;
+
+            load();
+        })();
     </script>
 </body>
 </html>

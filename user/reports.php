@@ -78,25 +78,6 @@ if (empty($avatar_url)) {
     }
 }
 
-// Fetch notifications from Neon database
-$dynamic_notifications = [];
-try {
-    $stmt_notif = $pdo->prepare("SELECT * FROM notifications WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 10");
-    $stmt_notif->execute([':user_id' => $user_id]);
-    $dynamic_notifications = $stmt_notif->fetchAll();
-} catch (PDOException $e) {
-    $dynamic_notifications = [];
-}
-
-$unread_count = 0;
-if (is_array($dynamic_notifications)) {
-    foreach ($dynamic_notifications as $notification) {
-        if (isset($notification['is_read']) && $notification['is_read'] == false) {
-            $unread_count++;
-        }
-    }
-}
-
 // ==========================================================================
 // METRIC & CHART CALCULATIONS FROM NEON DB (`carbon_records`)
 // ==========================================================================
@@ -544,6 +525,181 @@ function time_elapsed_string($datetime, $full = false) {
             .canvas-container { height: 220px; }
             .reports-content { padding: 15px; gap: 15px; }
         }
+
+        /* ===== CarbonWise unified notification dropdown (same on every page) ===== */
+        .notification-container { position: relative; display: inline-block; }
+        .notification-bell { cursor: pointer; user-select: none; }
+        .notification-badge { z-index: 2; }
+        .cwn-dropdown { position: absolute; top: calc(100% + 12px); right: 0; width: 380px; max-width: calc(100vw - 24px); background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #E2E8F0); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); display: none; flex-direction: column; overflow: hidden; z-index: 2000; }
+        .cwn-dropdown.show { display: flex; }
+        .cwn-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; }
+        .cwn-title { font-size: 1.05rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-markall { background: none; border: none; color: var(--accent-green, #2D6A4F); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 5px 8px; border-radius: 6px; font-family: inherit; }
+        .cwn-markall:hover { background: var(--input-bg, #F3F4F6); }
+        .cwn-markall[hidden], .cwn-footer[hidden] { display: none; }
+        .cwn-list { overflow-y: auto; padding: 0 20px; }
+        .cwn-dropdown.expanded .cwn-list { max-height: 360px; }
+        .cwn-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border-color, #E2E8F0); cursor: pointer; }
+        .cwn-item.read { cursor: default; }
+        .cwn-icon { flex-shrink: 0; font-size: 1.35rem; margin-top: 1px; color: #B7DFC8; }
+        .cwn-item.unread .cwn-icon { color: #2D6A4F; }
+        .cwn-item.t-warning .cwn-icon { color: #F2C14E; }
+        .cwn-item.t-warning.unread .cwn-icon { color: #E09F1F; }
+        .cwn-item.t-error .cwn-icon { color: #F0A5A9; }
+        .cwn-item.t-error.unread .cwn-icon { color: #BA181B; }
+        .cwn-item.t-info .cwn-icon { color: #A9CDEB; }
+        .cwn-item.t-info.unread .cwn-icon { color: #0074d9; }
+        .cwn-body { flex: 1; min-width: 0; }
+        .cwn-item-title { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 700; color: var(--accent-green, #2D6A4F); }
+        .cwn-dot { width: 8px; height: 8px; border-radius: 50%; background: #E63946; flex-shrink: 0; }
+        .cwn-msg { font-size: 0.85rem; color: var(--text-muted, #8E8E93); line-height: 1.4; margin-top: 3px; word-wrap: break-word; }
+        .cwn-time { font-size: 0.72rem; color: var(--text-muted, #8E8E93); margin-top: 5px; opacity: 0.85; }
+        .cwn-empty { padding: 28px 0; text-align: center; font-size: 0.85rem; color: var(--text-muted, #8E8E93); }
+        .cwn-footer { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border-color, #E2E8F0); padding: 14px; text-align: center; font-size: 0.9rem; font-weight: 600; color: var(--accent-green, #2D6A4F); cursor: pointer; font-family: inherit; }
+        .cwn-footer:hover { background: var(--input-bg, #F9FAFB); }
+        @media (max-width: 600px) {
+            .cwn-dropdown { position: fixed; top: 76px; left: 12px; right: 12px; width: auto; max-width: none; }
+        }
+
+        /* =====================================================================
+           REPORTS – app-style redesign (score card, 30-day forecast, mobile shell)
+           ===================================================================== */
+        :root {
+            --fc-line: #3DA66B;
+            --mint-card: #E6F4EA;
+            --mint-soft: #F1F8F3;
+            --mint-border: #A9D8BB;
+            --accent-dark: #1E5B3A;
+            --fc-grid: #ECEFED;
+            --nav-idle: #7A807D;
+        }
+        [data-theme="dark"] {
+            --fc-line: #52B788;
+            --mint-card: #14261D;
+            --mint-soft: #18241F;
+            --mint-border: #2A5A41;
+            --accent-dark: #8FD9AE;
+            --fc-grid: #1B2B23;
+            --nav-idle: #8A948E;
+        }
+
+        .t-mob { display: none; }
+        .sticky-head { display: contents; }
+        .score-wrap { padding: 35px 35px 0; }
+        .reports-content { padding-top: 25px; }
+        .avatar-icon { display: none; }
+        .avatar-circle-nav { text-decoration: none; }
+        .bottom-nav { display: none; }
+
+        /* ---- CarbonWise score card ---- */
+        .progress-card { text-align: left; background: var(--mint-card); border: none; border-radius: 20px; padding: 18px 22px; box-shadow: none; }
+        .progress-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-style: normal; font-size: 1rem; margin-bottom: 14px; }
+        .ph-left { display: flex; align-items: center; gap: 12px; font-weight: 600; color: var(--text-main); }
+        .ph-icon { color: var(--fc-line); font-size: 1.15rem; }
+        .ph-score { font-weight: 800; color: var(--accent-dark); }
+        .progress-bar-wrapper { height: 12px; border-radius: 999px; background: rgba(61, 166, 107, 0.2); border: none; }
+        .progress-bar-fill { border-radius: 999px; }
+
+        /* ---- 30-day forecast card ---- */
+        .forecast-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 24px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.01); width: 100%; }
+        .fc-head { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; cursor: pointer; border-radius: 14px; -webkit-tap-highlight-color: transparent; }
+        .fc-head:focus-visible { outline: 2px solid var(--fc-line); outline-offset: 4px; }
+        .fc-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--mint-card); color: var(--fc-line); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .fc-titles { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+        .fc-title { font-size: 1.05rem; font-weight: 700; color: var(--text-main); }
+        .fc-sub { font-size: 0.8rem; color: var(--text-muted); }
+        .fc-chevron { color: var(--text-muted); font-size: 0.95rem; transition: transform 0.3s ease; flex-shrink: 0; padding: 6px; }
+        .forecast-card.collapsed .fc-chevron { transform: rotate(180deg); }
+
+        .fc-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.3s ease; }
+        .forecast-card.collapsed .fc-body { grid-template-rows: 0fr; }
+        .fc-body-inner { overflow: hidden; min-height: 0; }
+        .fc-desc { margin: 18px 0 8px; font-size: 0.85rem; line-height: 1.55; color: var(--text-muted); }
+
+        .fc-chart { display: flex; align-items: flex-start; }
+        .fc-yaxis { position: relative; width: 34px; flex-shrink: 0; }
+        .fc-ylabel { position: absolute; left: 0; font-size: 0.72rem; line-height: 16px; color: var(--text-muted); }
+        .fc-scroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; cursor: grab; user-select: none; -webkit-user-select: none; }
+        .fc-scroll.dragging { cursor: grabbing; }
+        .fc-scroll svg { display: block; touch-action: pan-x pan-y; }
+        .fc-grid { stroke: var(--fc-grid); stroke-width: 1.5; }
+        .fc-line { fill: none; stroke: var(--fc-line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+        .fc-dot { fill: var(--bg-card); stroke: var(--fc-line); stroke-width: 2.5; }
+        .fc-dot-sel { fill: var(--fc-line); stroke: var(--fc-line); stroke-width: 2.5; }
+        .fc-halo { fill: var(--fc-line); opacity: 0.18; }
+        .fc-xlabel { font-size: 11.5px; fill: var(--text-muted); }
+        .fc-hit { cursor: pointer; }
+
+        .fc-selected { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 14px 18px; border: 1.5px solid var(--mint-border); background: var(--mint-card); border-radius: 18px; animation: fcIn 0.25s ease; }
+        .fc-selected[hidden] { display: none; }
+        @keyframes fcIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .fc-sel-ico { width: 44px; height: 44px; border-radius: 50%; background: var(--bg-card); color: var(--fc-line); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
+        .fc-sel-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .fc-sel-date { font-size: 0.82rem; color: var(--text-muted); }
+        .fc-sel-val { font-size: 1.08rem; font-weight: 700; color: var(--accent-dark); }
+        .fc-sel-val sub { font-size: 0.65em; }
+        .fc-sel-close { all: unset; margin-left: auto; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; border-radius: 50%; flex-shrink: 0; }
+        .fc-sel-close:hover { background: rgba(0,0,0,0.05); }
+        .fc-sel-close:focus-visible { outline: 2px solid var(--fc-line); }
+
+        .fc-stats { display: grid; grid-template-columns: 1fr 1fr; margin-top: 16px; padding: 16px 6px; background: var(--mint-soft); border-radius: 16px; }
+        .fc-stat { display: flex; flex-direction: column; gap: 8px; padding: 0 16px; min-width: 0; }
+        .fc-stat + .fc-stat { border-left: 1px solid var(--border-color); }
+        .fc-stat-label { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+        .fc-stat-label i { color: var(--fc-line); }
+        .fc-stat-val { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
+
+        @media (max-width: 992px) {
+            .score-wrap { padding: 20px 20px 0; }
+            .reports-content { padding-top: 20px; }
+        }
+
+        /* ---- Phone layout: matches the CarbonWise mobile app ---- */
+        @media (max-width: 768px) {
+            :root:not([data-theme="dark"]) { --bg-body: #F2F6F3; }
+
+            .sidebar, .sidebar-overlay, .mobile-nav-toggle { display: none !important; }
+            .t-desk { display: none; }
+            .t-mob { display: inline; }
+
+            .main-workspace { height: 100vh; height: 100dvh; }
+
+            .sticky-head { display: block; position: sticky; top: 0; z-index: 100; background: var(--bg-body); padding-bottom: 14px; }
+            .top-navbar { position: static; height: auto; background: transparent; border: none; padding: 20px 18px 14px; }
+            .header-title-area h2 { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+            .header-title-area p { font-size: 0.88rem; }
+
+            .user-nav-profile { gap: 10px; }
+            .notification-bell, .avatar-circle-nav { width: 46px; height: 46px; background: var(--bg-card); color: var(--accent-green); border: none; box-shadow: 0 1px 6px rgba(20, 60, 40, 0.06); font-size: 1.15rem; }
+            .profile-card { border-left: none; padding-left: 0; }
+            .avatar-initials { display: none; }
+            .avatar-icon { display: inline; }
+            .notification-badge { top: 0; right: 0; }
+
+            .score-wrap { padding: 0 18px; }
+            .reports-content { padding: 4px 18px calc(120px + env(safe-area-inset-bottom)); gap: 16px; }
+
+            .metrics-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .metric-card, .chart-box, .forecast-card { border: none; border-radius: 24px; box-shadow: 0 2px 14px rgba(20, 60, 40, 0.05); }
+            .metric-card { padding: 18px; }
+            .metric-value { font-size: 1.5rem; }
+            .chart-box, .forecast-card { padding: 18px; }
+            .fc-scroll { scrollbar-width: none; }
+            .fc-selected { gap: 12px; padding: 12px 14px; }
+            .fc-sel-ico { width: 40px; height: 40px; }
+            .fc-sel-val { font-size: 0.98rem; }
+            .fc-sel-close { width: 32px; height: 32px; }
+            .fc-sub { font-size: 0.78rem; }
+            .fc-scroll::-webkit-scrollbar { display: none; }
+
+            /* bottom tab bar */
+            .bottom-nav { display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; position: fixed; left: 0; right: 0; bottom: 0; z-index: 500; background: var(--bg-card); padding: 10px 6px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 18px rgba(0, 0, 0, 0.07); }
+            .bn-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; text-decoration: none; color: var(--nav-idle); font-size: 0.7rem; font-weight: 500; -webkit-tap-highlight-color: transparent; }
+            .bn-item i { font-size: 1.45rem; }
+            .bn-item.active { color: var(--fc-line); font-weight: 600; }
+            .bn-fab { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: var(--nav-idle); font-size: 0.7rem; font-weight: 500; margin-top: -40px; -webkit-tap-highlight-color: transparent; }
+            .bn-fab-btn { width: 62px; height: 62px; border-radius: 50%; background: var(--fc-line); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; border: 5px solid var(--bg-card); box-shadow: 0 4px 14px rgba(61, 166, 107, 0.35); }
+        }
     </style>
 </head>
 <body>
@@ -575,65 +731,46 @@ function time_elapsed_string($datetime, $full = false) {
     </div>
 
     <div class="main-workspace">
+        <div class="sticky-head">
         <div class="top-navbar">
             <div style="display: flex; align-items: center;">
                 <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Sidebar">
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 <div class="header-title-area">
-                    <h2>Reports</h2>
-                    <p>View your summaries, trends, and historical performance</p>
+                    <h2><span class="t-desk">Reports</span><span class="t-mob">View your Reports</span></h2>
+                    <p><span class="t-desk">View your summaries, trends, and historical performance</span><span class="t-mob">Manage your carbon footprint.</span></p>
                 </div>
             </div>
             
             <div class="user-nav-profile">
                 <div class="notification-container">
-                    <div class="notification-bell" id="bellBtn">
+                    <div class="notification-bell" id="bellBtn" role="button" tabindex="0" aria-label="Notifications" aria-haspopup="true">
                         <i class="fa-regular fa-bell"></i>
                     </div>
-                    <?php if ($unread_count > 0): ?>
-                        <span class="notification-badge" id="navBadgeCount"><?= $unread_count ?></span>
-                    <?php endif; ?>
+                    <span class="notification-badge" id="cwnBadge" style="display: none;">0</span>
 
-                    <div class="notification-dropdown" id="notificationMenu">
-                        <div class="dropdown-header">Notifications</div>
-                        <div id="reportsNotifContainer" style="max-height: 360px; overflow-y: auto;">
-                        <?php if (empty($dynamic_notifications) || !is_array($dynamic_notifications)): ?>
-                            <div class="no-notifications">No new updates at this time.</div>
-                        <?php else: ?>
-                            <?php foreach ($dynamic_notifications as $notif): 
-                                if (!isset($notif['id'])) continue;
-                                $is_unread = !($notif['is_read'] ?? true);
-                                $type = strtolower($notif['type'] ?? 'info');
-                                $icon = ($type === 'success') ? 'fa-circle-check' : 'fa-circle-info';
-                                $icon_color = ($type === 'success') ? '#2D6A4F' : '#0074d9';
-                            ?>
-                                <div class="notification-item <?= $is_unread ? 'unread' : '' ?>" onclick="markAsReadReports(<?= intval($notif['id']) ?>, this)">
-                                    <i class="fa-solid <?= $icon ?>" style="color: <?= $icon_color ?>; margin-top: 3px; font-size: 1.1rem; flex-shrink: 0;"></i>
-                                    <div style="flex: 1;">
-                                        <strong style="display: block; font-size: 0.85rem; margin-bottom: 2px; color: var(--text-main);">
-                                            <?= htmlspecialchars($notif['title'] ?? 'System Update') ?>
-                                        </strong>
-                                        <span style="display: block; font-size: 0.8rem; color: var(--text-muted); line-height: 1.35;">
-                                            <?= htmlspecialchars($notif['message'] ?? '') ?>
-                                        </span>
-                                        <span class="time"><i class="fa-regular fa-clock" style="font-size: 0.65rem; margin-right: 4px;"></i><?= isset($notif['created_at']) ? time_elapsed_string($notif['created_at']) : 'just now' ?></span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                    <div class="cwn-dropdown" id="cwnMenu">
+                        <div class="cwn-header">
+                            <span class="cwn-title">Notifications</span>
+                            <button type="button" class="cwn-markall" id="cwnMarkAll" hidden>Mark all as read</button>
                         </div>
+                        <div class="cwn-list" id="cwnList">
+                            <div class="cwn-empty">Loading notifications...</div>
+                        </div>
+                        <button type="button" class="cwn-footer" id="cwnFooter" hidden>Show all notifications</button>
                     </div>
                 </div>
 
                 <div class="profile-card">
-                    <div class="avatar-circle-nav">
+                    <a href="profile.php" class="avatar-circle-nav" aria-label="View profile">
                         <?php if (!empty($avatar_url)): ?>
                             <img src="<?= htmlspecialchars($avatar_url) ?>" alt="User Avatar">
                         <?php else: ?>
-                            <?= htmlspecialchars($initials) ?>
+                            <span class="avatar-initials"><?= htmlspecialchars($initials) ?></span>
+                            <i class="fa-regular fa-user avatar-icon"></i>
                         <?php endif; ?>
-                    </div>
+                    </a>
                     <div class="user-info-text">
                         <h4><?= htmlspecialchars($full_name) ?></h4>
                         <p><?= htmlspecialchars($role) ?></p>
@@ -642,13 +779,20 @@ function time_elapsed_string($datetime, $full = false) {
             </div>
         </div>
 
-        <div class="reports-content">
-            <div class="progress-card">
-                <div class="progress-header">Green Points (<?= (int)$green_points ?> / 100 pts)</div>
-                <div class="progress-bar-wrapper">
-                    <div class="progress-bar-fill"></div>
+            <div class="score-wrap">
+                <div class="progress-card">
+                    <div class="progress-header">
+                        <span class="ph-left"><i class="fa-solid fa-leaf ph-icon"></i><span>CarbonWise Score</span></span>
+                        <span class="ph-score"><?= (int)$green_points ?>/100</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar-fill"></div>
+                    </div>
                 </div>
             </div>
+        </div><!-- /.sticky-head -->
+
+        <div class="reports-content">
 
             <div class="metrics-grid">
                 <div class="metric-card">
@@ -710,21 +854,70 @@ function time_elapsed_string($datetime, $full = false) {
             </div>
 
             <!-- 30-Day Emissions Forecast Card -->
-            <div class="chart-box" style="margin-top: 5px;">
-                <div class="chart-title-bar">
-                    <div>
-                        <h3 style="font-size: 1.05rem; font-weight: 700;">30-Day Emissions Forecast</h3>
-                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
-                            Predicted carbon emissions for the next 30 days
-                        </p>
+            <div class="forecast-card" id="forecastCard">
+                <button type="button" class="fc-head" id="fcToggle" aria-expanded="true" aria-controls="fcBody">
+                    <span class="fc-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="3 18 9 12 13 16 21 8"></polyline>
+                            <circle cx="3" cy="18" r="1.2" fill="currentColor"></circle>
+                            <circle cx="9" cy="12" r="1.2" fill="currentColor"></circle>
+                            <circle cx="13" cy="16" r="1.2" fill="currentColor"></circle>
+                            <circle cx="21" cy="8" r="1.2" fill="currentColor"></circle>
+                            <path d="M15 3v3M13.5 4.5h3" stroke-width="1.6"></path>
+                            <path d="M5 5v2M4 6h2" stroke-width="1.4"></path>
+                        </svg>
+                    </span>
+                    <span class="fc-titles">
+                        <span class="fc-title">30-Day Emissions Forecast</span>
+                        <span class="fc-sub">Tap to see your projected carbon footprint.</span>
+                    </span>
+                    <i class="fa-solid fa-chevron-up fc-chevron" aria-hidden="true"></i>
+                </button>
+
+                <div class="fc-body" id="fcBody">
+                    <div class="fc-body-inner">
+                        <p class="fc-desc">Projected carbon footprint for the upcoming month. Swipe horizontally to see all 30 days.</p>
+
+                        <div class="fc-chart">
+                            <div class="fc-yaxis" id="fcY" aria-hidden="true"></div>
+                            <div class="fc-scroll" id="fcScroll"><svg id="fcSvg" role="img" aria-label="30-day emissions forecast line chart"></svg></div>
+                        </div>
+
+                        <div class="fc-selected" id="fcSelected" hidden>
+                            <span class="fc-sel-ico"><i class="fa-regular fa-calendar"></i></span>
+                            <span class="fc-sel-text">
+                                <span class="fc-sel-date" id="fcSelDate"></span>
+                                <span class="fc-sel-val" id="fcSelVal"></span>
+                            </span>
+                            <button type="button" class="fc-sel-close" id="fcSelClose" aria-label="Clear selection"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+
+                        <div class="fc-stats">
+                            <div class="fc-stat">
+                                <span class="fc-stat-label"><i class="fa-solid fa-arrow-trend-up"></i> Daily Average</span>
+                                <span class="fc-stat-val" id="fcAvg">–</span>
+                            </div>
+                            <div class="fc-stat">
+                                <span class="fc-stat-label"><i class="fa-solid fa-arrow-trend-up"></i> <span id="fcPeakLabel">Peak Day</span></span>
+                                <span class="fc-stat-val" id="fcPeak">–</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="canvas-container">
-                    <canvas id="forecastChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
+
+    <nav class="bottom-nav" aria-label="Primary">
+        <a href="dashboard.php" class="bn-item"><i class="fa-solid fa-house"></i><span>Home</span></a>
+        <a href="reports.php" class="bn-item active" aria-current="page"><i class="fa-solid fa-chart-simple"></i><span>Reports</span></a>
+        <a href="activity_input.php" class="bn-fab" aria-label="Input activity">
+            <span class="bn-fab-btn"><i class="fa-solid fa-plus"></i></span>
+            <span class="bn-fab-label">Input</span>
+        </a>
+        <a href="mitigation_strategies.php" class="bn-item"><i class="fa-regular fa-lightbulb"></i><span>Strategies</span></a>
+        <a href="profile.php" class="bn-item"><i class="fa-regular fa-user"></i><span>Profile</span></a>
+    </nav>
 
     <script>
         const mobileNavToggle = document.getElementById('mobileNavToggle');
@@ -810,36 +1003,165 @@ function time_elapsed_string($datetime, $full = false) {
             });
         }
 
-        const bellBtn = document.getElementById('bellBtn');
-        const notificationMenu = document.getElementById('notificationMenu');
-        bellBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            notificationMenu.classList.toggle('show');
-        });
-        document.addEventListener('click', (e) => {
-            if (!notificationMenu.contains(e.target) && e.target !== bellBtn) {
-                notificationMenu.classList.remove('show');
-            }
-        });
+        // ===== CarbonWise unified notification dropdown (same on every page) =====
+        (function () {
+            var bell = document.getElementById('bellBtn');
+            var menu = document.getElementById('cwnMenu');
+            var badge = document.getElementById('cwnBadge');
+            var list = document.getElementById('cwnList');
+            var footer = document.getElementById('cwnFooter');
+            var markAllBtn = document.getElementById('cwnMarkAll');
+            if (!bell || !menu || !badge || !list || !footer || !markAllBtn) return;
 
-        function markAsReadReports(id, element) {
-            let formData = new FormData();
-            formData.append('id', id);
-            
-            fetch('update_notifications.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        element.classList.remove('unread');
-                        let badge = document.getElementById('navBadgeCount');
-                        if (badge) {
-                            let count = parseInt(badge.innerText) - 1;
-                            if (count <= 0) badge.remove();
-                            else badge.innerText = count;
-                        }
-                    }
+            var PREVIEW_COUNT = 3;
+            var POLL_MS = 15000;
+            var state = { items: [], unread: 0, expanded: false, loaded: false };
+            var channel = null;
+            try { channel = ('BroadcastChannel' in window) ? new BroadcastChannel('carbonwise-notifications') : null; } catch (e) { channel = null; }
+
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
                 });
-        }
+            }
+
+            function typeInfo(type) {
+                type = String(type || 'info').toLowerCase();
+                if (type === 'success' || type === 'achievement' || type === 'progress') return { cls: 't-success', icon: 'fa-circle-check' };
+                if (type === 'warning' || type === 'alert') return { cls: 't-warning', icon: 'fa-triangle-exclamation' };
+                if (type === 'error' || type === 'danger') return { cls: 't-error', icon: 'fa-circle-xmark' };
+                return { cls: 't-info', icon: 'fa-circle-info' };
+            }
+
+            function renderBadge() {
+                if (state.unread > 0) {
+                    badge.textContent = state.unread > 99 ? '99+' : state.unread;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            function render() {
+                renderBadge();
+                menu.classList.toggle('expanded', state.expanded);
+
+                if (!state.items.length) {
+                    list.innerHTML = '<div class="cwn-empty">No notifications yet.</div>';
+                    footer.hidden = true;
+                    markAllBtn.hidden = true;
+                    return;
+                }
+
+                var visible = state.expanded ? state.items : state.items.slice(0, PREVIEW_COUNT);
+                list.innerHTML = visible.map(function (n) {
+                    var t = typeInfo(n.type);
+                    return '<div class="cwn-item ' + t.cls + ' ' + (n.is_read ? 'read' : 'unread') + '" data-id="' + parseInt(n.id, 10) + '" role="button" tabindex="0">' +
+                        '<i class="fa-solid ' + t.icon + ' cwn-icon"></i>' +
+                        '<div class="cwn-body">' +
+                            '<div class="cwn-item-title">' + esc(n.title || 'Notification') + (n.is_read ? '' : '<span class="cwn-dot"></span>') + '</div>' +
+                            '<div class="cwn-msg">' + esc(n.message) + '</div>' +
+                            '<div class="cwn-time">' + esc(n.time_ago || n.created_at || '') + '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+
+                if (state.items.length > PREVIEW_COUNT) {
+                    footer.hidden = false;
+                    footer.textContent = state.expanded ? 'Show less' : 'Show all notifications';
+                } else {
+                    footer.hidden = true;
+                }
+                markAllBtn.hidden = (state.unread === 0);
+            }
+
+            function load() {
+                return fetch('get_notifications.php', { credentials: 'same-origin', cache: 'no-store' })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data && data.status === 'success') {
+                            state.items = Array.isArray(data.notifications) ? data.notifications : [];
+                            state.unread = parseInt(data.unread_count, 10) || 0;
+                            state.loaded = true;
+                            render();
+                        } else if (!state.loaded) {
+                            list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
+                        }
+                    })
+                    .catch(function () {
+                        if (!state.loaded) list.innerHTML = '<div class="cwn-empty">Notifications are unavailable right now.</div>';
+                    });
+            }
+
+            function post(formData) {
+                return fetch('update_notifications.php', { method: 'POST', body: formData, credentials: 'same-origin' })
+                    .then(function (res) { return res.json(); });
+            }
+
+            function tellOtherTabs() {
+                try { if (channel) channel.postMessage('changed'); } catch (e) {}
+            }
+
+            function markOne(id) {
+                var item = state.items.find(function (n) { return parseInt(n.id, 10) === id; });
+                if (!item || item.is_read) return;
+                item.is_read = true;
+                state.unread = Math.max(0, state.unread - 1);
+                render();
+                var fd = new FormData();
+                fd.append('id', id);
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { state.unread = parseInt(data.unread_count, 10) || 0; render(); tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function markAll() {
+                state.items.forEach(function (n) { n.is_read = true; });
+                state.unread = 0;
+                render();
+                var fd = new FormData();
+                fd.append('action', 'mark_all');
+                post(fd).then(function (data) {
+                    if (data && data.status === 'success') { tellOtherTabs(); }
+                    else { load(); }
+                }).catch(load);
+            }
+
+            function openMenu() { menu.classList.add('show'); load(); }
+            function closeMenu() { menu.classList.remove('show'); }
+
+            bell.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (menu.classList.contains('show')) closeMenu(); else openMenu();
+            });
+            bell.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bell.click(); }
+            });
+            menu.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+            list.addEventListener('click', function (e) {
+                var el = e.target.closest('.cwn-item');
+                if (el) markOne(parseInt(el.getAttribute('data-id'), 10));
+            });
+            list.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                var el = e.target.closest('.cwn-item');
+                if (el) { e.preventDefault(); markOne(parseInt(el.getAttribute('data-id'), 10)); }
+            });
+            footer.addEventListener('click', function () { state.expanded = !state.expanded; render(); });
+            markAllBtn.addEventListener('click', markAll);
+
+            // Keep every open tab/page in sync
+            if (channel) channel.onmessage = function () { load(); };
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+            setInterval(function () { if (!document.hidden) load(); }, POLL_MS);
+            window.cwnRefresh = load;
+
+            load();
+        })();
 
         const timeDatasets = <?= json_encode($formatted_time_datasets); ?>;
         const sourceDatasets = <?= json_encode($timeframe_by_source); ?>;
@@ -919,50 +1241,165 @@ function time_elapsed_string($datetime, $full = false) {
             }
         });
 
-        const ctxForecast = document.getElementById('forecastChart').getContext('2d');
-        const forecastGradient = ctxForecast.createLinearGradient(0, 0, 0, 280);
-        forecastGradient.addColorStop(0, 'rgba(82, 183, 136, 0.35)');
-        forecastGradient.addColorStop(1, 'rgba(82, 183, 136, 0.01)');
+        // ===== 30-Day Forecast (horizontally scrollable, tap-to-inspect) =====
+        (function () {
+            var labels = forecastLabels.slice();
+            var vals = forecastData.map(Number);
+            var n = vals.length;
 
-        const forecastChart = new Chart(ctxForecast, {
-            type: 'line',
-            data: {
-                labels: forecastLabels,
-                datasets: [{
-                    label: 'Predicted CO2 (kg)',
-                    data: forecastData,
-                    borderColor: '#52B788',
-                    borderWidth: 2.5,
-                    pointRadius: 2,
-                    pointHoverRadius: 6,
-                    fill: true,
-                    backgroundColor: forecastGradient,
-                    tension: 0.35
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: getGridColor(currentTheme) },
-                        ticks: { color: getLabelColor(currentTheme) }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: {
-                            color: getLabelColor(currentTheme),
-                            maxTicksLimit: 10
-                        }
+            var card = document.getElementById('forecastCard');
+            var toggle = document.getElementById('fcToggle');
+            var scroll = document.getElementById('fcScroll');
+            var svg = document.getElementById('fcSvg');
+            var yAxis = document.getElementById('fcY');
+            var selBox = document.getElementById('fcSelected');
+            var selDate = document.getElementById('fcSelDate');
+            var selVal = document.getElementById('fcSelVal');
+            var selClose = document.getElementById('fcSelClose');
+            if (!card || !svg || !n) { if (card) card.style.display = 'none'; return; }
+
+            // summary stats
+            var sum = vals.reduce(function (a, b) { return a + b; }, 0);
+            var peakIdx = 0;
+            vals.forEach(function (v, i) { if (v > vals[peakIdx]) peakIdx = i; });
+            document.getElementById('fcAvg').textContent = (sum / n).toFixed(2) + ' kg';
+            document.getElementById('fcPeak').textContent = vals[peakIdx].toFixed(2) + ' kg';
+            document.getElementById('fcPeakLabel').textContent = 'Peak Day (' + labels[peakIdx] + ')';
+
+            // geometry
+            var H = 190, TOP = 14, BOT = 34, PAD_L = 24, PAD_R = 24, MIN_STEP = 48;
+            var TOTAL_H = TOP + H + BOT;
+            yAxis.style.height = TOTAL_H + 'px';
+
+            var maxVal = Math.max.apply(null, vals.concat([1]));
+            var rough = (maxVal * 1.15) / 4;
+            var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+            var norm = rough / mag;
+            var stepY = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+            var topVal = stepY * 4;
+
+            // y labels (fixed, outside the scroller)
+            var yHtml = '';
+            for (var k = 1; k <= 4; k++) {
+                var yy = TOP + H - (k * stepY / topVal) * H;
+                yHtml += '<span class="fc-ylabel" style="top:' + (yy - 8) + 'px">' + (k * stepY).toFixed(1) + '</span>';
+            }
+            yAxis.innerHTML = yHtml;
+
+            // monotone cubic path (no overshoot below/above data)
+            function smooth(xs, ys) {
+                var m = [], t = [], i;
+                for (i = 0; i < xs.length - 1; i++) m[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
+                t[0] = m[0]; t[xs.length - 1] = m[xs.length - 2];
+                for (i = 1; i < xs.length - 1; i++) t[i] = (m[i - 1] * m[i] <= 0) ? 0 : 2 * m[i - 1] * m[i] / (m[i - 1] + m[i]);
+                var d = 'M' + xs[0] + ',' + ys[0];
+                for (i = 0; i < xs.length - 1; i++) {
+                    var dx = (xs[i + 1] - xs[i]) / 3;
+                    d += ' C' + (xs[i] + dx) + ',' + (ys[i] + t[i] * dx) + ' ' + (xs[i + 1] - dx) + ',' + (ys[i + 1] - t[i + 1] * dx) + ' ' + xs[i + 1] + ',' + ys[i + 1];
+                }
+                return d;
+            }
+
+            var selected = null;
+            var xs = [], ys = [], stepX = MIN_STEP;
+
+            function render() {
+                var cw = scroll.clientWidth || 300;
+                stepX = Math.max(MIN_STEP, (cw - PAD_L - PAD_R) / Math.max(1, n - 1));
+                var W = PAD_L + PAD_R + stepX * (n - 1);
+                xs = vals.map(function (_, i) { return PAD_L + i * stepX; });
+                ys = vals.map(function (v) { return TOP + H - (v / topVal) * H; });
+                var base = TOP + H;
+
+                var out = '<defs><linearGradient id="fcFill" x1="0" y1="0" x2="0" y2="1">' +
+                    '<stop offset="0%" stop-color="var(--fc-line)" stop-opacity="0.28"/>' +
+                    '<stop offset="100%" stop-color="var(--fc-line)" stop-opacity="0.02"/></linearGradient></defs>';
+
+                for (var g = 1; g <= 4; g++) {
+                    var gy = TOP + H - (g * stepY / topVal) * H;
+                    out += '<line x1="0" x2="' + W + '" y1="' + gy + '" y2="' + gy + '" class="fc-grid"/>';
+                }
+
+                var line = smooth(xs, ys);
+                out += '<path d="' + line + ' L' + xs[n - 1] + ',' + base + ' L' + xs[0] + ',' + base + ' Z" fill="url(#fcFill)"/>';
+                out += '<path d="' + line + '" class="fc-line"/>';
+
+                for (var i = 0; i < n; i++) {
+                    if (i % 2 === 0) out += '<text x="' + xs[i] + '" y="' + (base + 26) + '" text-anchor="middle" class="fc-xlabel">' + labels[i] + '</text>';
+                }
+                for (var j = 0; j < n; j++) {
+                    if (j === selected) {
+                        out += '<circle cx="' + xs[j] + '" cy="' + ys[j] + '" r="12" class="fc-halo"/>' +
+                               '<circle cx="' + xs[j] + '" cy="' + ys[j] + '" r="7.5" class="fc-dot-sel"/>';
+                    } else {
+                        out += '<circle cx="' + xs[j] + '" cy="' + ys[j] + '" r="5.5" class="fc-dot"/>';
+                    }
+                }
+                for (var h = 0; h < n; h++) {
+                    out += '<rect x="' + (xs[h] - stepX / 2) + '" y="0" width="' + stepX + '" height="' + TOTAL_H + '" fill="transparent" class="fc-hit" data-i="' + h + '"/>';
+                }
+
+                svg.setAttribute('width', W);
+                svg.setAttribute('height', TOTAL_H);
+                svg.setAttribute('viewBox', '0 0 ' + W + ' ' + TOTAL_H);
+                svg.innerHTML = out;
+            }
+
+            function showSelection() {
+                if (selected === null) { selBox.hidden = true; return; }
+                selDate.textContent = labels[selected];
+                selVal.innerHTML = vals[selected].toFixed(2) + ' kg CO<sub>2</sub>e predicted';
+                selBox.hidden = false;
+                selBox.style.animation = 'none'; void selBox.offsetWidth; selBox.style.animation = '';
+            }
+
+            function select(i) {
+                selected = (selected === i) ? null : i;
+                render();
+                showSelection();
+                if (selected !== null) {
+                    var cw = scroll.clientWidth, x = xs[selected];
+                    if (x < scroll.scrollLeft + 30 || x > scroll.scrollLeft + cw - 30) {
+                        scroll.scrollTo({ left: Math.max(0, x - cw / 2), behavior: 'smooth' });
                     }
                 }
             }
-        });
+
+            // click / tap on a day
+            var dragged = false;
+            svg.addEventListener('click', function (e) {
+                if (dragged) { dragged = false; return; }
+                var hit = e.target.closest('[data-i]');
+                if (hit) select(parseInt(hit.getAttribute('data-i'), 10));
+            });
+            selClose.addEventListener('click', function () { selected = null; render(); showSelection(); });
+
+            // mouse drag-to-scroll (touch uses native swipe)
+            var down = false, startX = 0, startL = 0;
+            scroll.addEventListener('pointerdown', function (e) {
+                if (e.pointerType !== 'mouse') return;
+                down = true; dragged = false; startX = e.clientX; startL = scroll.scrollLeft;
+            });
+            window.addEventListener('pointermove', function (e) {
+                if (!down) return;
+                var dx = e.clientX - startX;
+                if (Math.abs(dx) > 4) { dragged = true; scroll.classList.add('dragging'); }
+                if (dragged) scroll.scrollLeft = startL - dx;
+            });
+            window.addEventListener('pointerup', function () { down = false; scroll.classList.remove('dragging'); });
+
+            // collapse / expand
+            toggle.addEventListener('click', function () {
+                var collapsed = card.classList.toggle('collapsed');
+                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if (!collapsed) render();
+            });
+
+            var rt;
+            window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 120); });
+
+            render();
+        })();
 
         function checkOverTimeDataEmpty(key) {
             const timeObj = timeDatasets[key] || { data: [] };
@@ -1026,17 +1463,12 @@ function time_elapsed_string($datetime, $full = false) {
             bySourceChart.options.plugins.legend.labels.color = label;
             bySourceChart.update();
 
-            forecastChart.options.scales.y.grid.color = grid;
-            forecastChart.options.scales.y.ticks.color = label;
-            forecastChart.options.scales.x.ticks.color = label;
-            forecastChart.update();
         }
         updateChartThemeColors(currentTheme);
 
         window.addEventListener('resize', () => {
             overTimeChart.resize();
             bySourceChart.resize();
-            forecastChart.resize();
         });
     </script>
 </body>
