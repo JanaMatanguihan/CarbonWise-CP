@@ -17,11 +17,16 @@ class AnalyticsReportController extends Controller
     {
         // Filters
         $selectedMonth = request('month');
+        $selectedYear = request('year', now()->year);
 
         $records = CarbonRecord::query();
 
-        if ($selectedMonth) {
-            $date = Carbon::parse($selectedMonth . '-01');
+        if ($selectedMonth && $selectedMonth !== 'all') {
+            $date = Carbon::createFromDate(
+                (int) $selectedYear,
+                (int) $selectedMonth,
+                1
+            );
 
             $records
                 ->whereYear('record_date', $date->year)
@@ -54,7 +59,6 @@ class AnalyticsReportController extends Controller
         $food = (clone $records)
             ->sum('food');
 
-        // Source Data
         $sources = [
             'Transportation' => $transportation,
             'Electricity' => $electricity,
@@ -64,8 +68,12 @@ class AnalyticsReportController extends Controller
         $highestSource = max($sources);
 
         // Emissions Comparison
-        if ($selectedMonth) {
-            $selectedDate = Carbon::parse($selectedMonth . '-01');
+        if ($selectedMonth && $selectedMonth !== 'all') {
+            $selectedDate = Carbon::createFromDate(
+                (int) $selectedYear,
+                (int) $selectedMonth,
+                1
+            );
         } else {
             $selectedDate = now()->startOfMonth();
         }
@@ -97,7 +105,6 @@ class AnalyticsReportController extends Controller
             ],
         ];
 
-        // Return Analytics Page
         return view(
             'admin.analytics-reports',
             compact(
@@ -113,25 +120,35 @@ class AnalyticsReportController extends Controller
         );
     }
 
-    // Export Excel Report
+    /**
+     * Export Excel Report.
+     */
     public function exportExcel()
     {
         return Excel::download(
-            new AnalyticsReportExport,
+            new AnalyticsReportExport(),
             'carbonwise-analytics-report.xlsx'
         );
     }
 
-    // Export PDF Report
+    /**
+     * Export PDF Report.
+     *
+     * Limits the number of detail rows rendered by DomPDF
+     * to help prevent timeouts with large datasets.
+     */
     public function exportPDF()
     {
-        $records = CarbonRecord::latest()
+        $records = CarbonRecord::query()
+            ->orderByDesc('record_date')
+            ->orderByDesc('id')
+            ->limit(500)
             ->get();
 
         $pdf = Pdf::loadView(
             'admin.analytics-pdf',
             compact('records')
-        );
+        )->setPaper('a4', 'landscape');
 
         return $pdf->download(
             'carbonwise-analytics-report.pdf'

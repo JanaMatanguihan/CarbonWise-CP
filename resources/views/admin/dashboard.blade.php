@@ -249,6 +249,187 @@
         color: #2f7d57;
         font-weight: 500;
     }
+
+    /* Keep Overview cards consistent with the User Side theme */
+    [data-theme="dark"] .overview-page {
+        color: #F3F4F6;
+    }
+
+    [data-theme="dark"] .overview-card {
+        background: #121A16;
+        border-color: #1B3A2B;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+    }
+
+    [data-theme="dark"] .overview-card:hover {
+        border-color: #2D6A4F;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+    }
+
+    [data-theme="dark"] .overview-card-title,
+    [data-theme="dark"] .overview-stat-value,
+    [data-theme="dark"] .overview-department-name,
+    [data-theme="dark"] .overview-alert-title,
+    [data-theme="dark"] .overview-strategy-title {
+        color: #F3F4F6;
+    }
+
+    [data-theme="dark"] .overview-card-description,
+    [data-theme="dark"] .overview-stat-label,
+    [data-theme="dark"] .overview-stat-unit,
+    [data-theme="dark"] .overview-department-value,
+    [data-theme="dark"] .overview-small,
+    [data-theme="dark"] .overview-alert-message,
+    [data-theme="dark"] .overview-alert-time,
+    [data-theme="dark"] .overview-strategy-description {
+        color: #9CA3AF;
+    }
+
+    [data-theme="dark"] .overview-legend {
+        color: #D1D5DB;
+    }
+
+    [data-theme="dark"] .overview-select {
+        background: #18241F;
+        border-color: #2D6A4F;
+        color: #F3F4F6;
+    }
+
+    [data-theme="dark"] .overview-select option {
+        background: #121A16;
+        color: #F3F4F6;
+    }
+
+    [data-theme="dark"] .overview-card .bg-gray-200 {
+        background-color: #1B3A2B;
+    }
+
+    [data-theme="dark"] .overview-card .border-gray-100,
+    [data-theme="dark"] .overview-card .border-r {
+        border-color: #1B3A2B;
+    }
+
+    [data-theme="dark"] .overview-forecast-empty {
+        color: #9CA3AF;
+    }
+
+    /* Responsive dashboard: prevent cards and chart labels from overflowing */
+    .overview-page,
+    .overview-page > *,
+    .overview-card,
+    .overview-card > *,
+    .overview-chart,
+    .overview-chart canvas {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .overview-card {
+        overflow: hidden;
+    }
+
+    .overview-stat-value {
+        font-size: clamp(18px, 1.5vw, 28px);
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .overview-card-title,
+    .overview-card-description,
+    .overview-stat-label,
+    .overview-stat-unit,
+    .overview-stat-subtext,
+    .overview-legend,
+    .overview-department-name,
+    .overview-department-value,
+    .overview-alert-title,
+    .overview-alert-message,
+    .overview-strategy-title,
+    .overview-strategy-description {
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .overview-department-name {
+        min-width: 0;
+    }
+
+    .overview-alert-time {
+        white-space: normal;
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .overview-chart-large,
+    .overview-chart-medium,
+    .overview-chart-small {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    @media (max-width: 1280px) {
+        .overview-page {
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        .overview-card {
+            padding: 16px !important;
+        }
+
+        .overview-stat-value {
+            font-size: clamp(17px, 1.7vw, 24px);
+        }
+
+        .overview-chart-large { height: 270px; }
+        .overview-chart-medium { height: 250px; }
+    }
+
+    @media (max-width: 900px) {
+        .overview-page {
+            padding: 12px;
+        }
+
+        .overview-stat-value {
+            font-size: clamp(18px, 3vw, 25px);
+        }
+
+        .overview-chart-large { height: 250px; }
+        .overview-chart-medium { height: 230px; }
+        .overview-chart-small { height: 200px; }
+    }
+
+    @media (max-width: 600px) {
+        .overview-page {
+            padding: 10px;
+            gap: 12px;
+        }
+
+        .overview-card {
+            padding: 14px !important;
+            border-radius: 10px;
+        }
+
+        .overview-card-title {
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        .overview-stat-value {
+            font-size: clamp(18px, 5vw, 24px);
+        }
+
+        .overview-chart-large { height: 230px; }
+        .overview-chart-medium { height: 220px; }
+        .overview-chart-small { height: 190px; }
+
+        .overview-select {
+            min-width: 0;
+            max-width: 100%;
+        }
+    }
+
 </style>
 
 <div class="overview-page max-w-[1800px] mx-auto px-4 py-5 space-y-4">
@@ -1941,6 +2122,31 @@ document.addEventListener('DOMContentLoaded', function () {
         );
 
     }
+
+
+    // Update chart labels and grid lines when the shared theme changes.
+    window.addEventListener('carbonwise:themechange', function (event) {
+        const dark = event.detail && event.detail.theme === 'dark';
+        const tickColor = dark ? '#9CA3AF' : '#667085';
+        const gridColor = dark ? '#1B3A2B' : '#e5e7eb';
+
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.color = tickColor;
+
+            Object.values(Chart.instances || {}).forEach(function (chart) {
+                if (!chart || !chart.options) return;
+
+                if (chart.options.scales) {
+                    Object.values(chart.options.scales).forEach(function (scale) {
+                        if (scale.ticks) scale.ticks.color = tickColor;
+                        if (scale.grid) scale.grid.color = gridColor;
+                    });
+                }
+
+                chart.update('none');
+            });
+        }
+    });
 
 });
 </script>

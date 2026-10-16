@@ -87,18 +87,18 @@
     }
 
     .profile-small {
-        font-size: 11px;
-        line-height: 1.5;
+        font-size: 13px;
+        line-height: 1.6;
     }
 
     .profile-label {
-        font-size: 12px;
+        font-size: 14px;
         color: #6b7280;
         font-weight: 500;
     }
 
     .profile-value {
-        font-size: 13px;
+        font-size: 14px;
         color: #111827;
         font-weight: 600;
     }
@@ -261,22 +261,23 @@
     }
 
     .profile-stat-label {
-        font-size: 12px;
+        font-size: 13px;
         color: #6b7280;
-        line-height: 1.4;
+        line-height: 1.5;
     }
 
     .profile-stat-value {
         margin-top: 4px;
-        font-size: 21px;
-        line-height: 1.2;
+        font-size: clamp(18px, 1.3vw, 22px);
+        line-height: 1.25;
+        overflow-wrap: anywhere;
         color: #111827;
         font-weight: 700;
     }
 
     .profile-stat-unit {
         margin-top: 3px;
-        font-size: 10px;
+        font-size: 12px;
         color: #6b7280;
     }
 
@@ -335,6 +336,138 @@
             white-space: nowrap;
         }
     }
+
+
+    /* CarbonWise shared dark-mode palette */
+    html[data-theme="dark"] .profile-page {
+        color: #F3F4F6;
+        color-scheme: dark;
+    }
+
+    html[data-theme="dark"] .profile-card,
+    html[data-theme="dark"] .profile-info-box,
+    html[data-theme="dark"] .profile-stat-card,
+    html[data-theme="dark"] .profile-chart-card {
+        background: #121A16;
+        border-color: #1B3A2B;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+    }
+
+    html[data-theme="dark"] .profile-title,
+    html[data-theme="dark"] .profile-section-title,
+    html[data-theme="dark"] .profile-value,
+    html[data-theme="dark"] .profile-stat-value,
+    html[data-theme="dark"] .profile-chart-title,
+    html[data-theme="dark"] .profile-page .text-gray-900 {
+        color: #F3F4F6 !important;
+    }
+
+    html[data-theme="dark"] .profile-muted,
+    html[data-theme="dark"] .profile-label,
+    html[data-theme="dark"] .profile-stat-label,
+    html[data-theme="dark"] .profile-stat-unit,
+    html[data-theme="dark"] .profile-chart-description,
+    html[data-theme="dark"] .profile-empty,
+    html[data-theme="dark"] .profile-page .text-gray-500,
+    html[data-theme="dark"] .profile-page .text-gray-600 {
+        color: #9CA3AF !important;
+    }
+
+    html[data-theme="dark"] .profile-back-button,
+    html[data-theme="dark"] .profile-edit-button {
+        background: #18241F;
+        color: #76C893;
+        border-color: #2D6A4F;
+    }
+
+    html[data-theme="dark"] .profile-back-button:hover,
+    html[data-theme="dark"] .profile-edit-button:hover {
+        background: #162E24;
+        color: #B7E4C7;
+        border-color: #52B788;
+    }
+
+    html[data-theme="dark"] .profile-tabs {
+        border-bottom-color: #1B3A2B;
+    }
+
+    html[data-theme="dark"] .profile-tab {
+        color: #9CA3AF;
+    }
+
+    html[data-theme="dark"] .profile-tab:hover,
+    html[data-theme="dark"] .profile-tab.active {
+        color: #76C893;
+    }
+
+    html[data-theme="dark"] .profile-tab.active::after {
+        background: #52B788;
+    }
+
+    html[data-theme="dark"] .profile-role {
+        background: #163D2A;
+        color: #76C893;
+    }
+
+    html[data-theme="dark"] .profile-avatar {
+        border-color: #1B3A2B;
+    }
+
+    html[data-theme="dark"] .profile-avatar-initials {
+        border-color: #1B3A2B;
+        background: #2D6A4F;
+    }
+
+    html[data-theme="dark"] .profile-info-row {
+        border-bottom: 1px solid rgba(118, 200, 147, 0.08);
+    }
+
+    html[data-theme="dark"] .profile-info-row:last-child {
+        border-bottom: 0;
+    }
+
+    html[data-theme="dark"] .profile-page .profile-status {
+        color: #76C893;
+    }
+
+    html[data-theme="dark"] .profile-stat-icon {
+        filter: brightness(0.85);
+    }
+
+    .profile-page,
+    .profile-page .profile-card,
+    .profile-page .profile-info-box,
+    .profile-page .profile-stat-card,
+    .profile-page .profile-chart-card,
+    .profile-page .profile-tabs,
+    .profile-page .profile-tab,
+    .profile-page .profile-back-button,
+    .profile-page .profile-edit-button {
+        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    @media (max-width: 640px) {
+        .profile-info-row {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .profile-value {
+            text-align: left !important;
+            overflow-wrap: anywhere;
+        }
+
+        .profile-chart-card {
+            padding: 16px;
+            min-height: 340px;
+        }
+
+        .profile-stat-card {
+            padding: 16px;
+        }
+    }
+
 </style>
 
 <div class="profile-page">
@@ -508,13 +641,6 @@
                     class="profile-tab"
                 >
                     Carbon Records
-                </a>
-
-                <a
-                    href="{{ route('admin.users.badges', $user->g_suite) }}"
-                    class="profile-tab"
-                >
-                    Badges
                 </a>
 
             </div>
@@ -766,6 +892,14 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
+    const isDarkTheme = () => document.documentElement.getAttribute('data-theme') === 'dark';
+    const chartTextColor = () => isDarkTheme() ? '#9CA3AF' : '#6b7280';
+    const chartStrongTextColor = () => isDarkTheme() ? '#F3F4F6' : '#111827';
+    const chartGridColor = () => isDarkTheme() ? '#1B3A2B' : '#e5e7eb';
+    let profileBreakdownChart = null;
+    let profileTrendChart = null;
+    let profileTrendHasData = false;
+
     const dataElement = document.getElementById('profile-chart-data');
 
     if (!dataElement) {
@@ -774,6 +908,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const chartData = JSON.parse(dataElement.textContent);
 
+    const transportationValue = Number(chartData.transportation || 0);
+    const electricityValue = Number(chartData.electricity || 0);
+    const foodValue = Number(chartData.food || 0);
+    const hasBreakdownData =
+        transportationValue > 0 || electricityValue > 0 || foodValue > 0;
+
+    const neutralChartColor = () => isDarkTheme() ? '#26332D' : '#E5E7EB';
 
     /*
      * Emissions Breakdown
@@ -783,7 +924,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (breakdownElement && typeof ApexCharts !== 'undefined') {
 
-        const breakdownChart = new ApexCharts(
+        profileBreakdownChart = new ApexCharts(
             breakdownElement,
             {
                 chart: {
@@ -795,41 +936,51 @@ document.addEventListener('DOMContentLoaded', function () {
                     fontFamily: 'Poppins, sans-serif'
                 },
 
-                series: [
-                    Number(chartData.transportation || 0),
-                    Number(chartData.electricity || 0),
-                    Number(chartData.food || 0)
-                ],
+                // ApexCharts does not draw a donut when every value is zero.
+                // Use one neutral placeholder slice in that case, while the
+                // center label continues to display the real total (0 kg).
+                series: hasBreakdownData
+                    ? [transportationValue, electricityValue, foodValue]
+                    : [1],
 
-                labels: [
-                    'Transportation',
-                    'Electricity',
-                    'Food Consumption'
-                ],
+                labels: hasBreakdownData
+                    ? ['Transportation', 'Electricity', 'Food Consumption']
+                    : ['No emissions'],
 
-                colors: [
-                    '#2f9d68',
-                    '#f59e0b',
-                    '#ef4444'
-                ],
+                colors: hasBreakdownData
+                    ? ['#2f9d68', '#f59e0b', '#ef4444']
+                    : [neutralChartColor()],
 
                 dataLabels: {
                     enabled: false
                 },
 
                 legend: {
+                    show: hasBreakdownData,
                     position: 'bottom',
                     fontFamily: 'Poppins, sans-serif',
                     fontSize: '11px',
 
                     labels: {
-                        colors: '#6b7280'
+                        colors: chartTextColor()
+                    }
+                },
+
+                tooltip: {
+                    enabled: hasBreakdownData,
+                    y: {
+                        formatter: function (value) {
+                            return Number(value).toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 2 }
+                            ) + ' kg CO₂e';
+                        }
                     }
                 },
 
                 stroke: {
                     width: 2,
-                    colors: ['#ffffff']
+                    colors: [isDarkTheme() ? '#121A16' : '#ffffff']
                 },
 
                 plotOptions: {
@@ -844,7 +995,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     show: true,
                                     fontFamily: 'Poppins, sans-serif',
                                     fontSize: '12px',
-                                    color: '#6b7280'
+                                    color: chartTextColor()
                                 },
 
                                 value: {
@@ -852,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     fontFamily: 'Poppins, sans-serif',
                                     fontSize: '18px',
                                     fontWeight: 700,
-                                    color: '#111827',
+                                    color: chartStrongTextColor(),
 
                                     formatter: function (value) {
                                         return Number(value).toLocaleString(
@@ -869,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     label: 'Total Emissions',
                                     fontFamily: 'Poppins, sans-serif',
                                     fontSize: '12px',
-                                    color: '#6b7280',
+                                    color: chartTextColor(),
 
                                     formatter: function () {
                                         return Number(
@@ -887,22 +1038,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 },
 
-                tooltip: {
-                    y: {
-                        formatter: function (value) {
-                            return Number(value).toLocaleString(
-                                undefined,
-                                {
-                                    maximumFractionDigits: 2
-                                }
-                            ) + ' kg CO₂e';
-                        }
-                    }
-                }
             }
         );
 
-        breakdownChart.render();
+        profileBreakdownChart.render();
     }
 
 
@@ -927,7 +1066,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 : [];
 
 
-        const trendChart = new ApexCharts(
+        profileTrendHasData = historyValues.some(function (value) {
+            return value > 0;
+        });
+
+        profileTrendChart = new ApexCharts(
             trendElement,
             {
                 chart: {
@@ -939,14 +1082,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     fontFamily: 'Poppins, sans-serif'
                 },
 
+                // Keep the chart axes and dates visible, but don't draw a
+                // colored line or markers when every recorded value is zero.
                 series: [
                     {
                         name: 'CO₂e',
-                        data: historyValues
+                        data: profileTrendHasData
+                            ? historyValues
+                            : historyValues.map(function () { return null; })
                     }
                 ],
 
-                colors: ['#2f7d57'],
+                colors: [profileTrendHasData ? '#2f7d57' : neutralChartColor()],
 
                 stroke: {
                     curve: 'smooth',
@@ -967,11 +1114,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
 
                 markers: {
-                    size: 4,
+                    size: profileTrendHasData ? 4 : 0,
                     strokeWidth: 2,
 
                     hover: {
-                        size: 6
+                        size: profileTrendHasData ? 6 : 0
                     }
                 },
 
@@ -982,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         style: {
                             fontFamily: 'Poppins, sans-serif',
                             fontSize: '10px',
-                            colors: '#6b7280'
+                            colors: chartTextColor()
                         },
 
                         rotate: -35,
@@ -999,26 +1146,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
 
                 yaxis: {
+                    min: 0,
+                    ...(profileTrendHasData ? {} : { max: 1 }),
                     labels: {
                         style: {
                             fontFamily: 'Poppins, sans-serif',
                             fontSize: '10px',
-                            colors: '#6b7280'
+                            colors: chartTextColor()
                         },
 
                         formatter: function (value) {
                             return Number(value).toLocaleString(
                                 undefined,
-                                {
-                                    maximumFractionDigits: 0
-                                }
+                                { maximumFractionDigits: 0 }
                             );
                         }
                     }
                 },
 
                 grid: {
-                    borderColor: '#e5e7eb',
+                    borderColor: chartGridColor(),
                     strokeDashArray: 4
                 },
 
@@ -1041,8 +1188,55 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         );
 
-        trendChart.render();
+        profileTrendChart.render();
     }
+
+
+    function updateProfileChartsForTheme() {
+        const textColor = chartTextColor();
+        const strongTextColor = chartStrongTextColor();
+        const gridColor = chartGridColor();
+        const dark = isDarkTheme();
+
+        if (profileBreakdownChart) {
+            profileBreakdownChart.updateOptions({
+                chart: { background: 'transparent', foreColor: textColor },
+                colors: hasBreakdownData
+                    ? ['#2f9d68', '#f59e0b', '#ef4444']
+                    : [neutralChartColor()],
+                legend: { show: hasBreakdownData, labels: { colors: textColor } },
+                stroke: { colors: [dark ? '#121A16' : '#ffffff'] },
+                plotOptions: { pie: { donut: { labels: {
+                    name: { color: textColor },
+                    value: { color: strongTextColor },
+                    total: { color: textColor }
+                } } } }
+            }, false, true);
+        }
+
+        if (profileTrendChart) {
+            profileTrendChart.updateOptions({
+                chart: { background: 'transparent', foreColor: textColor },
+                colors: [profileTrendHasData ? '#2f7d57' : neutralChartColor()],
+                xaxis: { labels: { style: { colors: textColor } } },
+                yaxis: {
+                    min: 0,
+                    ...(profileTrendHasData ? {} : { max: 1 }),
+                    labels: { style: { colors: textColor } }
+                },
+                markers: {
+                    size: profileTrendHasData ? 4 : 0,
+                    hover: { size: profileTrendHasData ? 6 : 0 }
+                },
+                grid: { borderColor: gridColor }
+            }, false, true);
+        }
+    }
+
+    window.addEventListener('carbonwise:themechange', updateProfileChartsForTheme);
+    window.addEventListener('storage', function (event) {
+        if (event.key === 'theme') updateProfileChartsForTheme();
+    });
 
 });
 </script>

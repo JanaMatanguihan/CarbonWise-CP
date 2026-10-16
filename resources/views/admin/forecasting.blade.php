@@ -7,102 +7,127 @@
 @section('content')
 
 <style>
-
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
     .forecast-page {
+        --forecast-card: #ffffff;
+        --forecast-text: #111827;
+        --forecast-secondary: #5b6472;
+        --forecast-muted: #6b7280;
+        --forecast-border: #e5e7eb;
+        --forecast-grid: #e5e7eb;
+        --forecast-tooltip: #ffffff;
         font-family: 'Poppins', sans-serif;
-        color: #111111;
+        color: var(--forecast-text);
+        width: 100%;
+        min-width: 0;
     }
+
+    .forecast-page *, .forecast-page *::before, .forecast-page *::after { box-sizing: border-box; }
 
     .forecast-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+        min-width: 0;
+        background: var(--forecast-card);
+        color: var(--forecast-text);
+        border: 1px solid var(--forecast-border);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: background-color .2s ease, border-color .2s ease, color .2s ease;
     }
 
-    .forecast-card-label {
+    .forecast-card-label, .forecast-metric-label {
         font-family: 'Poppins', sans-serif;
-        font-size: 11px;
-        line-height: 16px;
-        font-weight: 500;
-        color: #111111;
+        font-size: clamp(12px, .85rem, 14px);
+        line-height: 1.5;
+        font-weight: 600;
+        color: var(--forecast-text);
+        overflow-wrap: anywhere;
     }
 
-    .forecast-main-value {
+    .forecast-main-value, .forecast-metric-value {
         font-family: 'Poppins', sans-serif;
-        font-size: 23px;
-        line-height: 32px;
+        font-size: clamp(22px, 1.6vw, 28px);
+        line-height: 1.35;
         font-weight: 700;
-        letter-spacing: -0.5px;
-        color: #111111;
+        letter-spacing: -.35px;
+        color: var(--forecast-text);
+        overflow-wrap: anywhere;
     }
 
     .forecast-unit {
         font-family: 'Poppins', sans-serif;
-        font-size: 8px;
-        line-height: 12px;
-        font-weight: 400;
-        color: #333333;
+        font-size: clamp(10px, .75rem, 12px);
+        line-height: 1.5;
+        font-weight: 500;
+        color: var(--forecast-secondary);
     }
 
     .forecast-small-text {
         font-family: 'Poppins', sans-serif;
-        font-size: 8px;
-        line-height: 13px;
+        font-size: clamp(11px, .78rem, 13px);
+        line-height: 1.55;
         font-weight: 400;
-        color: #9ca3af;
+        color: var(--forecast-muted);
+        overflow-wrap: anywhere;
     }
 
     .forecast-confidence {
         font-family: 'Poppins', sans-serif;
-        font-size: 23px;
-        line-height: 32px;
+        font-size: clamp(22px, 1.6vw, 28px);
+        line-height: 1.35;
         font-weight: 700;
         color: #2f7d57;
+        overflow-wrap: anywhere;
     }
 
     .forecast-model {
         font-family: 'Poppins', sans-serif;
-        font-size: 15px;
-        line-height: 21px;
+        font-size: clamp(14px, 1rem, 16px);
+        line-height: 1.5;
         font-weight: 700;
-        color: #111111;
+        color: var(--forecast-text);
+        overflow-wrap: anywhere;
     }
 
-    .forecast-chart-title {
-        font-family: 'Poppins', sans-serif;
-        font-size: 15px;
-        line-height: 22px;
-        font-weight: 700;
-        color: #111111;
+    .forecast-chart-title { font-size: clamp(16px, 1.1rem, 18px); line-height: 1.5; font-weight: 700; color: var(--forecast-text); }
+    .forecast-chart-description { font-size: clamp(12px, .82rem, 14px); line-height: 1.55; font-weight: 400; color: var(--forecast-secondary); }
+
+    #forecastChart { display: block; width: 100%; min-width: 0; height: 320px; min-height: 320px; overflow: hidden; }
+    #forecastChart .apexcharts-canvas { width: 100% !important; height: 320px !important; }
+    .forecast-chart-legend { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 0 0 .5rem; color: var(--forecast-text); font-size: 12px; line-height: 1.4; }
+    .forecast-chart-legend-item { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
+    .forecast-legend-line { display: inline-block; width: 22px; height: 0; border-top: 2px solid #2F7D57; }
+    .forecast-legend-line--forecast { border-top-style: dashed; }
+    #forecastChart .apexcharts-canvas, #forecastChart svg { max-width: 100%; }
+    #forecastChart .apexcharts-tooltip { border: 1px solid var(--forecast-border); }
+
+    /* Match the shared admin layout theme: html[data-theme="dark"]. */
+    html[data-theme="dark"] .forecast-page {
+        --forecast-card: #121a16;
+        --forecast-text: #f3f4f6;
+        --forecast-secondary: #c0c8c3;
+        --forecast-muted: #a7b0aa;
+        --forecast-border: #294236;
+        --forecast-grid: #294236;
+        --forecast-tooltip: #121a16;
     }
 
-    .forecast-chart-description {
-        font-family: 'Poppins', sans-serif;
-        font-size: 9px;
-        line-height: 14px;
-        font-weight: 400;
-        color: #6b7280;
+    html[data-theme="dark"] .forecast-card { box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
+    html[data-theme="dark"] .forecast-confidence { color: #75c99a; }
+
+    @media (max-width: 640px) {
+        #forecastChart, #forecastChart .apexcharts-canvas { height: 280px !important; min-height: 280px; }
+        .forecast-chart-card { padding: 1rem !important; }
+        .forecast-page .forecast-card { border-radius: 10px; }
     }
 
-    .forecast-metric-label {
-        font-family: 'Poppins', sans-serif;
-        font-size: 11px;
-        line-height: 16px;
-        font-weight: 500;
-        color: #111111;
+    @media (min-width: 641px) and (max-width: 1024px) {
+        #forecastChart, #forecastChart .apexcharts-canvas { height: 300px !important; min-height: 300px; }
     }
 
-    .forecast-metric-value {
-        font-family: 'Poppins', sans-serif;
-        font-size: 23px;
-        line-height: 32px;
-        font-weight: 700;
-        color: #111111;
+    @media (prefers-reduced-motion: reduce) {
+        .forecast-card { transition: none; }
     }
-
 </style>
 
 <div class="forecast-page">
@@ -211,7 +236,7 @@
 
     <!-- Forecast Chart -->
 
-    <div class="forecast-card mt-6 px-7 py-7">
+    <div class="forecast-card forecast-chart-card mt-6 px-7 py-7">
 
         <div class="mb-5">
 
@@ -233,10 +258,16 @@
             data-forecast-values="{{ json_encode($forecastValues->values()) }}"
         ></div>
 
+        <div class="forecast-chart-legend" aria-label="Chart legend">
+            <span class="forecast-chart-legend-item"><span class="forecast-legend-line" aria-hidden="true"></span>Historical</span>
+            <span class="forecast-chart-legend-item"><span class="forecast-legend-line forecast-legend-line--forecast" aria-hidden="true"></span>Forecast</span>
+        </div>
+
         <div
             id="forecastChart"
             class="w-full"
-            style="height: 330px;"
+            role="img"
+            aria-label="Historical carbon emissions and future TFT forecast chart"
         ></div>
 
     </div>
@@ -401,15 +432,26 @@
             : null;
 
 
+    // Theme values follow the shared admin layout's html[data-theme] attribute.
+    const isForecastDarkMode = () => document.documentElement.getAttribute('data-theme') === 'dark';
+    const forecastTextColor = () => isForecastDarkMode() ? '#c0c8c3' : '#6b7280';
+    const forecastGridColor = () => isForecastDarkMode() ? '#294236' : '#e5e7eb';
+
     // Configure the chart
 
     const forecastOptions = {
+
+        theme: { mode: isForecastDarkMode() ? 'dark' : 'light' },
 
         chart: {
 
             type: 'area',
 
-            height: 330,
+            height: 320,
+            width: '100%',
+            parentHeightOffset: 0,
+            redrawOnParentResize: true,
+            redrawOnWindowResize: true,
 
             toolbar: {
                 show: false
@@ -420,6 +462,9 @@
             },
 
             fontFamily: 'Poppins, sans-serif',
+            foreColor: forecastTextColor(),
+            background: 'transparent',
+
 
             animations: {
                 enabled: true
@@ -507,9 +552,9 @@
 
                     fontFamily: 'Poppins, sans-serif',
 
-                    fontSize: '9px',
+                    fontSize: '12px',
 
-                    colors: '#9ca3af'
+                    colors: forecastTextColor()
 
                 }
 
@@ -544,9 +589,9 @@
 
                     fontFamily: 'Poppins, sans-serif',
 
-                    fontSize: '9px',
+                    fontSize: '12px',
 
-                    colors: '#9ca3af'
+                    colors: forecastTextColor()
 
                 },
 
@@ -571,11 +616,11 @@
 
                     fontFamily: 'Poppins, sans-serif',
 
-                    fontSize: '9px',
+                    fontSize: '12px',
 
                     fontWeight: 500,
 
-                    color: '#6b7280'
+                    color: forecastTextColor()
 
                 }
 
@@ -586,7 +631,7 @@
 
         grid: {
 
-            borderColor: '#e5e7eb',
+            borderColor: forecastGridColor(),
 
             strokeDashArray: 3,
 
@@ -602,57 +647,12 @@
 
 
         legend: {
-
-            position: 'top',
-
-            horizontalAlign: 'right',
-
-            fontFamily: 'Poppins, sans-serif',
-
-            fontSize: '9px',
-
-            labels: {
-
-                colors: '#111111'
-
-            },
-
-            markers: {
-
-                width: 0,
-
-                height: 0
-
-            },
-
-            itemMargin: {
-
-                horizontal: 8
-
-            },
-
-            customLegendItems: [
-
-                'Historical',
-                'Forecast'
-            ],
-
-            onItemClick: {
-
-                toggleDataSeries: true
-
-            },
-
-            onItemHover: {
-
-                highlightDataSeries: false
-
-            }
-
+            show: false
         },
 
-
         tooltip: {
+
+            theme: isForecastDarkMode() ? 'dark' : 'light',
 
             shared: false,
 
@@ -745,45 +745,22 @@
     );
 
 
-    // Render the chart
+    // Render chart. A separate HTML legend guarantees solid/dashed samples.
+    forecastChart.render();
 
-    forecastChart.render().then(function () {
-
-        const legendItems =
-            document.querySelectorAll(
-                '#forecastChart .apexcharts-legend-series'
-            );
-
-        legendItems.forEach(function (item, index) {
-
-            const marker = document.createElement('span');
-
-            marker.style.display = 'inline-block';
-            marker.style.width = '18px';
-            marker.style.height = '2px';
-            marker.style.marginRight = '6px';
-            marker.style.verticalAlign = 'middle';
-            marker.style.backgroundColor = '#2F7D57';
-
-            if (index === 1) {
-
-                marker.style.background =
-                    'repeating-linear-gradient(to right, #2F7D57 0px, #2F7D57 5px, transparent 5px, transparent 8px)';
-
-            }
-
-            const text =
-                item.querySelector('.apexcharts-legend-text');
-
-            if (text) {
-
-                item.insertBefore(marker, text);
-
-            }
-
-        });
-
+    // Update ApexCharts colors when the shared theme toggle changes.
+    const forecastThemeObserver = new MutationObserver(function () {
+        const dark = isForecastDarkMode();
+        forecastChart.updateOptions({
+            chart: { foreColor: forecastTextColor() },
+            theme: { mode: dark ? 'dark' : 'light' },
+            xaxis: { labels: { style: { colors: forecastTextColor(), fontSize: '12px', fontFamily: 'Poppins, sans-serif' } } },
+            yaxis: { labels: { style: { colors: forecastTextColor(), fontSize: '12px', fontFamily: 'Poppins, sans-serif' } }, title: { style: { color: forecastTextColor() } } },
+            grid: { borderColor: forecastGridColor() },
+            tooltip: { theme: dark ? 'dark' : 'light' }
+        }, false, true);
     });
+    forecastThemeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 </script>
 

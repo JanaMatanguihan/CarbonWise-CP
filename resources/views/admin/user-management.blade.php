@@ -508,6 +508,394 @@
             padding-bottom: 14px;
         }
     }
+
+    /* =========================================
+       CarbonWise theme support
+       Follows the shared admin layout's data-theme
+    ========================================== */
+
+    .users-page {
+        background: var(--page-background, #f1f1ee) !important;
+        color: var(--text-primary, #111111);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .users-card {
+        background: var(--card-background, #ffffff);
+        color: var(--text-primary, #111111);
+        border-color: var(--border-color, #e5e7eb);
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .users-toolbar,
+    .users-pagination {
+        border-color: var(--border-color, #e5e7eb);
+    }
+
+    .users-search,
+    .users-filter {
+        background: var(--input-bg, #ffffff);
+        color: var(--text-primary, #111111);
+        border-color: var(--input-border, #d1d5db);
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .users-filter option {
+        background: var(--card-background, #ffffff);
+        color: var(--text-primary, #111111);
+    }
+
+    .users-table-wrapper {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .users-table {
+        min-width: 900px;
+    }
+
+    .users-table thead th {
+        color: var(--text-primary, #111111);
+        border-color: var(--border-color, #d1d5db);
+    }
+
+    .users-table tbody tr {
+        border-color: var(--border-color, #eeeeee);
+    }
+
+    .users-table tbody tr:hover {
+        background: var(--bg-sidebar-hover, #fafafa);
+    }
+
+    .users-table tbody td,
+    .user-name,
+    .user-role {
+        color: var(--text-primary, #111111);
+    }
+
+    .user-email,
+    .user-department,
+    .user-joined {
+        color: var(--text-muted, #6b7280);
+    }
+
+    .action-button {
+        color: var(--text-secondary, #4b5563);
+    }
+
+    .action-button:hover {
+        background: var(--bg-sidebar-hover, #f3f4f6);
+        border-color: var(--border-color, #e5e7eb);
+        color: var(--text-primary, #111111);
+    }
+
+    .action-menu-dropdown {
+        background: var(--card-background, #ffffff);
+        border-color: var(--border-color, #e5e7eb);
+    }
+
+    .action-menu-dropdown a {
+        color: var(--text-primary, #374151);
+    }
+
+    .action-menu-dropdown a:hover {
+        background: var(--bg-sidebar-hover, #f9fafb);
+    }
+
+    .action-menu-dropdown button {
+        background: var(--card-background, #ffffff);
+    }
+
+    .action-menu-dropdown .border-t {
+        border-color: var(--border-color, #e5e7eb);
+    }
+
+    .users-pagination-text {
+        color: var(--text-muted, #9ca3af);
+    }
+
+    .users-pagination-text strong {
+        color: var(--text-secondary, #6b7280);
+    }
+
+    .pagination-button {
+        background: var(--input-bg, #ffffff);
+        border-color: var(--input-border, #d1d5db);
+        color: var(--text-secondary, #374151);
+    }
+
+    .pagination-button:hover,
+    .pagination-current {
+        background: var(--bg-sidebar-hover, #f3f4f6);
+        color: var(--text-primary, #111111);
+    }
+
+    .pagination-disabled {
+        background: var(--card-background, #ffffff);
+        color: var(--text-muted, #d1d5db);
+    }
+
+    [data-theme="dark"] .users-page {
+        --page-background: #0A0F0D;
+        --card-background: #121A16;
+        --text-primary: #F3F4F6;
+        --text-secondary: #9CA3AF;
+        --text-muted: #9CA3AF;
+        --border-color: #1B3A2B;
+        --input-bg: #18241F;
+        --input-border: #2D6A4F;
+        --bg-sidebar-hover: #162E24;
+        background: #0A0F0D !important;
+        color: #F3F4F6 !important;
+    }
+
+    [data-theme="dark"] .users-card,
+    [data-theme="dark"] .action-menu-dropdown {
+        background: #121A16 !important;
+        border-color: #1B3A2B !important;
+        color: #F3F4F6 !important;
+    }
+
+    [data-theme="dark"] .users-toolbar,
+    [data-theme="dark"] .users-pagination,
+    [data-theme="dark"] .users-table thead th,
+    [data-theme="dark"] .users-table tbody tr {
+        border-color: #1B3A2B !important;
+    }
+
+    [data-theme="dark"] .users-search,
+    [data-theme="dark"] .users-filter,
+    [data-theme="dark"] .pagination-button {
+        background: #18241F !important;
+        color: #F3F4F6 !important;
+        border-color: #2D6A4F !important;
+    }
+
+    [data-theme="dark"] .users-table thead th,
+    [data-theme="dark"] .users-table tbody td,
+    [data-theme="dark"] .user-name,
+    [data-theme="dark"] .user-role,
+    [data-theme="dark"] .action-menu-dropdown a {
+        color: #F3F4F6 !important;
+    }
+
+    [data-theme="dark"] .user-email,
+    [data-theme="dark"] .user-department,
+    [data-theme="dark"] .user-joined,
+    [data-theme="dark"] .users-pagination-text,
+    [data-theme="dark"] .users-pagination-text strong {
+        color: #9CA3AF !important;
+    }
+
+    [data-theme="dark"] .users-table tbody tr:hover,
+    [data-theme="dark"] .action-button:hover,
+    [data-theme="dark"] .action-menu-dropdown a:hover,
+    [data-theme="dark"] .pagination-button:hover,
+    [data-theme="dark"] .pagination-current {
+        background: #162E24 !important;
+        color: #F3F4F6 !important;
+    }
+
+    [data-theme="dark"] .action-button {
+        color: #9CA3AF;
+    }
+
+    [data-theme="dark"] .action-menu-dropdown button {
+        background: #121A16;
+        color: #f87171;
+    }
+
+    [data-theme="dark"] .action-menu-dropdown .border-t {
+        border-color: #1B3A2B !important;
+    }
+
+    /* Keep toolbar usable at browser zoom and narrow widths. */
+    .users-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .users-filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    @media (max-width: 1200px) {
+        .users-table {
+            min-width: 900px;
+        }
+
+        .users-table-wrapper {
+            overflow-x: auto;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .users-page {
+            padding: 1rem !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+
+        .users-toolbar {
+            align-items: stretch;
+            gap: 12px;
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .users-filter-group {
+            gap: 8px;
+        }
+
+        .users-filter {
+            flex: 1 1 130px;
+            width: auto !important;
+        }
+
+        .users-add-button {
+            flex: 1 1 100%;
+            min-height: 38px;
+        }
+
+        .users-pagination {
+            align-items: flex-start;
+            gap: 10px;
+            padding-left: 16px;
+            padding-right: 16px;
+            overflow-x: auto;
+        }
+
+        .pagination-list {
+            flex-wrap: wrap;
+        }
+    }
+
+
+
+    /* =========================================
+       Readability improvements
+       Keep table text readable at normal zoom
+       and allow wrapping instead of overflow.
+    ========================================== */
+    .users-page {
+        font-size: 14px;
+    }
+
+    .users-table thead th {
+        font-size: 14px !important;
+        line-height: 1.5;
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .users-table tbody td {
+        font-size: 14px !important;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .user-name {
+        font-size: 15px !important;
+        line-height: 1.5;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .user-email,
+    .user-department,
+    .user-joined {
+        font-size: 13px !important;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .user-role {
+        font-size: 13px !important;
+        line-height: 1.5;
+    }
+
+    .users-search,
+    .users-filter {
+        font-size: 14px !important;
+    }
+
+    .users-add-button {
+        font-size: 13px !important;
+    }
+
+    .users-pagination-text,
+    .pagination-button,
+    .pagination-dots {
+        font-size: 13px !important;
+        line-height: 1.5;
+    }
+
+    .user-status {
+        font-size: 12px !important;
+        min-width: 64px;
+        padding: 5px 8px;
+        line-height: 1.4;
+    }
+
+    .users-search,
+    .users-filter,
+    .users-add-button,
+    .pagination-button {
+        min-height: 36px;
+    }
+
+    .users-table {
+        table-layout: auto;
+    }
+
+    .users-table th,
+    .users-table td {
+        min-width: 90px;
+    }
+
+    .users-table th:first-child,
+    .users-table td:first-child {
+        min-width: 250px;
+    }
+
+    @media (max-width: 900px) {
+        .users-toolbar {
+            gap: 12px;
+            padding: 16px !important;
+        }
+
+        .users-search-wrapper {
+            width: min(100%, 280px);
+            flex: 1 1 220px;
+        }
+
+        .users-filter-group {
+            gap: 8px;
+            flex: 1 1 100%;
+        }
+
+        .users-filter {
+            flex: 1 1 140px;
+        }
+
+        .users-add-button {
+            min-height: 38px;
+        }
+    }
+
 </style>
 
 

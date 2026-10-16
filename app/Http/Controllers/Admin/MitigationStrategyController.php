@@ -11,15 +11,22 @@ class MitigationStrategyController extends Controller
 {
     public function index(Request $request)
     {
-        $strategies = MitigationAction::with('user');
+        $query = MitigationAction::with('user');
 
-        if ($request->status) {
-            $strategies->where('status', $request->status);
+        // Apply the selected status filter.
+        if (in_array($request->query('status'), [
+            'pending',
+            'in_progress',
+            'completed',
+        ], true)) {
+            $query->where('status', $request->query('status'));
         }
 
-        $strategies = $strategies
+        // Use paginate(), not get(), for the pagination footer.
+        $strategies = $query
             ->latest()
-            ->get();
+            ->paginate(8)
+            ->withQueryString();
 
         return view(
             'admin.mitigation-strategies',
@@ -34,7 +41,11 @@ class MitigationStrategyController extends Controller
             'description' => ['nullable', 'string'],
             'carbon_reduced' => ['required', 'numeric', 'min:0'],
             'status' => ['required', 'in:pending,in_progress,completed'],
-            'completed_at' => ['nullable', 'date'],
+            'completed_at' => [
+                'nullable',
+                'date',
+                'required_if:status,completed',
+            ],
         ]);
 
         MitigationAction::create([
@@ -46,9 +57,20 @@ class MitigationStrategyController extends Controller
             'completed_at' => $validated['completed_at'] ?? null,
         ]);
 
+        return redirect()
+            ->route('admin.mitigation', array_filter([
+                'status' => $request->query('status'),
+            ]))
+            ->with('success', 'Mitigation action added successfully.');
+    }
+
+    public function destroy(MitigationAction $strategy)
+    {
+        $strategy->delete();
+
         return back()->with(
             'success',
-            'Mitigation action added successfully.'
+            'Mitigation strategy deleted successfully.'
         );
     }
 }

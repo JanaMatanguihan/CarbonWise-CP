@@ -10,206 +10,210 @@
 
     .add-user-page {
         font-family: 'Poppins', sans-serif;
-        color: #111111;
+        color: var(--au-text, #111827);
+        background: var(--au-page, #f1f1ee) !important;
+        min-height: 100vh;
     }
 
-    /* ================================
-       Main Card
-    ================================= */
+    /* Theme colors follow the shared admin layout's data-theme setting. */
+    :root {
+        --au-page: #f1f1ee;
+        --au-card: #ffffff;
+        --au-text: #111827;
+        --au-muted: #6b7280;
+        --au-border: #e5e7eb;
+        --au-input: #ffffff;
+        --au-input-text: #111827;
+        --au-placeholder: #6b7280;
+        --au-info-bg: #f0fdf4;
+        --au-info-border: #bbf7d0;
+        --au-info-title: #166534;
+        --au-info-text: #4b5563;
+        --au-hover: #f9fafb;
+    }
+
+    html[data-theme="dark"] {
+        --au-page: #0A0F0D;
+        --au-card: #121A16;
+        --au-text: #F3F4F6;
+        --au-muted: #9CA3AF;
+        --au-border: #1B3A2B;
+        --au-input: #18241F;
+        --au-input-text: #F3F4F6;
+        --au-placeholder: #9CA3AF;
+        --au-info-bg: #162E24;
+        --au-info-border: #2D6A4F;
+        --au-info-title: #76C893;
+        --au-info-text: #D1D5DB;
+        --au-hover: #162E24;
+    }
 
     .add-user-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+        background: var(--au-card);
+        color: var(--au-text);
+        border: 1px solid var(--au-border);
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+        min-width: 0;
     }
 
-    /* ================================
-       Back Button
-    ================================= */
+    .add-user-page .border-gray-200 {
+        border-color: var(--au-border) !important;
+    }
 
-    .add-user-back {
+    .add-user-back,
+    .add-user-cancel {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
-        height: 38px;
-        padding: 0 14px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #374151;
+        min-height: 42px;
+        padding: 0 16px;
+        border: 1px solid var(--au-border);
+        border-radius: 7px;
+        background: var(--au-card);
+        color: var(--au-text);
         font-family: 'Poppins', sans-serif;
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 14px;
+        line-height: 1.4;
         font-weight: 500;
         text-decoration: none;
-        transition: all 0.2s ease;
+        transition: background 0.2s ease, border-color 0.2s ease;
     }
 
-    .add-user-back:hover {
-        background: #f9fafb;
-        border-color: #9ca3af;
-        color: #2f7d57;
+    .add-user-back:hover,
+    .add-user-cancel:hover {
+        background: var(--au-hover);
+        border-color: #52B788;
+        color: var(--au-text);
     }
 
     .add-user-back svg {
-        width: 17px;
-        height: 17px;
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
     }
 
-    /* ================================
-       Section Header
-    ================================= */
-
     .add-user-section-title {
-        font-size: 18px;
-        line-height: 25px;
+        font-size: 20px;
+        line-height: 1.4;
         font-weight: 700;
-        color: #111111;
+        color: var(--au-text);
     }
 
     .add-user-section-description {
-        font-size: 11px;
-        line-height: 17px;
+        font-size: 13px;
+        line-height: 1.6;
         font-weight: 400;
-        color: #9ca3af;
+        color: var(--au-muted);
     }
-
-    /* ================================
-       Form Labels
-    ================================= */
 
     .add-user-label {
-        font-size: 12px;
-        line-height: 18px;
+        display: block;
+        font-size: 14px;
+        line-height: 1.5;
         font-weight: 600;
-        color: #111111;
+        color: var(--au-text);
+        margin-bottom: 7px;
     }
 
-    /* ================================
-       Form Inputs
-    ================================= */
-
     .add-user-input {
+        display: block;
         width: 100%;
-        height: 44px;
-        padding: 0 14px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #111111;
+        min-width: 0;
+        min-height: 46px;
+        padding: 10px 13px;
+        border: 1px solid var(--au-border);
+        border-radius: 7px;
+        background: var(--au-input);
+        color: var(--au-input-text);
         font-family: 'Poppins', sans-serif;
-        font-size: 12px;
-        line-height: 18px;
+        font-size: 14px;
+        line-height: 1.5;
         outline: none;
         transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     .add-user-input:focus {
-        border-color: #2f7d57;
-        box-shadow: 0 0 0 2px rgba(47, 125, 87, 0.10);
+        border-color: #52B788;
+        box-shadow: 0 0 0 3px rgba(82, 183, 136, 0.16);
     }
 
     .add-user-input::placeholder {
-        color: #9ca3af;
+        color: var(--au-placeholder);
+        opacity: 1;
     }
 
-    /* ================================
-       Validation Errors
-    ================================= */
+    .add-user-input option {
+        background: var(--au-input);
+        color: var(--au-input-text);
+    }
 
     .add-user-error {
-        margin-top: 5px;
-        font-size: 10px;
-        line-height: 15px;
-        color: #dc2626;
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #ef4444;
     }
-
-    /* ================================
-       Error Summary
-    ================================= */
 
     .add-user-error-box {
         margin: 20px 24px 0;
         border: 1px solid #fecaca;
         background: #fef2f2;
-        border-radius: 6px;
-        padding: 13px 15px;
+        border-radius: 7px;
+        padding: 14px 16px;
     }
 
     .add-user-error-title {
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 14px;
+        line-height: 1.5;
         font-weight: 600;
         color: #b91c1c;
     }
 
     .add-user-error-list {
-        margin-top: 4px;
-        font-size: 10px;
-        line-height: 16px;
+        margin-top: 5px;
+        font-size: 13px;
+        line-height: 1.6;
         color: #dc2626;
     }
 
-    /* ================================
-       Account Information
-    ================================= */
-
     .add-user-info {
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        border-radius: 6px;
-        padding: 13px 15px;
+        background: var(--au-info-bg);
+        border: 1px solid var(--au-info-border);
+        border-radius: 7px;
+        padding: 14px 16px;
     }
 
     .add-user-info-title {
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 14px;
+        line-height: 1.5;
         font-weight: 600;
-        color: #166534;
+        color: var(--au-info-title);
     }
 
     .add-user-info-text {
-        font-size: 10px;
-        line-height: 15px;
-        color: #4b5563;
-    }
-
-    /* ================================
-       Bottom Actions
-    ================================= */
-
-    .add-user-cancel {
-        height: 42px;
-        padding: 0 20px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #374151;
-        font-family: 'Poppins', sans-serif;
-        font-size: 11px;
-        line-height: 16px;
-        font-weight: 500;
-        text-decoration: none;
-        transition: background 0.2s;
-    }
-
-    .add-user-cancel:hover {
-        background: #f9fafb;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--au-info-text);
     }
 
     .add-user-submit {
-        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
         padding: 0 22px;
         border: none;
-        border-radius: 6px;
+        border-radius: 7px;
         background: #2f7d57;
         color: #ffffff;
         font-family: 'Poppins', sans-serif;
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 14px;
+        line-height: 1.4;
         font-weight: 600;
-        transition: background 0.2s;
+        cursor: pointer;
+        transition: background 0.2s ease;
     }
 
     .add-user-submit:hover {
@@ -217,27 +221,66 @@
     }
 
     .add-user-required {
-        color: #dc2626;
+        color: #ef4444;
     }
 
-    /* ================================
-       Responsive
-    ================================= */
+    /* Prevent form fields from overflowing when browser zoom reduces viewport width. */
+    .add-user-page,
+    .add-user-page * {
+        box-sizing: border-box;
+    }
+
+    .add-user-page .grid {
+        min-width: 0;
+    }
+
+    .add-user-page .grid > div {
+        min-width: 0;
+    }
 
     @media (max-width: 768px) {
-
-        .add-user-section-title {
-            font-size: 16px;
-            line-height: 23px;
+        .add-user-page {
+            padding: 16px !important;
         }
 
+        .add-user-section-title {
+            font-size: 18px;
+        }
+
+        .add-user-section-description {
+            font-size: 13px;
+        }
+
+        .add-user-label,
         .add-user-input {
-            height: 44px;
+            font-size: 14px;
         }
 
         .add-user-back {
             width: 100%;
-            justify-content: center;
+        }
+
+        .add-user-error-box {
+            margin-left: 16px;
+            margin-right: 16px;
+        }
+
+        .add-user-page form {
+            padding: 16px !important;
+        }
+
+        .add-user-page form > .grid {
+            gap: 18px;
+        }
+
+        .add-user-page form > div:last-child {
+            flex-wrap: wrap;
+        }
+
+        .add-user-cancel,
+        .add-user-submit {
+            min-height: 44px;
+            font-size: 14px;
         }
     }
 </style>

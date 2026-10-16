@@ -33,12 +33,12 @@
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-        min-height: 112px;
+        min-height: 124px;
     }
 
     .emissions-card-label {
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 13px;
+        line-height: 19px;
         font-weight: 500;
         color: #111111;
     }
@@ -52,22 +52,22 @@
     }
 
     .emissions-unit {
-        font-size: 9px;
-        line-height: 13px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 400;
         color: #333333;
     }
 
     .emissions-small-text {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 400;
         color: #9ca3af;
     }
 
     .emissions-percentage {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 500;
         color: #6b7280;
     }
@@ -111,15 +111,15 @@
     ================================= */
 
     .emissions-chart-title {
-        font-size: 15px;
-        line-height: 21px;
+        font-size: 17px;
+        line-height: 24px;
         font-weight: 700;
         color: #111111;
     }
 
     .emissions-chart-description {
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         font-weight: 400;
         color: #9ca3af;
     }
@@ -129,23 +129,23 @@
     ================================= */
 
     .emissions-filter-label {
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         font-weight: 500;
         color: #111111;
     }
 
     .emissions-filter-input {
         font-family: 'Poppins', sans-serif;
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         color: #111111;
     }
 
     .emissions-export-btn {
         font-family: 'Poppins', sans-serif;
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         font-weight: 500;
     }
 
@@ -154,22 +154,22 @@
     ================================= */
 
     .emissions-source-name {
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         font-weight: 500;
         color: #374151;
     }
 
     .emissions-source-percent {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 600;
         color: #4b5563;
     }
 
     .emissions-source-value {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 400;
         color: #9ca3af;
     }
@@ -179,22 +179,22 @@
     ================================= */
 
     .emissions-department-name {
-        font-size: 10px;
-        line-height: 15px;
+        font-size: 12px;
+        line-height: 18px;
         font-weight: 500;
         color: #4b5563;
     }
 
     .emissions-department-value {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 500;
         color: #6b7280;
     }
 
     .emissions-department-percent {
-        font-size: 9px;
-        line-height: 14px;
+        font-size: 11px;
+        line-height: 16px;
         font-weight: 400;
         color: #6b7280;
     }
@@ -206,13 +206,13 @@
     @media (max-width: 768px) {
 
         .emissions-main-value {
-            font-size: 20px;
-            line-height: 28px;
+            font-size: 21px;
+            line-height: 29px;
         }
 
         .emissions-chart-title {
-            font-size: 14px;
-            line-height: 20px;
+            font-size: 16px;
+            line-height: 22px;
         }
 
         .emissions-icon-box {
@@ -227,6 +227,252 @@
         }
 
     }
+
+
+    /* =========================================
+       DARK MODE — CarbonWise admin theme
+       ========================================= */
+
+    html[data-theme="dark"] .emissions-page {
+        background: #0A0F0D !important;
+        color: #F3F4F6 !important;
+    }
+
+    html[data-theme="dark"] .emissions-card,
+    html[data-theme="dark"] .emissions-summary-card {
+        background: #121A16 !important;
+        color: #F3F4F6 !important;
+        border-color: #1B3A2B !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+    }
+
+    html[data-theme="dark"] .emissions-card-label,
+    html[data-theme="dark"] .emissions-main-value,
+    html[data-theme="dark"] .emissions-chart-title,
+    html[data-theme="dark"] .emissions-filter-label {
+        color: #F3F4F6 !important;
+    }
+
+    html[data-theme="dark"] .emissions-unit,
+    html[data-theme="dark"] .emissions-small-text,
+    html[data-theme="dark"] .emissions-percentage,
+    html[data-theme="dark"] .emissions-chart-description,
+    html[data-theme="dark"] .emissions-source-value,
+    html[data-theme="dark"] .emissions-department-value,
+    html[data-theme="dark"] .emissions-department-percent {
+        color: #9CA3AF !important;
+    }
+
+    html[data-theme="dark"] .emissions-source-name,
+    html[data-theme="dark"] .emissions-source-percent,
+    html[data-theme="dark"] .emissions-department-name {
+        color: #D1D5DB !important;
+    }
+
+    html[data-theme="dark"] .emissions-filter-input {
+        background: #18241F !important;
+        color: #F3F4F6 !important;
+        border-color: #2D6A4F !important;
+        color-scheme: dark;
+    }
+
+    html[data-theme="dark"] .emissions-filter-input option {
+        background: #121A16;
+        color: #F3F4F6;
+    }
+
+    html[data-theme="dark"] .emissions-export-btn {
+        background: #2f7d57 !important;
+        color: #ffffff !important;
+    }
+
+    html[data-theme="dark"] .emissions-export-btn:hover {
+        background: #256847 !important;
+    }
+
+    html[data-theme="dark"] .emissions-page .bg-gray-100 {
+        background: #24332B !important;
+    }
+
+    html[data-theme="dark"] .emissions-page .bg-gray-200 {
+        border-color: #2D6A4F !important;
+    }
+
+    /* ApexCharts text and chart grid */
+    html[data-theme="dark"] .emissions-page .apexcharts-text,
+    html[data-theme="dark"] .emissions-page .apexcharts-xaxis-label,
+    html[data-theme="dark"] .emissions-page .apexcharts-yaxis-label,
+    html[data-theme="dark"] .emissions-page .apexcharts-legend-text,
+    html[data-theme="dark"] .emissions-page .apexcharts-datalabel-label,
+    html[data-theme="dark"] .emissions-page .apexcharts-datalabel-value {
+        fill: #D1D5DB !important;
+        color: #D1D5DB !important;
+    }
+
+    html[data-theme="dark"] .emissions-page .apexcharts-gridline {
+        stroke: #26382F !important;
+    }
+
+    html[data-theme="dark"] .emissions-page .apexcharts-tooltip {
+        background: #121A16 !important;
+        border-color: #2D6A4F !important;
+        color: #F3F4F6 !important;
+    }
+
+    html[data-theme="dark"] .emissions-page .apexcharts-tooltip-title {
+        background: #18241F !important;
+        border-bottom-color: #2D6A4F !important;
+        color: #F3F4F6 !important;
+    }
+
+    /* Keep the zero-emissions donut visible, neutral, and readable */
+    html[data-theme="dark"] #emptyDonut .border-gray-200 {
+        border-color: #2D6A4F !important;
+    }
+
+    html[data-theme="dark"] #emptyDonut .text-gray-400 {
+        color: #9CA3AF !important;
+    }
+
+    /* Dark-mode browser scrollbars */
+    html[data-theme="dark"] .emissions-page ::-webkit-scrollbar {
+        width: 7px;
+        height: 7px;
+    }
+
+    html[data-theme="dark"] .emissions-page ::-webkit-scrollbar-track {
+        background: #121A16;
+    }
+
+    html[data-theme="dark"] .emissions-page ::-webkit-scrollbar-thumb {
+        background: #2D6A4F;
+        border-radius: 8px;
+    }
+
+    /* Responsive chart panels and browser zoom support */
+    .emissions-page,
+    .emissions-page * {
+        box-sizing: border-box;
+    }
+
+    .emissions-page > *,
+    .emissions-card,
+    .emissions-summary-card,
+    .emissions-chart-row > * {
+        min-width: 0;
+    }
+
+    .emissions-summary-card .flex.items-center {
+        min-width: 0;
+        gap: 12px;
+    }
+
+    .emissions-summary-card .min-w-0 {
+        min-width: 0;
+        flex: 1 1 0%;
+    }
+
+    .emissions-main-value {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        font-size: clamp(18px, 1.35vw, 25px);
+        line-height: 1.25;
+    }
+
+    .emissions-summary-card .flex.items-baseline {
+        flex-wrap: wrap;
+        min-width: 0;
+        gap: 3px 5px;
+    }
+
+    .emissions-unit {
+        overflow-wrap: anywhere;
+    }
+
+    .emissions-source-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        gap: 16px !important;
+    }
+
+    #emissionSourceWrapper,
+    #emissionSourceChart,
+    #emissionTrendChart,
+    #comparisonChart {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    #emissionSourceChart .apexcharts-canvas,
+    #emissionTrendChart .apexcharts-canvas,
+    #comparisonChart .apexcharts-canvas {
+        max-width: 100% !important;
+    }
+
+    @media (max-width: 1280px) {
+        .emissions-page {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+        }
+
+        .emissions-page > .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .emissions-chart-row {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .emissions-summary-card {
+            padding: 14px !important;
+        }
+
+        .emissions-main-value {
+            font-size: clamp(18px, 1.6vw, 23px);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .emissions-page {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+        }
+
+        .emissions-page > .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .emissions-source-layout {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .emissions-source-layout > div:first-child {
+            max-width: 100%;
+        }
+
+        .emissions-card {
+            height: auto !important;
+            min-height: 340px;
+            padding: 16px !important;
+        }
+
+        .emissions-chart-row > .emissions-card {
+            min-height: 360px;
+        }
+
+        .emissions-icon-box {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+        }
+
+        .emissions-icon {
+            width: 29px;
+            height: 29px;
+        }
+    }
+
 </style>
 
 
@@ -606,7 +852,7 @@
          ROW 1
     ========================================== -->
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="emissions-chart-row grid grid-cols-1 lg:grid-cols-2 gap-4">
 
 
         <!-- Emissions Over Time -->
@@ -679,7 +925,7 @@
             </div>
 
 
-            <div class="grid grid-cols-1 sm:grid-cols-[45%_55%] gap-3 items-center flex-1">
+            <div class="emissions-source-layout grid grid-cols-1 sm:grid-cols-[45%_55%] gap-3 items-center flex-1">
 
                 <!-- Donut -->
 
@@ -821,7 +1067,7 @@
          ROW 2
     ========================================== -->
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="emissions-chart-row grid grid-cols-1 lg:grid-cols-2 gap-4">
 
 
         <!-- Emissions by Department -->
@@ -1075,7 +1321,7 @@
 
                     style: {
                         fontFamily: 'Poppins, sans-serif',
-                        fontSize: '9px'
+                        fontSize: '11px'
                     }
 
                 },
@@ -1097,7 +1343,7 @@
 
                     style: {
                         fontFamily: 'Poppins, sans-serif',
-                        fontSize: '9px'
+                        fontSize: '11px'
                     }
 
                 }
@@ -1276,7 +1522,7 @@
 
                     height: 245,
 
-                    width: 245,
+                    width: '100%',
 
                     sparkline: {
                         enabled: true
@@ -1413,7 +1659,7 @@
                                     fontFamily:
                                         'Poppins, sans-serif',
 
-                                    fontSize: '9px',
+                                    fontSize: '11px',
 
                                     fontWeight: 500,
 
