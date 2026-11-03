@@ -3,6 +3,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Campus-only access: location must be verified (and match the account's campus)
+require_once __DIR__ . '/require_campus.php';
+
 // Force consistent timezone handling
 date_default_timezone_set('UTC');
 
@@ -147,6 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Password must be at least 6 characters long.";
     } elseif (empty($terms)) {
         $error = "You must agree to the Terms and Conditions to register.";
+    } elseif (!campus_matches($campus, $_SESSION['campus_name'] ?? '')) {
+        $error = "You can only register for the campus you are currently on (detected: " . ($_SESSION['campus_name'] ?? 'unknown') . ").";
     } else {
         try {
             $dsn_options = "sslmode=require";
@@ -601,18 +606,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label>Campus</label>
                     <select name="campus" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
                         <option value="">Choose Campus</option>
-                        <option value="Lipa Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Lipa Campus') ? 'selected' : '' ?>>Lipa Campus</option>
-                        <option value="Pablo Borbon Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Pablo Borbon Campus') ? 'selected' : '' ?>>Pablo Borbon Campus</option>
-                        <option value="Alangilan Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Alangilan Campus') ? 'selected' : '' ?>>Alangilan Campus</option>
-                        <option value="LIMA Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'LIMA Campus') ? 'selected' : '' ?>>LIMA Campus</option>
-                        <option value="ARASOF Nasugbu Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'ARASOF Nasugbu Campus') ? 'selected' : '' ?>>ARASOF Nasugbu Campus</option>
-                        <option value="JPLPC Malvar Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'JPLPC Malvar Campus') ? 'selected' : '' ?>>JPLPC Malvar Campus</option>
-                        <option value="Lemery Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Lemery Campus') ? 'selected' : '' ?>>Lemery Campus</option>
-                        <option value="Rosario Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Rosario Campus') ? 'selected' : '' ?>>Rosario Campus</option>
-                        <option value="San Juan Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'San Juan Campus') ? 'selected' : '' ?>>San Juan Campus</option>
-                        <option value="Balayan Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Balayan Campus') ? 'selected' : '' ?>>Balayan Campus</option>
-                        <option value="Lobo Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Lobo Campus') ? 'selected' : '' ?>>Lobo Campus</option>
-                        <option value="Mabini Campus" <?= (isset($_POST['campus']) && $_POST['campus'] === 'Mabini Campus') ? 'selected' : '' ?>>Mabini Campus</option>
+                        <?php foreach (CAMPUS_LOCATIONS as $cw_c): ?>
+                            <option value="<?= htmlspecialchars($cw_c['name'], ENT_QUOTES, 'UTF-8') ?>" <?= (($_POST['campus'] ?? '') === $cw_c['name']) ? 'selected' : '' ?>><?= htmlspecialchars($cw_c['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 

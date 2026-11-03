@@ -3,6 +3,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Campus-only access: location must be verified (and match the account's campus)
+require_once __DIR__ . '/require_campus.php';
+
 // If user is already authenticated, redirect them straight to the dashboard
 if (isset($_SESSION['user_token'])) {
     header('Location: dashboard.php');

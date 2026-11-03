@@ -3,6 +3,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Campus-only access: location must be verified (and match the account's campus)
+require_once __DIR__ . '/require_campus.php';
+
 // Redirect immediately if the user already holds an active session token
 if (isset($_SESSION['user_token'])) {
     header('Location: dashboard.php');
@@ -11,6 +14,11 @@ if (isset($_SESSION['user_token'])) {
 
 $error = '';
 $success = '';
+
+if (isset($_SESSION['flash_error'])) {
+    $error = $_SESSION['flash_error'];
+    unset($_SESSION['flash_error']);
+}
 
 if (isset($_SESSION['reg_success_message'])) {
     $success = $_SESSION['reg_success_message'];
@@ -71,6 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user) {
                 if (password_verify($user_password, $user['password'])) {
+                    // CAMPUS CHECK: the account's registered campus must match the campus the user is currently on
+                    if (!campus_matches($user['campus'] ?? '', $_SESSION['campus_name'] ?? '')) {
+                        $error = "Your account is registered to the " . (($user['campus'] ?? '') ?: 'unassigned') . ". You can only log in while on that campus.";
+                    } else {
                     // REGENERATE SESSION TO PREVENT SESSION FIXATION
                     session_regenerate_id(true);
 
@@ -87,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // DIRECT REDIRECT TO DASHBOARD
                     header('Location: dashboard.php');
                     exit; 
+                    } // end campus check
                 } else {
                     $error = "Incorrect password. Please double-check your password and try again.";
                 }

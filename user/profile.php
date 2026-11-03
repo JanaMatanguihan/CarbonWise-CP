@@ -3,6 +3,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Campus-only access: location must be verified (and match the account's campus)
+require_once __DIR__ . '/require_campus.php';
+
 // 1. Generate CSRF Token for Secure form submissions
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
