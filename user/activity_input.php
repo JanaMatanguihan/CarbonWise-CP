@@ -156,13 +156,19 @@ if (!empty($user_id) && isset($pdo)) {
                    transportation, electricity, food, total_emission, created_at 
             FROM carbon_records 
             WHERE user_id = :user_id AND record_date = :record_date
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
         ");
         $recStmt->execute([':user_id' => $user_id, ':record_date' => $today_date]);
         $today_records = $recStmt->fetchAll();
     } catch (\PDOException $e) {
         $today_records = [];
     }
+}
+
+// How many transport trips are already saved today (so trip numbers keep counting up)
+$saved_transport_count = 0;
+foreach ($today_records as $rec) {
+    if (!empty($rec['transport_item'])) { $saved_transport_count++; }
 }
 
 // Save process block
@@ -177,17 +183,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 
-    $transportation = (float)($_POST['total_transport'] ?? 0); 
-    $electricity    = (float)($_POST['total_office'] ?? 0);
-    $food           = (float)($_POST['total_food'] ?? 0);
-    $waste          = 0.00;
-    $total_emission = $transportation + $electricity + $food + $waste;
+    // Build the list of rows to insert.
+    // New page: every activity the user added is its own row (multiple trips per day).
+    // Old clients that only send totals still work (single combined row).
+    $rows = [];
 
-    $transport_item   = !empty($_POST['transport_item']) ? $_POST['transport_item'] : null;
-    $office_item      = !empty($_POST['office_item']) ? $_POST['office_item'] : null;
-    $food_item        = !empty($_POST['food_item']) ? $_POST['food_item'] : null;
-    $food_meal_period = !empty($_POST['food_meal_period']) ? $_POST['food_meal_period'] : null;
-    $food_consumed_at = !empty($_POST['food_consumed_at']) ? $_POST['food_consumed_at'] : null;
+    if (isset($_POST['entries'])) {
+        $entries = json_decode((string)$_POST['entries'], true);
+        if (!is_array($entries)) { $entries = []; }
+
+        foreach ($entries as $e) {
+            if (!is_array($e)) { continue; }
+            $cat      = $e['category'] ?? '';
+            $item     = trim((string)($e['item'] ?? ''));
+            $emission = round(max(0, (float)($e['emission'] ?? 0)), 4);
+
+            if (!in_array($cat, ['transport', 'office', 'food'], true) || $item === '') { continue; }
+            $item = function_exists('mb_substr') ? mb_substr($item, 0, 255) : substr($item, 0, 255);
+
+            $row = [
+                'transportation'   => 0.0,
+                'electricity'      => 0.0,
+                'food'             => 0.0,
+                'transport_item'   => null,
+                'office_item'      => null,
+                'food_item'        => null,
+                'food_meal_period' => null,
+                'food_consumed_at' => null,
+            ];
+
+            if ($cat === 'transport') {
+                $row['transportation'] = $emission;
+                $row['transport_item'] = $item;
+            } elseif ($cat === 'office') {
+                $row['electricity']  = $emission;
+                $row['office_item']  = $item;
+            } else {
+                $row['food']             = $emission;
+                $row['food_item']        = $item;
+                $meal = trim((string)($e['meal'] ?? ''));
+                $row['food_meal_period'] = $meal !== '' ? substr($meal, 0, 50) : null;
+                $at = (string)($e['consumed_at'] ?? '');
+                $row['food_consumed_at'] = ($at !== '' && strtotime($at)) ? date('Y-m-d H:i:s', strtotime($at)) : null;
+            }
+            $rows[] = $row;
+        }
+
+        if (empty($rows)) {
+            echo json_encode(["status" => "error", "message" => "There are no activities to save."]);
+            exit;
+        }
+    } else {
+        $rows[] = [
+            'transportation'   => (float)($_POST['total_transport'] ?? 0),
+            'electricity'      => (float)($_POST['total_office'] ?? 0),
+            'food'             => (float)($_POST['total_food'] ?? 0),
+            'transport_item'   => !empty($_POST['transport_item']) ? $_POST['transport_item'] : null,
+            'office_item'      => !empty($_POST['office_item']) ? $_POST['office_item'] : null,
+            'food_item'        => !empty($_POST['food_item']) ? $_POST['food_item'] : null,
+            'food_meal_period' => !empty($_POST['food_meal_period']) ? $_POST['food_meal_period'] : null,
+            'food_consumed_at' => !empty($_POST['food_consumed_at']) ? $_POST['food_consumed_at'] : null,
+        ];
+    }
 
     $current_timestamp = date('Y-m-d H:i:s');
 
@@ -222,22 +279,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     :food_consumed_at
                 )";
 
+        $pdo->beginTransaction();
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':user_id'           => $user_id,
-            ':transportation'    => $transportation,
-            ':electricity'       => $electricity,
-            ':food'              => $food,
-            ':total_emission'    => $total_emission,
-            ':record_date'       => $today_date,
-            ':created_at'        => $current_timestamp,
-            ':updated_at'        => $current_timestamp,
-            ':transport_item'    => $transport_item,
-            ':office_item'       => $office_item,
-            ':food_item'         => $food_item,
-            ':food_meal_period'  => $food_meal_period,
-            ':food_consumed_at'  => $food_consumed_at
-        ]);
+
+        // Rows are inserted in the order the user added them (oldest first),
+        // so the newest entry has the highest id and is listed first.
+        foreach ($rows as $row) {
+            $waste = 0.00;
+            $total_emission = $row['transportation'] + $row['electricity'] + $row['food'] + $waste;
+
+            $stmt->execute([
+                ':user_id'           => $user_id,
+                ':transportation'    => $row['transportation'],
+                ':electricity'       => $row['electricity'],
+                ':food'              => $row['food'],
+                ':total_emission'    => $total_emission,
+                ':record_date'       => $today_date,
+                ':created_at'        => $current_timestamp,
+                ':updated_at'        => $current_timestamp,
+                ':transport_item'    => $row['transport_item'],
+                ':office_item'       => $row['office_item'],
+                ':food_item'         => $row['food_item'],
+                ':food_meal_period'  => $row['food_meal_period'],
+                ':food_consumed_at'  => $row['food_consumed_at']
+            ]);
+        }
+
+        $pdo->commit();
 
         // Notify (shows in the bell on Dashboard, Reports, Mitigation Strategies and Profile too)
         cw_notify_after_activity($pdo, $user_id, $today_date);
@@ -246,6 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
 
     } catch (\PDOException $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
         echo json_encode([
             "status"  => "error", 
             "message" => "Database Error: " . $e->getMessage()
@@ -449,6 +518,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .route-label-item { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 4px; }
         .route-label-title { font-weight: 700; font-size: 0.8rem; color: var(--accent-green); text-transform: uppercase; }
         .route-label-value { font-weight: 600; color: var(--text-main); }
+        .route-label-item.pin-target { cursor: pointer; padding: 8px 10px; border-radius: 10px; border: 2px solid transparent; }
+        .route-label-item.pin-target.active { border-color: var(--accent-green); }
+        .ride-clear-btn { background: none; border: none; color: var(--accent-green); font-weight: 600; font-size: 0.8rem; cursor: pointer; align-self: flex-start; padding: 2px 2px; }
+        .ride-clear-btn:hover { text-decoration: underline; }
+        .ride-name-input { display: none; width: 100%; margin-top: 6px; padding: 8px 10px; font-size: 0.8rem; border: 1px solid var(--input-border); border-radius: 8px; background-color: var(--input-bg); color: var(--text-main); outline: none; }
 
         .btn-add { background-color: var(--accent-green); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; height: 45px; position: relative; z-index: 20; }
         .btn-add.full-width { width: 100%; margin-top: 5px; }
@@ -847,8 +921,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <div class="cw-card-head">
                         <span class="cw-card-icon"><i class="fa-solid fa-car"></i></span>
                         <div class="cw-card-titles">
-                            <h3 id="transportCardTitle" class="cw-card-title">Trip 1: Transport Calculator (Home to BSU Campus)</h3>
-                            <p class="cw-card-sub">Record the trips you made today.</p>
+                            <h3 id="transportCardTitle" class="cw-card-title">Ride 1: Transport Calculator</h3>
+                            <p class="cw-card-sub">Record every ride you took today. Need 2 or more vehicles to get to school? Add one ride for each vehicle.</p>
                         </div>
                     </div>
                     
@@ -856,26 +930,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <!-- Left Column: Controls & Dynamic Route Labels -->
                         <div class="transport-controls-col">
                             <div class="cw-form cw-form-stack">
-                                <div class="cw-field" id="primarySelectorGroup">
-                                    <label id="campusLabel" for="campusSelect">BSU Campus (Destination)</label>
-                                    <select id="campusSelect" class="cw-select" required name="campus_select" onchange="handleCampusSelection()">
-                                        <option value="" selected disabled>Select Campus</option>
-                                        <option value="13.9575,121.1610">Lipa Campus</option>
-                                        <option value="13.7542,121.0547">Pablo Borbon Campus</option>
-                                        <option value="13.7745,121.0772">Alangilan Campus</option>
-                                        <option value="14.0498,121.1292">LIMA Campus</option>
-                                        <option value="14.0670,120.6260">ARASOF Nasugbu Campus</option>
-                                        <option value="14.0450,121.1575">JPLPC Malvar Campus</option>
-                                        <option value="13.8821,120.9168">Lemery Campus</option>
-                                        <option value="13.8456,121.2038">Rosario Campus</option>
-                                        <option value="13.8248,121.3283">San Juan Campus</option>
-                                        <option value="13.9372,120.7325">Balayan Campus</option>
-                                        <option value="13.6415,121.1922">Lobo Campus</option>
-                                        <option value="13.7502,120.9405">Mabini Campus</option>
-                                    </select>
-                                </div>
                                 <div class="cw-field">
-                                    <label for="vehicleType">Vehicle Used</label>
+                                    <label for="vehicleType">Vehicle Used for this Ride (select first)</label>
                                     <select id="vehicleType" class="cw-select" required onchange="calculateRouteIfPossible()">
                                         <option value="" selected disabled>Select Vehicle Type</option>
                                         <option value="0.103">Motorcycle (0.103 kg CO2e/km)</option>
@@ -887,21 +943,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     </select>
                                 </div>
                                 <div class="cw-field">
-                                    <label for="transportDistance">Point-to-Point Distance (KM)</label>
-                                    <input type="number" id="transportDistance" class="cw-input" step="0.01" placeholder="Auto-calculates or enter manually">
+                                    <label for="startSelect">Starting Point of this Ride</label>
+                                    <select id="startSelect" class="cw-select" onchange="handlePointSelect('start')"></select>
+                                </div>
+                                <div class="cw-field">
+                                    <label for="endSelect">Destination of this Ride</label>
+                                    <select id="endSelect" class="cw-select" onchange="handlePointSelect('end')"></select>
+                                </div>
+                                <div class="cw-field">
+                                    <label for="transportDistance">Distance of this Ride (KM)</label>
+                                    <input type="number" id="transportDistance" class="cw-input" step="0.01" placeholder="Select a vehicle first" disabled>
                                 </div>
                             </div>
 
                             <div class="route-labels-box">
-                                <div class="route-label-item">
-                                    <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point (Home)</div>
-                                    <div id="startLabel" class="route-label-value">Click Map to Pin Home</div>
+                                <div class="route-label-item pin-target active" id="startPinBox" onclick="setActivePoint('start')">
+                                    <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point</div>
+                                    <div id="startLabel" class="route-label-value">Click the map or choose a campus</div>
+                                    <input type="text" id="startNameInput" class="ride-name-input" maxlength="40" placeholder="Name this place (e.g., Home, Palengke)" oninput="onPointNameInput()">
                                 </div>
-                                <div class="route-label-item">
-                                    <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-building-flag"></i> Destination Campus</div>
-                                    <div id="endLabel" class="route-label-value">Select Campus Dropdown</div>
+                                <div class="route-label-item pin-target" id="endPinBox" onclick="setActivePoint('end')">
+                                    <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-flag-checkered"></i> Destination</div>
+                                    <div id="endLabel" class="route-label-value">Click the map or choose a campus</div>
+                                    <input type="text" id="endNameInput" class="ride-name-input" maxlength="40" placeholder="Name this place (e.g., Home, Palengke)" oninput="onPointNameInput()">
                                 </div>
                             </div>
+                            <button type="button" class="ride-clear-btn" onclick="clearRidePoints()"><i class="fa-solid fa-rotate-left"></i> Clear points</button>
 
                             <button type="button" class="cw-btn-add" id="addTransportBtn" onclick="addTransport()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span>Add Activity</span></button>
                         </div>
@@ -910,7 +977,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="transport-map-col">
                             <div class="map-section-wrapper">
                                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;" id="mapInstructions">
-                                    <i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip 1 Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home position on the map.
+                                    <i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Ride 1:</strong> Set your starting point and destination.
                                 </p>
                                 <div id="map"></div>
                             </div>
@@ -1101,11 +1168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <input type="hidden" id="hiddenOffice" name="total_office" value="0">
                     <input type="hidden" id="hiddenFood" name="total_food" value="0">
                     
-                    <input type="hidden" id="transportItem" name="transport_item" value="">
-                    <input type="hidden" id="officeItem" name="office_item" value="">
-                    <input type="hidden" id="foodItem" name="food_item" value="">
-                    <input type="hidden" id="foodMealPeriod" name="food_meal_period" value="">
-                    <input type="hidden" id="foodConsumedAt" name="food_consumed_at" value="">
+                    <!-- Every activity the user adds (any number of trips per day) is sent here as JSON -->
+                    <input type="hidden" id="entriesPayload" name="entries" value="[]">
 
                     <div class="list-card">
                         <h3 style="color: var(--accent-green); margin-bottom: 4px;">Your Added Activities</h3>
@@ -1155,9 +1219,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
 
     <script>
-        let selectedCampusCoords = null; 
-        let selectedCampusName = "";
-
         function toggleMobileSidebar() {
             document.getElementById('sidebar').classList.toggle('active');
             document.getElementById('sidebarOverlay').classList.toggle('active');
@@ -1228,203 +1289,245 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         let totals = { transport: 0, office: 0, food: 0 };
+        let entries = [];   // every activity added on this page, one item per card
+        const SAVED_TRANSPORT_COUNT = <?= (int)$saved_transport_count ?>;
         let points = 100;
         const GHG_ELECTRICITY_FACTOR = 0.7122; 
         
         const map = L.map('map').setView([13.7565, 121.0583], 11);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        let mapMarkers = [];
         let routingControl = null;
-        
-        // Trips are unlimited: odd trips go Home -> Campus, even trips go Campus -> Home
-        let transportAttemptCount = 1; 
-        const isOutboundTrip = () => transportAttemptCount % 2 === 1;
+        let routeToken = 0;
 
-        function applyAttemptLayout() {
-            const titleEl = document.getElementById('transportCardTitle');
-            const campusLabelEl = document.getElementById('campusLabel');
-            const mapInstEl = document.getElementById('mapInstructions');
-            const startLblTitle = document.getElementById('startLabelTitle');
-            const endLblTitle = document.getElementById('endLabelTitle');
-            const campusSelect = document.getElementById('campusSelect');
-            const addBtn = document.getElementById('addTransportBtn');
-            const tripNo = transportAttemptCount;
+        // Every vehicle used is its own "ride". If a student needs 2 or more vehicles to reach school,
+        // they add one ride per vehicle (e.g. Home -> terminal by tricycle, terminal -> campus by jeepney).
+        // The next ride automatically starts where the previous ride ended.
+        const CAMPUSES = [
+            { name: 'Lipa Campus',           coords: '13.9575,121.1610' },
+            { name: 'Pablo Borbon Campus',   coords: '13.7542,121.0547' },
+            { name: 'Alangilan Campus',      coords: '13.7745,121.0772' },
+            { name: 'LIMA Campus',           coords: '14.0498,121.1292' },
+            { name: 'ARASOF Nasugbu Campus', coords: '14.0670,120.6260' },
+            { name: 'JPLPC Malvar Campus',   coords: '14.0450,121.1575' },
+            { name: 'Lemery Campus',         coords: '13.8821,120.9168' },
+            { name: 'Rosario Campus',        coords: '13.8456,121.2038' },
+            { name: 'San Juan Campus',       coords: '13.8248,121.3283' },
+            { name: 'Balayan Campus',        coords: '13.9372,120.7325' },
+            { name: 'Lobo Campus',           coords: '13.6415,121.1922' },
+            { name: 'Mabini Campus',         coords: '13.7502,120.9405' }
+        ];
+        const DEFAULT_POINT_TEXT = 'Click the map or choose a campus';
 
-            addBtn.disabled = false;
-            campusSelect.disabled = false;
-            campusSelect.value = "";
+        // Ride numbers continue from the rides already saved today
+        const nextTripNumber = () => SAVED_TRANSPORT_COUNT + entries.filter(e => e.category === 'transport').length + 1;
 
-            // start every trip with a clean map
-            if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
-            if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
-            mapMarkers = [];
-            if (routingControl) { map.removeControl(routingControl); routingControl = null; }
-            selectedCampusCoords = null;
-            selectedCampusName = "";
-            document.getElementById('transportDistance').value = "";
+        const ridePts = { start: null, end: null };   // { latlng, name, selectValue, marker }
+        let activePoint = 'start';                   // which point the next map click will set
 
-            if (isOutboundTrip()) {
-                titleEl.innerText = `Trip ${tripNo}: Transport Calculator (Home to BSU Campus)`;
-                campusLabelEl.innerText = "BSU Campus (Destination)";
-
-                startLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Starting Point (Home)';
-                endLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Destination Campus';
-                mapInstEl.innerHTML = `<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip ${tripNo} Setup:</strong> Select your destination BSU Campus from the dropdown, then click your Home location on the map.`;
-                document.getElementById('startLabel').innerText = "Click Map to Pin Home";
-                document.getElementById('endLabel').innerText = "Select Campus Dropdown";
-            } else {
-                titleEl.innerText = `Trip ${tripNo}: Transport Calculator (BSU Campus to Home)`;
-                campusLabelEl.innerText = "BSU Campus (Starting Point)";
-
-                startLblTitle.innerHTML = '<i class="fa-solid fa-building-flag"></i> Starting Point (BSU Campus)';
-                endLblTitle.innerHTML = '<i class="fa-solid fa-location-dot"></i> Destination (Pin Home on Map)';
-                mapInstEl.innerHTML = `<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> <strong>Trip ${tripNo} Setup:</strong> Select your starting BSU Campus from the dropdown, then click your Home location on the map.`;
-
-                document.getElementById('startLabel').innerText = "Select Campus Dropdown";
-                document.getElementById('endLabel').innerText = "Click Map to Pin Home";
-            }
+        function pointIcon(color) {
+            return L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-' + color + '.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
         }
 
-        function handleCampusSelection() {
-            const selectEl = document.getElementById('campusSelect');
-            if (!selectEl || !selectEl.value) return;
+        // Name shown for a point: the student's own name for a pinned place, otherwise the default name
+        function pointDisplayName(which) {
+            const pt = ridePts[which];
+            if (!pt) return '';
+            if (pt.selectValue !== 'pin') return pt.name;
+            const custom = document.getElementById(which + 'NameInput').value.trim();
+            return custom || pt.name;
+        }
 
-            const parts = selectEl.value.split(',');
-            selectedCampusCoords = [parseFloat(parts[0]), parseFloat(parts[1])];
-            selectedCampusName = selectEl.options[selectEl.selectedIndex].text;
+        function escapeHtml(text) {
+            return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
 
+        function refreshPointLabel(which) {
+            document.getElementById(which + 'Label').innerText = ridePts[which] ? pointDisplayName(which) : DEFAULT_POINT_TEXT;
+        }
+
+        function onPointNameInput() {
+            refreshPointLabel('start');
+            refreshPointLabel('end');
+        }
+
+        function buildPointSelects() {
+            ['startSelect', 'endSelect'].forEach(function (id) {
+                const sel = document.getElementById(id);
+                sel.innerHTML = '<option value="pin">Pin on the map</option>' +
+                    '<optgroup label="BSU Campuses">' +
+                    CAMPUSES.map(function (c) { return '<option value="' + c.coords + '">' + c.name + '</option>'; }).join('') +
+                    '</optgroup>';
+                sel.value = 'pin';
+            });
+        }
+
+        function clearRoute() {
+            routeToken++;
+            if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+        }
+
+        function updateRideHeader() {
+            const n = nextTripNumber();
+            document.getElementById('transportCardTitle').innerText = 'Ride ' + n + ': Transport Calculator';
+            const which = activePoint === 'start' ? 'starting point' : 'destination';
+            document.getElementById('mapInstructions').innerHTML =
+                '<i class="fa-solid fa-map-location-dot" style="color: var(--accent-green);"></i> ' +
+                '<strong>Ride ' + n + ':</strong> Select the vehicle first, then set your <strong>' + which + '</strong> by clicking the map or choosing a campus. Name a pinned place if you like (e.g., Home, Palengke). ' +
+                'Using 2 or more vehicles? Add one ride for each vehicle &mdash; the next ride starts where this one ends.';
+        }
+
+        function setActivePoint(which) {
+            activePoint = which;
+            syncDistanceField();
+            document.getElementById('startPinBox').classList.toggle('active', which === 'start');
+            document.getElementById('endPinBox').classList.toggle('active', which === 'end');
+            updateRideHeader();
+        }
+
+        function clearPoint(which) {
+            if (ridePts[which] && ridePts[which].marker) map.removeLayer(ridePts[which].marker);
+            ridePts[which] = null;
+            const nameInput = document.getElementById(which + 'NameInput');
+            nameInput.value = '';
+            nameInput.style.display = 'none';
+            document.getElementById(which + 'Label').innerText = DEFAULT_POINT_TEXT;
+            document.getElementById(which + 'Select').value = 'pin';
+        }
+
+        function setPoint(which, latlng, name, selectValue) {
+            clearRoute();
+            const prevWasPin = !!(ridePts[which] && ridePts[which].selectValue === 'pin');
+            if (ridePts[which] && ridePts[which].marker) map.removeLayer(ridePts[which].marker);
+
+            const isStart = (which === 'start');
+            const marker = L.marker(latlng, { icon: pointIcon(isStart ? 'blue' : 'red') }).addTo(map);
+            marker.bindPopup('<b>' + (isStart ? 'Starting Point' : 'Destination') + ': ' + name + '</b>', { closeButton: false }).openPopup();
+
+            ridePts[which] = { latlng: L.latLng(latlng), name: name, selectValue: selectValue, marker: marker };
+            document.getElementById(which + 'Select').value = selectValue;
+
+            const nameInput = document.getElementById(which + 'NameInput');
+            if (selectValue === 'pin') {
+                if (!prevWasPin) nameInput.value = '';
+                nameInput.style.display = 'block';
+            } else {
+                nameInput.value = '';
+                nameInput.style.display = 'none';
+            }
+            refreshPointLabel(which);
             document.getElementById('transportDistance').value = '';
 
-            if (routingControl) {
-                map.removeControl(routingControl);
-                routingControl = null;
-            }
-
-            if (isOutboundTrip()) {
-                if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
-
-                let campusMarker = L.marker(selectedCampusCoords, {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                    })
-                }).addTo(map);
-
-                campusMarker.bindPopup(`<b>Destination Campus: ${selectedCampusName}</b>`).openPopup();
-                mapMarkers[1] = campusMarker; 
-                document.getElementById('endLabel').innerText = selectedCampusName;
-
-            } else {
-                if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
-
-                let campusMarker = L.marker(selectedCampusCoords, {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                    })
-                }).addTo(map);
-
-                campusMarker.bindPopup(`<b>Starting Point: ${selectedCampusName}</b>`).openPopup();
-                mapMarkers[0] = campusMarker; 
-                document.getElementById('startLabel').innerText = selectedCampusName;
-            }
-
-            map.setView(selectedCampusCoords, 13);
+            // once one point is set, move on to the other one if it is still empty
+            const other = isStart ? 'end' : 'start';
+            setActivePoint(ridePts[other] ? which : other);
             calculateRouteIfPossible();
         }
 
-        map.on('click', function(e) {
-            const latLngText = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+        function handlePointSelect(which) {
+            const sel = document.getElementById(which + 'Select');
+            clearRoute();
+            document.getElementById('transportDistance').value = '';
 
-            if (isOutboundTrip()) {
-                if (mapMarkers[0]) map.removeLayer(mapMarkers[0]);
-                if (routingControl) { map.removeControl(routingControl); routingControl = null; }
-                document.getElementById('transportDistance').value = '';
-
-                let homeMarker = L.marker(e.latlng, {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                    })
-                }).addTo(map);
-                homeMarker.bindPopup("<b>Starting Point (Home)</b>").openPopup();
-                mapMarkers[0] = homeMarker; 
-                document.getElementById('startLabel').innerText = `Home (${latLngText})`;
-            } else {
-                if (mapMarkers[1]) map.removeLayer(mapMarkers[1]);
-                if (routingControl) { map.removeControl(routingControl); routingControl = null; }
-                document.getElementById('transportDistance').value = '';
-
-                let destMarker = L.marker(e.latlng, {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                    })
-                }).addTo(map);
-                destMarker.bindPopup("<b>Destination (Home)</b>").openPopup();
-                mapMarkers[1] = destMarker;
-                document.getElementById('endLabel').innerText = `Home (${latLngText})`;
+            if (sel.value === 'pin') {
+                clearPoint(which);
+                setActivePoint(which);
+                return;
             }
+            const parts = sel.value.split(',');
+            const coords = [parseFloat(parts[0]), parseFloat(parts[1])];
+            setPoint(which, coords, sel.options[sel.selectedIndex].text, sel.value);
+            map.setView(coords, 13);
+        }
 
-            calculateRouteIfPossible();
+        map.on('click', function (e) {
+            const name = 'Pin (' + e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4) + ')';
+            setPoint(activePoint, e.latlng, name, 'pin');
         });
 
-        function calculateRouteIfPossible() {
-            if (mapMarkers[0] && mapMarkers[1]) {
-                const startNode = mapMarkers[0].getLatLng();
-                const endNode = mapMarkers[1].getLatLng();
+        function clearRidePoints() {
+            clearRoute();
+            clearPoint('start');
+            clearPoint('end');
+            document.getElementById('transportDistance').value = '';
+            setActivePoint('start');
+        }
 
-                if (routingControl) {
-                    map.removeControl(routingControl);
-                    routingControl = null;
+        // After a ride is added: the next ride starts at the previous destination
+        function startNextRide() {
+            const prevEnd = ridePts.end;
+            const prevName = prevEnd ? pointDisplayName('end') : '';
+            clearRoute();
+            clearPoint('start');
+            clearPoint('end');
+            document.getElementById('transportDistance').value = '';
+            if (prevEnd) {
+                setPoint('start', prevEnd.latlng, prevEnd.name, prevEnd.selectValue);
+                if (prevEnd.selectValue === 'pin' && prevName !== prevEnd.name) {
+                    document.getElementById('startNameInput').value = prevName;   // keep the place name (e.g., Palengke)
+                    refreshPointLabel('start');
                 }
-
-                routingControl = L.Routing.control({
-                    waypoints: [startNode, endNode],
-                    router: L.Routing.osrmv1({
-                        serviceUrl: 'https://router.project-osrm.org/route/v1',
-                        profile: 'driving'
-                    }),
-                    lineOptions: {
-                        styles: [{ color: '#2D6A4F', opacity: 0.8, weight: 6 }]
-                    },
-                    createMarker: function() { return null; },
-                    show: false,
-                    addWaypoints: false,
-                    routeWhileDragging: false
-                }).addTo(map);
-
-                routingControl.on('routesfound', function(e) {
-                    const routes = e.routes;
-                    if (routes && routes.length > 0) {
-                        const distanceInMeters = routes[0].summary.totalDistance;
-                        const distanceInKm = (distanceInMeters / 1000).toFixed(2);
-                        document.getElementById('transportDistance').value = distanceInKm;
-                    }
-                });
-
-                routingControl.on('routingerror', function() {
-                    const straightDistanceKm = (startNode.distanceTo(endNode) / 1000).toFixed(2);
-                    document.getElementById('transportDistance').value = straightDistanceKm;
-                });
+            } else {
+                setActivePoint('start');
             }
+        }
+
+        // The distance is only calculated after the student has selected the vehicle for this ride
+        function syncDistanceField() {
+            const hasVehicle = !!document.getElementById('vehicleType').value;
+            const inp = document.getElementById('transportDistance');
+            inp.disabled = !hasVehicle;
+            inp.placeholder = hasVehicle ? 'Auto-calculates or enter manually' : 'Select a vehicle first';
+            if (!hasVehicle) inp.value = '';
+        }
+
+        function calculateRouteIfPossible() {
+            syncDistanceField();
+            if (!document.getElementById('vehicleType').value) { clearRoute(); return; }
+            if (!(ridePts.start && ridePts.end)) return;
+
+            const startNode = ridePts.start.latlng;
+            const endNode = ridePts.end.latlng;
+
+            clearRoute();
+            const token = routeToken;
+
+            routingControl = L.Routing.control({
+                waypoints: [startNode, endNode],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: 'driving'
+                }),
+                lineOptions: {
+                    styles: [{ color: '#2D6A4F', opacity: 0.8, weight: 6 }]
+                },
+                createMarker: function() { return null; },
+                show: false,
+                addWaypoints: false,
+                routeWhileDragging: false
+            }).addTo(map);
+
+            routingControl.on('routesfound', function(e) {
+                if (token !== routeToken) return;   // points changed meanwhile
+                const routes = e.routes;
+                if (routes && routes.length > 0) {
+                    document.getElementById('transportDistance').value = (routes[0].summary.totalDistance / 1000).toFixed(2);
+                }
+            });
+
+            routingControl.on('routingerror', function() {
+                if (token !== routeToken) return;
+                document.getElementById('transportDistance').value = (startNode.distanceTo(endNode) / 1000).toFixed(2);
+            });
         }
 
         function updateGreenPointsUI() {
@@ -1469,34 +1572,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             let vehicleFactor = parseFloat(vehicleSel.value);
             let vehicleLabel = vehicleSel.options[vehicleSel.selectedIndex].text;
             
-            let startText = document.getElementById('startLabel').innerText;
-            let endText = document.getElementById('endLabel').innerText;
-            
             let calculatedEmission = kmDistance * vehicleFactor;
-            totals.transport += calculatedEmission;
-            document.getElementById('hiddenTransport').value = totals.transport.toFixed(4);
 
-            let routeSummary = `${startText.split(' (')[0]} → ${endText.split(' (')[0]}`;
-            createListItem('activityCardContainer', 'transport', calculatedEmission, routeSummary, `${calculatedEmission.toFixed(2)} kg CO₂e (${kmDistance} km)`);
-            
-            document.getElementById('transportItem').value = vehicleLabel;
+            const rideNo = nextTripNumber();
+            const routeSummary = (ridePts.start && ridePts.end) ? `${escapeHtml(pointDisplayName('start'))} → ${escapeHtml(pointDisplayName('end'))}` : 'Manual distance entry';
+            const vehicleShort = vehicleLabel.split(' (')[0];
+            createListItem('activityCardContainer',
+                { category: 'transport', item: vehicleLabel, emission: calculatedEmission },
+                `Ride ${rideNo}: ${routeSummary} · ${vehicleShort}`, `${calculatedEmission.toFixed(2)} kg CO₂e (${kmDistance} km)`);
 
             distInp.value = "";
             vehicleSel.value = "";
-            document.getElementById('campusSelect').value = "";
 
-            if (routingControl) {
-                map.removeControl(routingControl);
-                routingControl = null;
-            }
-
-            transportAttemptCount++;
-
-            applyAttemptLayout();
+            // next ride starts where this one ended (for 2 or more vehicles to reach school)
+            startNextRide();
 
             Swal.fire({
-                title: 'Route Added!',
-                text: 'Your trip route has been added to your emission summary. Click "Calculate my Carbon Emissions" to save and finish.',
+                title: 'Ride Added!',
+                text: 'Riding another vehicle? Add the next ride — it starts where this one ended. When you are done, click "Calculate my Carbon Emissions" to save.',
                 icon: 'success',
                 confirmButtonColor: '#2D6A4F',
                 background: activeTheme === 'dark' ? '#121A16' : '#ffffff',
@@ -1524,11 +1617,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
             let itemText = typeSel.options[typeSel.selectedIndex].text;
             let calculatedValue = (parseFloat(typeSel.value) * parseFloat(hoursInp.value) / 1000) * GHG_ELECTRICITY_FACTOR;
-            totals.office += calculatedValue;
-            document.getElementById('hiddenOffice').value = totals.office.toFixed(4);
-            createListItem('activityCardContainer', 'office', calculatedValue, `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg CO₂e`);
-            
-            document.getElementById('officeItem').value = itemText;
+            createListItem('activityCardContainer',
+                { category: 'office', item: itemText, emission: calculatedValue },
+                `${itemText} (${hoursInp.value}h)`, `${calculatedValue.toFixed(4)} kg CO₂e`);
 
             hoursInp.value = "";
             typeSel.value = "";
@@ -1590,14 +1681,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             let calculatedValue = cupsCount * emissionFactorPerCup;
             let unitDisplay = `${cupsCount} cup${cupsCount > 1 ? 's' : ''}`;
 
-            totals.food += calculatedValue;
-            document.getElementById('hiddenFood').value = totals.food.toFixed(4);
-            
-            createListItem('activityCardContainer', 'food', calculatedValue, `[${mealText} · ${timeLabel}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO₂e`);
-            
-            document.getElementById('foodItem').value = foodText;
-            document.getElementById('foodMealPeriod').value = mealText;
-            document.getElementById('foodConsumedAt').value = FOOD_DATE + ' ' + timeInp.value + ':00';
+            createListItem('activityCardContainer',
+                { category: 'food', item: foodText, emission: calculatedValue, meal: mealText, consumed_at: FOOD_DATE + ' ' + timeInp.value + ':00' },
+                `[${mealText} · ${timeLabel}] ${foodText} (${unitDisplay})`, `${calculatedValue.toFixed(2)} kg CO₂e`);
 
             servingsInp.value = "";
             mealPeriodSel.value = "";
@@ -1619,32 +1705,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             return h + ':' + m + ' ' + suffix;
         }
 
-        function setFoodTimeNow() {
+        // The food time follows the real clock until the student picks a time manually.
+        // It goes back to the live clock after an activity is added.
+        let foodTimeAuto = true;
+
+        function updateFoodTimeFromClock() {
             const d = new Date();
             const hh = String(d.getHours()).padStart(2, '0');
             const mm = String(d.getMinutes()).padStart(2, '0');
             const inp = document.getElementById('foodTime');
-            inp.value = hh + ':' + mm;
-            document.getElementById('foodTimeText').textContent = formatTime12(inp.value);
+            if (inp.value !== hh + ':' + mm) {
+                inp.value = hh + ':' + mm;
+                document.getElementById('foodTimeText').textContent = formatTime12(inp.value);
+            }
+        }
+
+        function setFoodTimeNow() {
+            foodTimeAuto = true;
+            updateFoodTimeFromClock();
         }
 
         (function initFoodTime() {
             const inp = document.getElementById('foodTime');
-            const pill = inp.closest('.cw-pill-time');
-            inp.addEventListener('input', () => {
+
+            // A manual change stops the live clock
+            const onManualChange = () => {
+                foodTimeAuto = false;
                 document.getElementById('foodTimeText').textContent = inp.value ? formatTime12(inp.value) : '--:--';
-            });
-            pill.addEventListener('click', (e) => {
-                if (e.target !== inp && typeof inp.showPicker === 'function') {
+            };
+            inp.addEventListener('input', onManualChange);
+            inp.addEventListener('change', onManualChange);
+
+            // Clicking anywhere on the time pill opens the time picker
+            inp.addEventListener('click', () => {
+                if (typeof inp.showPicker === 'function') {
                     try { inp.showPicker(); } catch (err) {}
                 }
             });
+
             setFoodTimeNow();
+
+            // Keep the clock moving (paused while the student is choosing a time)
+            setInterval(() => {
+                if (foodTimeAuto && !document.hidden && document.activeElement !== inp) {
+                    updateFoodTimeFromClock();
+                }
+            }, 1000);
         })();
 
+        // Rebuilds the totals and the hidden JSON payload from the entries list
+        function syncEntries() {
+            totals = { transport: 0, office: 0, food: 0 };
+            entries.forEach(e => { totals[e.category] += e.emission; });
+            document.getElementById('hiddenTransport').value = totals.transport.toFixed(4);
+            document.getElementById('hiddenOffice').value = totals.office.toFixed(4);
+            document.getElementById('hiddenFood').value = totals.food.toFixed(4);
+            document.getElementById('entriesPayload').value = JSON.stringify(entries);
+        }
+
         // Single-Column Activity Card Renderer Function
-        function createListItem(containerId, category, value, labelText, numericalText) {
+        function createListItem(containerId, entry, labelText, numericalText) {
             const container = document.getElementById(containerId);
+            const category = entry.category;
             
             let iconClass = 'fa-car';
             let categoryTitle = 'Transportation';
@@ -1656,6 +1778,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 iconClass = 'fa-utensils';
                 categoryTitle = 'Food Consumption';
             }
+
+            entries.push(entry);
+            syncEntries();
 
             const cardDiv = document.createElement('div');
             cardDiv.className = 'activity-card-item';
@@ -1671,12 +1796,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             `;
 
             cardDiv.querySelector('.btn-delete-card').addEventListener('click', function() {
-                totals[category] = Math.max(0, totals[category] - value);
-                document.getElementById('hidden' + category.charAt(0).toUpperCase() + category.slice(1)).value = totals[category].toFixed(4);
+                entries = entries.filter(e => e !== entry);
+                syncEntries();
                 
                 if (category === 'transport') {
-                    transportAttemptCount = Math.max(1, transportAttemptCount - 1);
-                    applyAttemptLayout();
+                    updateRideHeader();
                 }
 
                 cardDiv.remove();
@@ -1690,7 +1814,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             event.preventDefault();
             let activeTheme = localStorage.getItem('theme') || 'light';
 
-            if (totals.transport === 0 && totals.office === 0 && totals.food === 0) {
+            if (entries.length === 0) {
                 Swal.fire({
                     title: 'No Items Added Yet',
                     text: "Please add at least one travel, office, or food entry before calculating your emissions.",
@@ -1914,7 +2038,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         })();
 
         document.addEventListener("DOMContentLoaded", function() {
-            applyAttemptLayout();
+            buildPointSelects();
+            setActivePoint('start');
 
             setTimeout(function() {
                 map.invalidateSize();
