@@ -1050,6 +1050,8 @@ if (empty($avatar_url)) {
         const globalCategoriesData = <?= json_encode($categories_data); ?>;
         const appCsrfToken = "<?= $_SESSION['csrf_token']; ?>";
     </script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
 </head>
 <body>
 
@@ -1574,5 +1576,6 @@ if (empty($avatar_url)) {
             });
         }
     </script>
+    <script src="pwa-register.js"></script>
 </body>
 </html>

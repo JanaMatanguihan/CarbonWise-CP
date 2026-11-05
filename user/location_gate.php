@@ -19,7 +19,9 @@ if (!in_array($next, $allowed, true)) $next = 'login.php';
  button{margin-top:16px;padding:12px 24px;background:#2D6A4F;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer}
  button:disabled{opacity:.6;cursor:not-allowed}
  #msg{margin-top:14px;font-size:.9rem;color:#6B7280}
-</style></head>
+</style>    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
+</head>
 <body>
 <div class="box">
   <h2>Campus Location Check</h2>
@@ -63,4 +65,5 @@ function check() {
 btn.addEventListener('click', check);
 check(); // prompt immediately on arrival
 </script>
+    <script src="pwa-register.js"></script>
 </body></html>

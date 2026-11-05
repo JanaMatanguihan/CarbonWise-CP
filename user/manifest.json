@@ -1,0 +1,37 @@
+{
+  "name": "CarbonWise",
+  "short_name": "CarbonWise",
+  "description": "Track, analyze, and reduce your carbon footprint across BatStateU campuses.",
+  "start_url": "/CarbonWise-CP/user/index.php",
+  "scope": "/CarbonWise-CP/user/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F3F4F6",
+  "theme_color": "#1B4332",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

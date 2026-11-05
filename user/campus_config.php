@@ -29,6 +29,15 @@ const CAMPUS_LOCATIONS = [
 const MAX_ACCURACY_M = 300;   // reject vague location fixes (meters)
 const VERIFY_TTL_SEC = 1800;  // re-verify location every 30 minutes
 
+// ---------------------------------------------------------------
+// DEV-ONLY geofence bypass
+// ---------------------------------------------------------------
+// Flip this to `true` while developing off-campus, and back to `false`
+// (or just delete this block) before deploying to the live server.
+// No .env involved — this is the one and only switch.
+const DEV_BYPASS_CAMPUS      = true;
+const DEV_BYPASS_CAMPUS_NAME = 'Lipa Campus'; // must match your test account's users.campus value
+
 function distance_m(float $lat1, float $lng1, float $lat2, float $lng2): float {
     $r  = 6371000;
     $p1 = deg2rad($lat1); $p2 = deg2rad($lat2);
@@ -39,6 +48,9 @@ function distance_m(float $lat1, float $lng1, float $lat2, float $lng2): float {
 
 // Returns the name of the campus the coordinates fall inside, or null.
 function find_campus(float $lat, float $lng): ?string {
+    if (DEV_BYPASS_CAMPUS) {
+        return DEV_BYPASS_CAMPUS_NAME;
+    }
     foreach (CAMPUS_LOCATIONS as $c) {
         if (distance_m($lat, $lng, $c['lat'], $c['lng']) <= $c['radius_m']) {
             return $c['name'];

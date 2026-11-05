@@ -148,6 +148,8 @@ if (isset($_SESSION['user_token'])) {
             .feature-card { padding: 25px 20px; }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
 </head>
 <body>
 
@@ -223,5 +225,6 @@ if (isset($_SESSION['user_token'])) {
         <p>&copy; <?php echo date('Y'); ?> CarbonWise Platform. All rights reserved.</p>
     </footer>
 
+    <script src="pwa-register.js"></script>
 </body>
 </html>

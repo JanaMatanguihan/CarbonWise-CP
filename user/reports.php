@@ -704,6 +704,8 @@ function time_elapsed_string($datetime, $full = false) {
             .bn-fab-btn { width: 62px; height: 62px; border-radius: 50%; background: var(--fc-line); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; border: 5px solid var(--bg-card); box-shadow: 0 4px 14px rgba(61, 166, 107, 0.35); }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
 </head>
 <body>
 
@@ -1474,5 +1476,6 @@ function time_elapsed_string($datetime, $full = false) {
             bySourceChart.resize();
         });
     </script>
+    <script src="pwa-register.js"></script>
 </body>
 </html>

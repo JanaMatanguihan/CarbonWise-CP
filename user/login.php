@@ -207,6 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
 </head>
 <body>
 
@@ -291,5 +293,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     </script>
 
+    <script src="pwa-register.js"></script>
 </body>
 </html>

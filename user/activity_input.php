@@ -835,6 +835,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             .cwn-dropdown { position: fixed; top: 76px; left: 12px; right: 12px; width: auto; max-width: none; }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1B4332">
 </head>
 <body>
 
@@ -2055,5 +2057,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }, 200);
         });
     </script>
+    <script src="pwa-register.js"></script>
 </body>
 </html>
