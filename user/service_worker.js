@@ -13,7 +13,7 @@
 // silently bypassing the location check. So: PHP pages are NEVER cached.
 // ---------------------------------------------------------------
 
-const CACHE_NAME = 'carbonwise-static-v1';
+const CACHE_NAME = 'carbonwise-static-v2';
 
 // Only static, non-sensitive assets go in the precache.
 const STATIC_ASSETS = [

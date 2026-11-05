@@ -265,36 +265,96 @@ if (isset($_SESSION['user_token'])) {
     <script src="pwa-register.js"></script>
     <script>
         // --- PWA install button (index page only) ---
-        let cwDeferredPrompt = null;
         const cwInstallBtn = document.getElementById('pwaInstallBtn');
 
-        // Fires only when the browser has verified the site meets install
-        // criteria (valid manifest + icons + active service worker).
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            cwDeferredPrompt = e;
+        // --- Platform detection ---
+        // iOS (iPhone/iPad/iPod) never fires beforeinstallprompt — there is
+        // no programmatic install API on iOS at all, by Apple's design, in
+        // any browser (Chrome/Edge/Firefox on iOS are all just Safari's
+        // engine underneath and share this limitation). The only install
+        // path is the user manually using Safari's Share -> Add to Home
+        // Screen menu, which we can't trigger — we can only explain it.
+        const cwIsIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS 13+ reports as Mac
+
+        // Safari is required on iOS — Chrome/Firefox/Edge on iOS cannot
+        // install PWAs even though the button is visible there, because
+        // only Safari implements "Add to Home Screen" as a real install.
+        const cwIsIOSSafari = cwIsIOS && /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent);
+
+        // Already running as an installed app (standalone)? Then there's
+        // nothing to offer — hide the button entirely.
+        const cwIsStandalone = window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+
+        let cwDeferredPrompt = null;
+
+        function cwShowIOSInstructions() {
+            if (!cwIsIOSSafari) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Open in Safari to Install',
+                    html: 'To install CarbonWise on your iPhone or iPad, please open this page in <b>Safari</b> — installation only works from Safari on iOS, not from this browser.',
+                    confirmButtonColor: '#098a38'
+                });
+                return;
+            }
+            Swal.fire({
+                icon: undefined,
+                title: 'Install CarbonWise',
+                html: `
+                    <div style="text-align:left; font-size:0.95rem; line-height:1.6;">
+                        <p style="margin-bottom:14px;">Add CarbonWise to your Home Screen for quick, app-like access:</p>
+                        <ol style="padding-left: 20px; margin:0;">
+                            <li style="margin-bottom:10px;">Tap the <b>Share</b> icon
+                                <span style="display:inline-block; vertical-align:middle;">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                </span>
+                                in Safari's toolbar.
+                            </li>
+                            <li style="margin-bottom:10px;">Scroll down and tap <b>"Add to Home Screen."</b></li>
+                            <li>Tap <b>"Add"</b> in the top-right corner to confirm.</li>
+                        </ol>
+                    </div>
+                `,
+                confirmButtonText: 'Got it',
+                confirmButtonColor: '#098a38'
+            });
+        }
+
+        if (cwIsStandalone) {
+            // Already installed — nothing to show.
+        } else if (cwIsIOS) {
+            // No beforeinstallprompt will ever fire here — show the button
+            // immediately and have it open instructions instead of a
+            // native prompt.
             cwInstallBtn.classList.add('visible');
-        });
+            cwInstallBtn.addEventListener('click', cwShowIOSInstructions);
+        } else {
+            // Android / desktop Chrome, Edge, etc. — use the real native
+            // install prompt once the browser confirms installability.
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                cwDeferredPrompt = e;
+                cwInstallBtn.classList.add('visible');
+            });
 
-        cwInstallBtn?.addEventListener('click', async () => {
-            if (!cwDeferredPrompt) return;
-            cwInstallBtn.disabled = true;
-            cwDeferredPrompt.prompt();
-            const { outcome } = await cwDeferredPrompt.userChoice;
-            cwDeferredPrompt = null;
-            cwInstallBtn.classList.remove('visible');
-            cwInstallBtn.disabled = false;
-            // outcome is 'accepted' or 'dismissed' — no action needed either way
-        });
+            cwInstallBtn.addEventListener('click', async () => {
+                if (!cwDeferredPrompt) return;
+                cwInstallBtn.disabled = true;
+                cwDeferredPrompt.prompt();
+                const { outcome } = await cwDeferredPrompt.userChoice;
+                cwDeferredPrompt = null;
+                cwInstallBtn.classList.remove('visible');
+                cwInstallBtn.disabled = false;
+                // outcome is 'accepted' or 'dismissed' — no action needed either way
+            });
 
-        // If it's already installed (or gets installed), hide the button.
-        window.addEventListener('appinstalled', () => {
-            cwInstallBtn.classList.remove('visible');
-            cwDeferredPrompt = null;
-        });
-
-        // Safari/iOS never fires beforeinstallprompt — nothing to do there;
-        // those users install via Share -> Add to Home Screen manually.
+            window.addEventListener('appinstalled', () => {
+                cwInstallBtn.classList.remove('visible');
+                cwDeferredPrompt = null;
+            });
+        }
     </script>
 </body>
 </html>
