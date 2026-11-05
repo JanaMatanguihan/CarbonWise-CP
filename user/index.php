@@ -80,7 +80,11 @@ if (isset($_SESSION['user_token'])) {
         .btn-hero-outline { padding: 14px 28px; background: transparent; color: #ffffff; font-weight: 700; border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 8px; text-decoration: none; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; }
         .btn-hero-outline:hover { border-color: #ffffff; background: rgba(255,255,255,0.05); }
 
-        /* PWA Install Button — hidden until the browser confirms installability */
+        /* PWA Install Button — present in the layout from the start, but
+           invisible and non-interactive until the browser confirms
+           installability. It fades/scales in smoothly instead of popping
+           in abruptly once beforeinstallprompt fires (this can take a
+           moment on first visit while the service worker activates). */
         .btn-install {
             padding: 14px 28px;
             background: #52B788;
@@ -90,17 +94,27 @@ if (isset($_SESSION['user_token'])) {
             border-radius: 8px;
             font-size: 1rem;
             cursor: pointer;
-            display: none;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
             box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-            transition: background 0.2s, transform 0.15s;
             font-family: 'Inter', sans-serif;
+            opacity: 0;
+            visibility: hidden;
+            transform: scale(0.92) translateY(4px);
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s ease, background 0.2s, visibility 0s linear 0.35s;
         }
-        .btn-install.visible { display: inline-flex; }
-        .btn-install:hover { background: #6fcc9e; transform: translateY(-1px); }
-        .btn-install:active { transform: translateY(0); }
+        .btn-install.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: scale(1) translateY(0);
+            pointer-events: auto;
+            transition: opacity 0.35s ease, transform 0.35s ease, background 0.2s;
+        }
+        .btn-install:hover { background: #6fcc9e; transform: scale(1.02) translateY(-1px); }
+        .btn-install:active { transform: scale(1) translateY(0); }
 
         .hero-card-preview { flex: 1; display: flex; justify-content: center; width: 100%; }
         .preview-box { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); padding: 30px; border-radius: 16px; backdrop-filter: blur(10px); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
