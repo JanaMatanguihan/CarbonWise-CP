@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h2>Welcome Back to CarbonWise</h2>
             <p class="auth-subtitle">Sign in to access your sustainability portal</p>
 
-            <form action="login.php" method="POST">
+            <form action="login.php" method="POST" id="loginForm">
                 <div class="form-group">
                     <label>SR-Code or Email</label>
                     <input type="text" name="username_or_email" placeholder="2x-xxxxx or email@domain.com" value="<?= isset($_POST['username_or_email']) ? htmlspecialchars($_POST['username_or_email'], ENT_QUOTES, 'UTF-8') : '' ?>" required style="width: 100%; box-sizing: border-box;">
@@ -291,6 +291,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 iconElement.classList.add("fa-eye-slash");
             }
         }
+
+        // Show a loading modal the moment the form is actually submitted
+        // (i.e. after the browser's own required-field validation passes).
+        // The form submits normally underneath it — this doesn't intercept
+        // or block the request — so the modal simply stays up until the
+        // next page (dashboard, or this page again with an error) loads.
+        document.getElementById('loginForm').addEventListener('submit', function () {
+            Swal.fire({
+                title: 'Logging in...',
+                text: 'Please wait while we verify your credentials.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        });
     </script>
 
     <script src="pwa-register.js"></script>

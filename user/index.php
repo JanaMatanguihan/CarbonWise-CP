@@ -80,6 +80,28 @@ if (isset($_SESSION['user_token'])) {
         .btn-hero-outline { padding: 14px 28px; background: transparent; color: #ffffff; font-weight: 700; border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 8px; text-decoration: none; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; }
         .btn-hero-outline:hover { border-color: #ffffff; background: rgba(255,255,255,0.05); }
 
+        /* PWA Install Button — hidden until the browser confirms installability */
+        .btn-install {
+            padding: 14px 28px;
+            background: #52B788;
+            color: #0B2B1E;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+            transition: background 0.2s, transform 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-install.visible { display: inline-flex; }
+        .btn-install:hover { background: #6fcc9e; transform: translateY(-1px); }
+        .btn-install:active { transform: translateY(0); }
+
         .hero-card-preview { flex: 1; display: flex; justify-content: center; width: 100%; }
         .preview-box { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); padding: 30px; border-radius: 16px; backdrop-filter: blur(10px); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
         .preview-metric { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 15px 20px; border-radius: 10px; gap: 10px; }
@@ -172,6 +194,7 @@ if (isset($_SESSION['user_token'])) {
             <div class="hero-buttons">
                 <a href="login.php" class="btn-hero-primary"><i class="fa-solid fa-right-to-bracket"></i> Sign In to Account</a>
                 <a href="register.php" class="btn-hero-outline"><i class="fa-solid fa-user-plus"></i> Register Now</a>
+                <button type="button" id="pwaInstallBtn" class="btn-install"><i class="fa-solid fa-circle-down"></i> Install App</button>
             </div>
         </div>
         <div class="hero-card-preview">
@@ -226,5 +249,38 @@ if (isset($_SESSION['user_token'])) {
     </footer>
 
     <script src="pwa-register.js"></script>
+    <script>
+        // --- PWA install button (index page only) ---
+        let cwDeferredPrompt = null;
+        const cwInstallBtn = document.getElementById('pwaInstallBtn');
+
+        // Fires only when the browser has verified the site meets install
+        // criteria (valid manifest + icons + active service worker).
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            cwDeferredPrompt = e;
+            cwInstallBtn.classList.add('visible');
+        });
+
+        cwInstallBtn?.addEventListener('click', async () => {
+            if (!cwDeferredPrompt) return;
+            cwInstallBtn.disabled = true;
+            cwDeferredPrompt.prompt();
+            const { outcome } = await cwDeferredPrompt.userChoice;
+            cwDeferredPrompt = null;
+            cwInstallBtn.classList.remove('visible');
+            cwInstallBtn.disabled = false;
+            // outcome is 'accepted' or 'dismissed' — no action needed either way
+        });
+
+        // If it's already installed (or gets installed), hide the button.
+        window.addEventListener('appinstalled', () => {
+            cwInstallBtn.classList.remove('visible');
+            cwDeferredPrompt = null;
+        });
+
+        // Safari/iOS never fires beforeinstallprompt — nothing to do there;
+        // those users install via Share -> Add to Home Screen manually.
+    </script>
 </body>
 </html>
