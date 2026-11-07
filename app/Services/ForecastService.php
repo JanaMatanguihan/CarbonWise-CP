@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Services;
 
 use App\Models\CarbonRecord;
@@ -10,12 +9,26 @@ class ForecastService
 {
     public function getHistoricalData()
     {
-        // Allow the TFT request to finish without PHP stopping it at 60 seconds.
         set_time_limit(0);
 
-        // Get real CarbonWise records from the database.
-        // Aggregate all users by record_date for daily emission totals.
-        $records = CarbonRecord::select('record_date')
+        /*
+         * COMMUNITY DATA CUTOFF
+         *
+         * July 20, 2026 is the last verified date containing
+         * community-level aggregated emission data.
+         *
+         * Records after this date belong to the newer test-user
+         * submissions and must not be mixed with community totals.
+         */
+        $communityDataCutoff = '2026-07-20';
+
+        /*
+         * Retrieve only verified community-level historical data.
+         * Aggregate all users by date.
+         */
+        $records = CarbonRecord::query()
+            ->whereDate('record_date', '<=', $communityDataCutoff)
+            ->select('record_date')
             ->selectRaw('SUM(transportation) AS transportation')
             ->selectRaw('SUM(electricity) AS electricity')
             ->selectRaw('SUM(food) AS food')
@@ -24,9 +37,11 @@ class ForecastService
             ->orderBy('record_date')
             ->get();
 
-        // Prepare records for the TFT API.
-        // Missing calendar dates are filled temporarily for forecasting only.
-        // Nothing is inserted into the carbon_records table.
+        /*
+         * Prepare continuous daily records for the TFT API.
+         * Missing dates are forward-filled temporarily.
+         * No database records are created or modified.
+         */
         $forecastRecords = collect();
 
         if ($records->isNotEmpty()) {
@@ -50,7 +65,6 @@ class ForecastService
 
                 if ($recordsByDate->has($dateKey)) {
 
-                    // Use the actual database record.
                     $record = $recordsByDate->get($dateKey);
 
                     $previousRecord = [
@@ -67,8 +81,6 @@ class ForecastService
 
                 } elseif ($previousRecord !== null) {
 
-                    // Fill a missing calendar date using the previous valid value.
-                    // Temporary data used only for forecasting.
                     $forecastRecords->push([
                         'record_date' => $dateKey,
                         ...$previousRecord,
@@ -77,7 +89,9 @@ class ForecastService
             }
         }
 
-        // Send the prepared historical data to the Railway TFT API.
+        /*
+         * Request the 30-day TFT forecast.
+         */
         $forecast = collect();
         $predictionInterval = null;
 
@@ -90,10 +104,9 @@ class ForecastService
             $forecastRecords->isNotEmpty() &&
             $tftApiUrl !== ''
         ) {
+
             try {
 
-                // TFT forecasting can take more than 30 seconds.
-                // The PHP execution limit is disabled above.
                 $response = Http::timeout(120)
                     ->post(
                         $tftApiUrl . '/forecast',
@@ -111,42 +124,63 @@ class ForecastService
                     $predictionInterval = $response->json(
                         'prediction_interval'
                     );
+
+                } else {
+
+                    Log::error(
+                        'TFT Forecast API returned an unsuccessful response.',
+                        [
+                            'status' => $response->status(),
+                            'body' => $response->body(),
+                        ]
+                    );
                 }
 
             } catch (\Throwable $e) {
 
-                // Keep the forecasting page from crashing if the TFT service is unavailable.
                 Log::error(
                     'TFT Forecast API Error: ' . $e->getMessage()
                 );
             }
         }
 
-        // Keep only the latest 30 real historical dates for the historical chart.
+        /*
+         * Historical chart data:
+         * Latest 30 verified community-level dates only.
+         */
         $historicalRecords = $records
             ->sortByDesc('record_date')
             ->take(30)
             ->sortBy('record_date')
             ->values();
 
-        // Calculate forecast totals and daily average.
-        // The updated TFT API uses the "forecast" field.
-        $predictedEmissions = $forecast->sum(
-            'forecast'
-        );
+        /*
+         * Forecast summary calculations.
+         */
+        $predictedEmissions = $forecast->sum('forecast');
 
         $predictedDailyAverage = $forecast->isNotEmpty()
             ? $forecast->avg('forecast')
             : null;
 
-        // TFT validation metrics from the overall validation evaluation.
-        $rmse = 262.82;
-        $mae = 183.07;
-        $r2 = 0.4561;
+        /*
+         * Actual V2 validation metrics.
+         *
+         * Source:
+         * tft_v2_validation_predictions.csv
+         *
+         * Validation period:
+         * January 1 - June 29, 2026
+         *
+         * Number of validation records: 180
+         */
+        $rmse = 248.6474;
+        $mae = 172.5523;
+        $r2 = 0.5132;
 
         return [
 
-            // Historical data
+            // Historical community emissions
             'records' => $historicalRecords,
 
             'labels' => $historicalRecords->pluck(
@@ -196,14 +230,12 @@ class ForecastService
                 ? 'Temporal Fusion Transformer (TFT)'
                 : null,
 
-            // TFT prediction interval.
+            // Prediction interval
             'confidenceLevel' => $predictionInterval,
 
-            // TFT validation metrics
+            // V2 validation metrics
             'rmse' => $rmse,
-
             'mae' => $mae,
-
             'r2' => $r2,
         ];
     }

@@ -40,12 +40,13 @@
         }
 
         [data-theme="dark"] {
-            --accent-color: #070B09;
+            /* Keep the sidebar visibly forest-green in dark mode. */
+            --accent-color: #121A16;
             --accent-hover: #162E24;
             --accent-green: #52B788;
             --neon-green: #39FF88;
 
-            --sidebar-active: rgba(57, 255, 136, 0.13);
+            ---sidebar-active: rgba(57, 255, 136, 0.13);
             --sidebar-hover: rgba(57, 255, 136, 0.07);
             --sidebar-glow: rgba(57, 255, 136, 0.12);
 
@@ -124,6 +125,14 @@
         }
 
         /* Logo area: aligned with desktop top bar */
+
+        [data-theme="dark"] .carbon-sidebar-logo {
+            border-bottom-color: rgba(82, 183, 136, 0.28);
+        }
+
+        [data-theme="dark"] .carbon-sidebar-footer {
+            border-top-color: rgba(82, 183, 136, 0.28);
+        }
 
         .carbon-sidebar-logo {
             height: 100px;

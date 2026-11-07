@@ -1269,13 +1269,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 const x = meta.data[0].x;
                 const y = meta.data[0].y;
 
+                const isDarkMode =
+                    document.documentElement.getAttribute('data-theme') === 'dark';
+
                 ctx.save();
 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
+                // Total emissions: light text in dark mode, dark text in light mode.
                 ctx.font = '700 18px Poppins';
-                ctx.fillStyle = '#111827';
+                ctx.fillStyle = isDarkMode ? '#F3F4F6' : '#111827';
 
                 ctx.fillText(
                     totalEmission.toLocaleString(
@@ -1288,8 +1292,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     y - 9
                 );
 
+                // Unit label.
                 ctx.font = '400 12px Poppins';
-                ctx.fillStyle = '#6b7280';
+                ctx.fillStyle = isDarkMode ? '#9CA3AF' : '#6b7280';
 
                 ctx.fillText(
                     'kg CO₂e',
@@ -1790,6 +1795,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
 
 
+            // Use a data-based Y-axis range so small, genuine forecast
+            // variations remain visible. The forecast values are not altered.
+            const forecastMinValue = Math.min.apply(null, forecastValues);
+            const forecastMaxValue = Math.max.apply(null, forecastValues);
+            const forecastRange = Math.max(
+                forecastMaxValue - forecastMinValue,
+                100
+            );
+            const forecastAxisPadding = forecastRange * 0.20;
+
+            const forecastAxisMin = Math.max(
+                0,
+                Math.floor((forecastMinValue - forecastAxisPadding) / 100) * 100
+            );
+
+            const forecastAxisMax =
+                Math.ceil((forecastMaxValue + forecastAxisPadding) / 100) * 100;
+
             const forecastChart = new Chart(
                 forecastCanvas,
                 {
@@ -1886,7 +1909,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             y: {
 
-                                beginAtZero: true,
+                                beginAtZero: false,
+                                min: forecastAxisMin,
+                                max: forecastAxisMax,
 
                                 grid: {
                                     color: '#e5e7eb'

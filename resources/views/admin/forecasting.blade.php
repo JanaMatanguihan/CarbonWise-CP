@@ -373,16 +373,27 @@
     });
 
 
-    // Convert TFT forecast data
+    // Convert TFT forecast data and connect it to the last historical value.
 
-    const forecastData = forecastLabels.map(function (date, index) {
+        const forecastData = [];
 
-        return {
-            x: new Date(date).getTime(),
-            y: Number(forecastValues[index])
-        };
+        // Start the forecast line at the last historical point.
+        if (historicalData.length > 0) {
+            const lastHistoricalPoint = historicalData[historicalData.length - 1];
 
-    });
+            forecastData.push({
+                x: lastHistoricalPoint.x,
+                y: lastHistoricalPoint.y
+            });
+        }
+
+        // Add the actual TFT predictions.
+        forecastLabels.forEach(function (date, index) {
+            forecastData.push({
+                x: new Date(date).getTime(),
+                y: Number(forecastValues[index])
+            });
+        });
 
 
     // Calculate the Y-axis range from the real data
