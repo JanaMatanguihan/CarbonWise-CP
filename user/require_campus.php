@@ -3,19 +3,6 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/campus_config.php';
 
-// --- DEV BYPASS -------------------------------------------------
-// Active automatically when APP_ENV=local (see campus_config.php), or when
-// CW_DEV_BYPASS_CAMPUS=1 is set explicitly in .env.
-// Every visitor is treated as already location-verified on
-// DEV_BYPASS_CAMPUS_NAME. The campus-match-on-login check below still runs
-// normally, so make sure your test account's campus column matches
-// DEV_BYPASS_CAMPUS_NAME (default: "Lipa Campus").
-if (DEV_BYPASS_CAMPUS) {
-    $_SESSION['campus_verified_at'] = time();
-    $_SESSION['campus_name']        = DEV_BYPASS_CAMPUS_NAME;
-}
-// --- END DEV BYPASS ----------------------------------------------
-
 // True for background requests (fetch/XHR/POST endpoints) that expect JSON, not a redirect.
 function cw_is_background_request(): bool {
     $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
