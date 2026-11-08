@@ -23,6 +23,17 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
   List<String> _recommendedStrategies = [];
 
+  // CACHE
+  static String? _cachedRecommendation;
+  static String? _cachedCategory;
+  static List<String>? _cachedStrategies;
+  static DateTime? _cachedAt;
+  static const Duration _cacheDuration = Duration(minutes: 15);
+
+  static DateTime? _lastForceRefreshAt;
+
+  bool _isLoadingRecommendation = false;
+
   @override
   void initState() {
     super.initState();
@@ -30,12 +41,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     strategyRefreshNotifier.addListener(_forceRefreshRecommendation);
   }
 
-  static String? _cachedRecommendation;
-  static String? _cachedCategory;
-  static List<String>? _cachedStrategies;
-
   void _forceRefreshRecommendation() {
-    print("Notifier received! Forcing refresh...");
     _loadRecommendation(forceRefresh: true);
   }
 
@@ -45,6 +51,32 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     super.dispose();
   }
 
+  // CACHE HELPERS
+  bool get _cacheIsValid {
+    if (_cachedRecommendation == null || _cachedAt == null) return false;
+    return DateTime.now().difference(_cachedAt!) < _cacheDuration;
+  }
+
+  void _writeCache(
+    String recommendation,
+    String category,
+    List<String> strategies,
+  ) {
+    _cachedRecommendation = recommendation;
+    _cachedCategory = category;
+    _cachedStrategies = strategies;
+    _cachedAt = DateTime.now();
+  }
+
+  // static void clearCache() {
+  //   _cachedRecommendation = null;
+  //   _cachedCategory = null;
+  //   _cachedStrategies = null;
+  //   _cachedAt = null;
+  //   _lastForceRefreshAt = null;
+  // }
+
+  // BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,9 +91,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              // =========================
               // PAGE TITLE
-              // =========================
               const Text(
                 "Your Strategies",
                 style: TextStyle(
@@ -80,9 +110,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
               const SizedBox(height: 20),
 
-              // =========================
               // AI COACH CARD
-              // =========================
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -138,6 +166,20 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                             ],
                           ),
                         ),
+
+                        // Manual refresh button
+                        if (!_isLoadingRecommendation)
+                          IconButton(
+                            splashRadius: 20,
+                            tooltip: 'Refresh recommendation',
+                            icon: const Icon(
+                              Icons.refresh_rounded,
+                              color: primaryGreen,
+                              size: 20,
+                            ),
+                            onPressed: () =>
+                                _loadRecommendation(forceRefresh: true),
+                          ),
                       ],
                     ),
 
@@ -204,25 +246,40 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
                     const SizedBox(height: 10),
 
-                    MarkdownBody(
-                      data: _aiRecommendation,
-                      selectable: true,
-                      styleSheet: MarkdownStyleSheet(
-                        p: const TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                          color: Colors.black87,
+                    if (_isLoadingRecommendation)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              color: primaryGreen,
+                              strokeWidth: 2.5,
+                            ),
+                          ),
                         ),
-                        strong: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF265D3B),
-                        ),
-                        listBullet: const TextStyle(
-                          color: primaryGreen,
-                          fontSize: 13,
+                      )
+                    else
+                      MarkdownBody(
+                        data: _aiRecommendation,
+                        selectable: true,
+                        styleSheet: MarkdownStyleSheet(
+                          p: const TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: Colors.black87,
+                          ),
+                          strong: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF265D3B),
+                          ),
+                          listBullet: const TextStyle(
+                            color: primaryGreen,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -232,23 +289,25 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
               // =========================
               // QUICK TIP SECTION
               // =========================
-              const Text(
-                "Recommended Strategies",
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2933),
+              if (_recommendedStrategies.isNotEmpty) ...[
+                const Text(
+                  "Recommended Strategies",
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2933),
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-              ..._recommendedStrategies.map(
-                (strategy) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _buildStrategyCard(strategy),
+                ..._recommendedStrategies.map(
+                  (strategy) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildStrategyCard(strategy),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -305,23 +364,46 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     );
   }
 
+  // RECOMMENDATION LOADING
   Future<void> _loadRecommendation({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cachedRecommendation != null) {
+    // 1. Serve from cache if valid and not forced.
+    if (!forceRefresh && _cacheIsValid) {
       if (mounted) {
         setState(() {
           _aiRecommendation = _cachedRecommendation!;
           _highestCategory = _cachedCategory ?? '';
           _recommendedStrategies = _cachedStrategies ?? [];
+          _isLoadingRecommendation = false;
         });
       }
       return;
     }
 
+    // 2. Guard against spamming Gemini after a 503
+    if (forceRefresh &&
+        _lastForceRefreshAt != null &&
+        DateTime.now().difference(_lastForceRefreshAt!) <
+            const Duration(seconds: 20)) {
+      if (_cachedRecommendation != null && mounted) {
+        setState(() {
+          _aiRecommendation = _cachedRecommendation!;
+          _highestCategory = _cachedCategory ?? '';
+          _recommendedStrategies = _cachedStrategies ?? [];
+          _isLoadingRecommendation = false;
+        });
+        _showSnack("Please wait a moment before refreshing again.");
+        return;
+      }
+    }
+
+    if (forceRefresh) {
+      _lastForceRefreshAt = DateTime.now();
+    }
+
+    // 3. Show loading state.
     if (mounted) {
       setState(() {
-        _aiRecommendation =
-            "🤖 Analyzing your recorded activities and preparing personalized recommendations...";
-        _recommendedStrategies = [];
+        _isLoadingRecommendation = true;
       });
     }
 
@@ -329,35 +411,22 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       final email = await ApiService.getCurrentUserEmail();
 
       if (email == null || email.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _aiRecommendation =
-                "Please log in and record an activity first so your AI coach can personalize your recommendations.";
-            _recommendedStrategies = [];
-            _highestCategory = "";
-          });
-        }
+        _setMessage(
+          "Please log in and record an activity first so your AI coach can personalize your recommendations.",
+        );
         return;
       }
 
-      // Get the user's recorded activities through Laravel.
-      // Flutter never connects directly to Neon.
       final records = await _apiService.getCarbonRecords(email);
 
       if (records.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _aiRecommendation =
-                "Record an activity first and I'll give you personalized sustainability advice based on your emissions.";
-            _recommendedStrategies = [];
-            _highestCategory = "";
-          });
-        }
+        _setMessage(
+          "Record an activity first and I'll give you personalized sustainability advice based on your emissions.",
+        );
         return;
       }
 
-      // Use all available user records so the coach is based on the user's
-      // actual activity history instead of only the most recent record.
+      // Aggregate the user's recorded activity.
       double transportation = 0;
       double electricity = 0;
       double food = 0;
@@ -370,39 +439,142 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         food += double.tryParse(record['food']?.toString() ?? '0') ?? 0.0;
       }
 
+      // Determine highest category.
+      String category;
       if (transportation >= electricity && transportation >= food) {
-        _highestCategory = "Transport";
+        category = "Transport";
       } else if (electricity >= food) {
-        _highestCategory = "Office Resource";
+        category = "Office Resource";
       } else {
-        _highestCategory = "Food Consumption";
+        category = "Food Consumption";
       }
 
-      // Generate the recommendation from the user's actual recorded data.
-      // Gemini is used for the AI text; Laravel/Neon remains the source of data.
+      // Call Gemini with retry + backoff.
       final gemini = GeminiService();
-      final recommendation = await gemini.generateStrategies(
-        transportation: transportation,
-        electricity: electricity,
-        food: food,
+      final recommendation = await _generateWithRetry(
+        call: () => gemini.generateStrategies(
+          transportation: transportation,
+          electricity: electricity,
+          food: food,
+        ),
       );
 
       if (!mounted) return;
-      _cachedRecommendation = recommendation;
+
+      _highestCategory = category;
       _parseRecommendation(recommendation);
     } catch (e) {
-      print("Recommendation Error: $e");
-
       if (!mounted) return;
-
-      setState(() {
-        _aiRecommendation =
-            "Unable to generate recommendations right now. Please make sure you have recorded activities and try again.";
-        _recommendedStrategies = [];
-      });
+      _showError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRecommendation = false);
+      }
     }
   }
 
+  // RETRY WITH BACKOFF (handles 503 / 429 from Gemini)
+  Future<String> _generateWithRetry({
+    required Future<String> Function() call,
+    int maxAttempts = 3,
+  }) async {
+    Duration delay = const Duration(seconds: 2);
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await call();
+      } catch (e) {
+        final message = e.toString().toLowerCase();
+
+        final isTransient =
+            message.contains('503') ||
+            message.contains('unavailable') ||
+            message.contains('high demand') ||
+            message.contains('overloaded') ||
+            message.contains('429') ||
+            message.contains('resource_exhausted');
+
+        if (!isTransient || attempt == maxAttempts) rethrow;
+
+        await Future.delayed(delay);
+        delay *= 2;
+      }
+    }
+
+    throw Exception("AI service unavailable after $maxAttempts attempts.");
+  }
+
+  // ERROR + FALLBACK HANDLING
+  void _showError(Object e) {
+    final message = e.toString();
+
+    String userMessage;
+    if (message.contains('503') || message.contains('UNAVAILABLE')) {
+      userMessage =
+          "Our AI coach is briefly overloaded. Please pull down to refresh in a moment.";
+    } else if (message.contains('429') ||
+        message.contains('RESOURCE_EXHAUSTED')) {
+      userMessage =
+          "You've reached today's AI request limit. Please try again later.";
+    } else if (message.contains('401') ||
+        message.contains('API key') ||
+        message.contains('permission')) {
+      userMessage =
+          "The AI service is temporarily unavailable. Please try again later.";
+    } else if (message.contains('SocketException') ||
+        message.contains('TimeoutException') ||
+        message.contains('Failed host lookup')) {
+      userMessage =
+          "Couldn't reach the AI service. Please check your internet and try again.";
+    } else {
+      userMessage =
+          "Unable to generate recommendations right now. Please try again.";
+    }
+
+    if (_cachedRecommendation != null && _cachedRecommendation!.isNotEmpty) {
+      setState(() {
+        _aiRecommendation =
+            "Showing your last recommendation — we couldn't reach the AI coach just now.\n\n"
+            "$_cachedRecommendation";
+        _highestCategory = _cachedCategory ?? '';
+        _recommendedStrategies = _cachedStrategies ?? [];
+      });
+      _showSnack(userMessage);
+      return;
+    }
+
+    setState(() {
+      _aiRecommendation = userMessage;
+      _recommendedStrategies = [];
+      _highestCategory = '';
+    });
+  }
+
+  void _setMessage(String message) {
+    if (!mounted) return;
+    setState(() {
+      _aiRecommendation = message;
+      _recommendedStrategies = [];
+      _highestCategory = '';
+      _isLoadingRecommendation = false;
+    });
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFF1F2933),
+        ),
+      );
+  }
+
+  // PARSING
   void _parseRecommendation(String recommendation) {
     final parts = recommendation.split("STRATEGIES:");
 
@@ -421,9 +593,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
           .toList();
     }
 
-    _cachedCategory = _highestCategory;
-    _cachedStrategies = strategies;
-    _cachedRecommendation = mainRecommendation;
+    _writeCache(mainRecommendation, _highestCategory, strategies);
 
     setState(() {
       _aiRecommendation = mainRecommendation;

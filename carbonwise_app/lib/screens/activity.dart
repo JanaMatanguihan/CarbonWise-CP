@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:carbonwise_app/services/notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 const primaryGreen = Color(0xFF3AA76D);
 const darkGreen = Color(0xFF1E5631);
@@ -49,6 +50,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   bool _isSavingCarbonRecord = false;
   bool _isCheckingCampus = false;
   bool _isOnCampus = false;
+  String? _openSection;
+  bool _isLockedForToday = false;
+  int _transportLockedCount = 0;
+  int _officeLockedCount = 0;
+  int _foodLockedCount = 0;
 
   final TextEditingController _homeAddressController = TextEditingController();
   final TextEditingController _officeHoursController = TextEditingController();
@@ -446,8 +452,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         _officeEmissions.clear();
         _foodEmissions.clear();
 
+        bool hasTodayRecord = false;
+
         for (final record in records) {
-          // Requirement: Only show user input for the current day
           final recordDate =
               record['record_date']?.toString() ??
               record['date']?.toString() ??
@@ -457,6 +464,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             continue;
           }
 
+          hasTodayRecord = true;
+
           final transportation = record['transportation'];
           final electricity = record['electricity'];
           final food = record['food'];
@@ -464,7 +473,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           if (transportation != null &&
               (double.tryParse(transportation.toString()) ?? 0) > 0) {
             final transportItem = record["transport_item"] ?? "Transportation";
-
             _transportEmissions.add(
               "$transportItem\n${transportation.toString()} kg CO₂e",
             );
@@ -473,7 +481,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           if (electricity != null &&
               (double.tryParse(electricity.toString()) ?? 0) > 0) {
             final officeItem = record["office_item"] ?? "Office resource";
-
             _officeEmissions.add(
               "$officeItem\n${electricity.toString()} kg CO₂e",
             );
@@ -481,10 +488,14 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
           if (food != null && (double.tryParse(food.toString()) ?? 0) > 0) {
             final foodItem = record["food_item"] ?? "Food";
-
             _foodEmissions.add("$foodItem\n${food.toString()} kg CO₂e");
           }
         }
+
+        _isLockedForToday = hasTodayRecord;
+        _transportLockedCount = _transportEmissions.length;
+        _officeLockedCount = _officeEmissions.length;
+        _foodLockedCount = _foodEmissions.length;
       });
     } catch (_) {
       // The screen remains usable when history cannot be loaded.
@@ -551,6 +562,10 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
       carbonScoreRefreshNotifier.value++;
       strategyRefreshNotifier.value++;
+      _isLockedForToday = true;
+      _transportLockedCount = _transportEmissions.length;
+      _officeLockedCount = _officeEmissions.length;
+      _foodLockedCount = _foodEmissions.length;
       saved = true;
       _generateSaveNotification();
     } catch (_) {
@@ -644,6 +659,75 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     }
   }
 
+  void _deleteTransportAt(int index) {
+    if (index < _transportLockedCount) return;
+    if (index < 0 || index >= _transportEmissions.length) return;
+
+    setState(() {
+      _transportEmissions.removeAt(index);
+      _recalculateTransportTotal();
+    });
+  }
+
+  void _deleteOfficeAt(int index) {
+    if (index < _officeLockedCount) return;
+    if (index < 0 || index >= _officeEmissions.length) return;
+
+    setState(() {
+      _officeEmissions.removeAt(index);
+      _recalculateOfficeTotal();
+    });
+  }
+
+  void _deleteFoodAt(int index) {
+    if (index < _foodLockedCount) return;
+    if (index < 0 || index >= _foodEmissions.length) return;
+
+    setState(() {
+      _foodEmissions.removeAt(index);
+      _recalculateFoodTotal();
+    });
+  }
+
+  void _recalculateTransportTotal() {
+    double total = 0;
+    for (final entry in _transportEmissions) {
+      final parts = entry.split(' - ');
+      if (parts.length < 2) continue;
+      final value = double.tryParse(
+        parts.last.replaceAll(' kg CO₂e', '').trim(),
+      );
+      if (value != null) total += value;
+    }
+    _transportationTotalEmission = total;
+  }
+
+  void _recalculateOfficeTotal() {
+    double total = 0;
+    for (final entry in _officeEmissions) {
+      final parts = entry.split('\n');
+      if (parts.length < 3) continue;
+      final value = double.tryParse(
+        parts.last.replaceAll(' kg CO₂e', '').trim(),
+      );
+      if (value != null) total += value;
+    }
+    _officeResourceTotalEmission = total;
+  }
+
+  void _recalculateFoodTotal() {
+    double total = 0;
+    for (final entry in _foodEmissions) {
+      final parts = entry.split('\n');
+      if (parts.length < 4) continue;
+      final value = double.tryParse(
+        parts.last.replaceAll(' kg CO₂e', '').trim(),
+      );
+      if (value != null) total += value;
+    }
+    _foodTotalEmission = total;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -654,7 +738,8 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Transport Form Card
-            _buildFormCard(
+            _buildAccordionSection(
+              key: 'transport',
               title: 'Transportation',
               icon: Icons.directions_car_rounded,
               subtitle: 'Record how you traveled today.',
@@ -676,9 +761,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     });
                   },
                 ),
-
                 const SizedBox(height: 14),
-
                 _buildTextField(
                   label: "Starting Point",
                   hint: "Enter your starting address",
@@ -690,17 +773,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     });
                   },
                 ),
-
                 const SizedBox(height: 14),
-
                 _buildCampusField(),
-
                 const SizedBox(height: 16),
-
                 _buildDistancePreview(),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -735,9 +812,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: _buildAddButton(
@@ -752,19 +827,15 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       final emission = _calculateTransportationEmission(
                         _selectedTransportType!,
                         _distanceKm!,
                       );
-
                       setState(() {
                         _transportationTotalEmission += emission;
-
                         _transportEmissions.add(
                           "$_selectedTransportType - ${emission.toStringAsFixed(2)} kg CO₂e",
                         );
-
                         _selectedTransportType = null;
                         _distanceKm = null;
                         _homeAddressController.clear();
@@ -775,18 +846,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // 2. Office Resource Form Card
-            _buildFormCard(
+            _buildAccordionSection(
+              key: 'office',
               title: 'Office Resource',
               icon: Icons.devices_other_outlined,
               subtitle: 'Record the resources or appliances you used.',
               children: [
                 _buildOfficeResourceDropdown(),
-
                 const SizedBox(height: 14),
-
                 _buildTextField(
                   label: "Hours Used",
                   hint: "Enter number of hours",
@@ -794,9 +864,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   keyboardType: TextInputType.number,
                   numbersOnly: true,
                 ),
-
                 const SizedBox(height: 16),
-
                 SizedBox(
                   width: double.infinity,
                   child: _buildAddButton(
@@ -810,7 +878,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       if (_officeHoursController.text.isEmpty) {
                         DialogHelper.showWarning(
                           context: context,
@@ -819,7 +886,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       final hours = double.tryParse(
                         _officeHoursController.text.trim(),
                       );
@@ -831,21 +897,17 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       final emission = _calculateOfficeResourceEmission(
                         _selectedOfficeResourceCategory!,
                         hours,
                       );
-
                       setState(() {
                         _officeEmissions.add(
                           '${_selectedOfficeResourceCategory!}\n'
                           '$hours hour(s)\n'
                           '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
-
                         _officeResourceTotalEmission += emission;
-
                         _selectedOfficeResourceCategory = null;
                         _officeHoursController.clear();
                       });
@@ -855,10 +917,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // 3. Food Consumption Form Card
-            _buildFormCard(
+            _buildAccordionSection(
+              key: 'food',
               title: 'Food Consumption',
               icon: Icons.restaurant_outlined,
               subtitle: 'Record what you consumed today.',
@@ -874,13 +937,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     });
                   },
                 ),
-
                 const SizedBox(height: 14),
-
                 _buildFoodDropdown(),
-
                 const SizedBox(height: 14),
-
                 Row(
                   children: [
                     Expanded(
@@ -903,9 +962,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 14),
-
                 _buildTextField(
                   label: 'Amount / Serving (Cups)',
                   hint: 'e.g., 1 cup',
@@ -915,9 +972,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   ),
                   numbersOnly: true,
                 ),
-
                 const SizedBox(height: 16),
-
                 SizedBox(
                   width: double.infinity,
                   child: _buildAddButton(
@@ -932,11 +987,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       final amount = double.tryParse(
                         _servingSizeController.text.trim(),
                       );
-
                       if (amount == null || amount <= 0) {
                         DialogHelper.showWarning(
                           context: context,
@@ -945,14 +998,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                         );
                         return;
                       }
-
                       final emission = _calculateFoodEmission(
                         _selectedFoodItem!,
                         amount,
                       );
-
                       final unit = amount == 1 ? 'cup' : 'cups';
-
                       setState(() {
                         _foodEmissions.add(
                           '${_selectedFoodItem!}\n'
@@ -962,12 +1012,9 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                           '$amount $unit\n'
                           '${emission.toStringAsFixed(2)} kg CO₂e',
                         );
-
                         _foodTotalEmission += emission;
-
                         _lastFoodMealPeriod = _selectedMealPeriod;
                         _lastFoodConsumedAt = _selectedFoodDateTime;
-
                         _selectedFoodItem = null;
                         _selectedMealPeriod = null;
                         _servingSizeController.clear();
@@ -1070,15 +1117,16 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   // Component Builders
-  Widget _buildFormCard({
+  Widget _buildAccordionSection({
+    required String key,
     required String title,
     required IconData icon,
     required String subtitle,
     required List<Widget> children,
   }) {
+    final isOpen = _openSection == key;
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -1092,52 +1140,76 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: primaryGreen.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: primaryGreen, size: 22),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2933),
-                      ),
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              setState(() {
+                _openSection = isOpen ? null : key;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: primaryGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-
-                    const SizedBox(height: 2),
-
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
+                    child: Icon(icon, color: primaryGreen, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2933),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  AnimatedRotation(
+                    duration: const Duration(milliseconds: 180),
+                    turns: isOpen ? 0.5 : 0,
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-
-          const SizedBox(height: 20),
-
-          ...children,
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: children,
+              ),
+            ),
+            crossFadeState: isOpen
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 220),
+          ),
         ],
       ),
     );
@@ -1697,37 +1769,42 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     final List<Widget> activities = [];
 
     // Transportation
-    for (final activity in _transportEmissions) {
+    for (var i = 0; i < _transportEmissions.length; i++) {
       activities.add(
         _buildActivityItem(
           icon: Icons.directions_car_rounded,
           iconColor: const Color(0xFF3AA76D),
           category: 'Transportation',
-          activity: activity,
+          activity: _transportEmissions[i],
+          onDelete: i < _transportLockedCount
+              ? null
+              : () => _deleteTransportAt(i),
         ),
       );
     }
 
     // Office Resource
-    for (final activity in _officeEmissions) {
+    for (var i = 0; i < _officeEmissions.length; i++) {
       activities.add(
         _buildActivityItem(
           icon: Icons.devices_other_rounded,
           iconColor: const Color(0xFF4F7CAC),
           category: 'Office Resource',
-          activity: activity,
+          activity: _officeEmissions[i],
+          onDelete: i < _officeLockedCount ? null : () => _deleteOfficeAt(i),
         ),
       );
     }
 
     // Food Consumption
-    for (final activity in _foodEmissions) {
+    for (var i = 0; i < _foodEmissions.length; i++) {
       activities.add(
         _buildActivityItem(
           icon: Icons.restaurant_rounded,
           iconColor: const Color(0xFFE38B3D),
           category: 'Food Consumption',
-          activity: activity,
+          activity: _foodEmissions[i],
+          onDelete: i < _foodLockedCount ? null : () => _deleteFoodAt(i),
         ),
       );
     }
@@ -1776,6 +1853,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     required Color iconColor,
     required String category,
     required String activity,
+    VoidCallback? onDelete,
   }) {
     final parts = activity.split('\n');
 
@@ -1795,7 +1873,6 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           title = firstLine;
         }
       }
-
       details = category;
     } else {
       title = parts.isNotEmpty ? parts[0] : '';
@@ -1830,9 +1907,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
             ),
             child: Icon(icon, color: iconColor, size: 23),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1847,9 +1922,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                     color: Color(0xFF1F2933),
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   details.isEmpty ? category : '$category · $details',
                   maxLines: 1,
@@ -1859,17 +1932,32 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
               ],
             ),
           ),
-
           const SizedBox(width: 8),
-
-          Text(
-            emission,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: darkGreen,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                emission,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: darkGreen,
+                ),
+              ),
+              if (onDelete != null)
+                GestureDetector(
+                  onTap: onDelete,
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -1879,6 +1967,5 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
 
 class _CampusCheckException implements Exception {
   const _CampusCheckException(this.message);
-
   final String message;
 }

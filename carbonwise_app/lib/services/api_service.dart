@@ -66,6 +66,8 @@ class ApiService {
     String password,
   ) async {
     try {
+      print("USER TOKEN: $token");
+
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/login'),
@@ -650,6 +652,9 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final value = data['rankings'] ?? data['data'] ?? data;
+
+        print('DEPARTMENT RANKINGS RESPONSE: $value');
+
         return value is List ? value : [];
       }
 
@@ -673,6 +678,9 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final value = data['rankings'] ?? data['data'] ?? data;
+
+        print('CAMPUS RANKINGS RESPONSE: $value');
+
         return value is List ? value : [];
       }
 
@@ -783,7 +791,7 @@ class ApiService {
             Uri.parse('$baseUrl/api/forecast/tft-30-days'),
             headers: {'Authorization': 'Bearer $token'},
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 120));
 
       print('TFT STATUS: ${response.statusCode}');
       print('TFT RESPONSE: ${response.body}');

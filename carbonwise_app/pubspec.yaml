@@ -47,6 +47,8 @@ dependencies:
   geolocator: ^14.0.2
   cached_network_image: ^3.4.1
   app_links: ^6.3.2
+  screenshot: ^3.0.0
+  gal: ^2.3.0
 
 dev_dependencies:
   flutter_test:
