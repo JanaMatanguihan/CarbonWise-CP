@@ -72,6 +72,25 @@ foreach (['BREVO_API_KEY' => $brevo_api_key, 'DB_HOST' => $db_host, 'DB_DATABASE
 if (!empty($missing_config)) {
     error_log('CarbonWise config error: missing ' . implode(', ', $missing_config) . ' in .env');
     http_response_code(500);
+
+    // On a local machine only, show what is wrong. On the live site the message stays generic.
+    $cw_host = $_SERVER['HTTP_HOST'] ?? '';
+    if (strpos($cw_host, 'localhost') === 0 || strpos($cw_host, '127.0.0.1') === 0) {
+        $cw_paths = [__DIR__ . '/.env', dirname(__DIR__) . '/.env'];
+        $cw_found = array_filter($cw_paths, 'file_exists');
+        echo '<pre style="font-family:monospace;padding:16px">';
+        echo "Server configuration error (shown on localhost only)\n\n";
+        echo 'Missing variables: ' . htmlspecialchars(implode(', ', $missing_config)) . "\n\n";
+        if (empty($cw_found)) {
+            echo "No .env file was found. Looked in:\n  " . htmlspecialchars(implode("\n  ", $cw_paths)) . "\n";
+            echo "Make sure the file is named exactly .env (not _env or .env.txt).\n";
+        } else {
+            echo "Found .env at:\n  " . htmlspecialchars(implode("\n  ", $cw_found)) . "\n";
+            echo "The file exists, but the variables above are missing or empty in it.\n";
+        }
+        echo '</pre>';
+        exit;
+    }
     die('Server configuration error. Please contact the administrator.');
 }
 
