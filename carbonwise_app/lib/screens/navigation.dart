@@ -941,9 +941,10 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
               final strength = _passwordStrength(newPass);
               final strengthColor = _passwordStrengthColor(strength);
               final strengthLabel = _passwordStrengthLabel(strength);
-              final hasMinLength = newPass.length >= 8;
+              final hasMinLength = newPass.length >= 6;
               final hasNumber = newPass.contains(RegExp(r'[0-9]'));
               final hasLetter = newPass.contains(RegExp(r'[a-zA-Z]'));
+              final hasSymbol = newPass.contains(RegExp(r'[!@#\$&*~]'));
 
               return Dialog(
                 shape: RoundedRectangleBorder(
@@ -1089,13 +1090,18 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _requirement(
-                                  'At least 8 characters',
+                                  'At least 6 characters',
+                                  hasMinLength,
+                                ),
+                                _requirement(
+                                  'At least 6 characters',
                                   hasMinLength,
                                 ),
                                 const SizedBox(height: 4),
                                 _requirement('Contains a letter', hasLetter),
                                 const SizedBox(height: 4),
                                 _requirement('Contains a number', hasNumber),
+                                _requirement('Contains a symbol', hasSymbol),
                               ],
                             ),
 
@@ -1241,7 +1247,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                                             return;
                                           }
 
-                                          if (newPass.length < 8) {
+                                          if (newPass.length < 6) {
                                             setDialogState(() {
                                               errorMessage =
                                                   'New password must be at least 8 characters.';

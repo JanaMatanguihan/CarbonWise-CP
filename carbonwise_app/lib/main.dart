@@ -10,18 +10,6 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // TEMP: deep links disabled for debugging
-  // final appLinks = AppLinks();
-  // try {
-  //   final initialUri = await appLinks.getInitialLink();
-  //   if (initialUri != null) _handleDeepLink(initialUri);
-  // } catch (e) { debugPrint('Initial link error: $e'); }
-  // appLinks.uriLinkStream.listen(
-  //   (uri) => _handleDeepLink(uri),
-  //   onError: (err) => debugPrint('Deep link error: $err'),
-  // );
-
   runApp(const CarbonWiseApp());
 }
 
@@ -1014,11 +1002,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    if (password.length < 8) {
+    final passwordRegex = RegExp(r'^(?=.*[0-9])(?=.*[!@#\$&*~]).{6,}$');
+
+    if (!passwordRegex.hasMatch(password)) {
       DialogHelper.showError(
         context: context,
         title: "Invalid Password",
-        message: "Password must be at least 6 characters.",
+        message:
+            "Password must be at least 6 characters and contain at least 1 number and 1 symbol.",
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      DialogHelper.showError(
+        context: context,
+        title: "Password Mismatch",
+        message: "Passwords do not match.",
       );
       return;
     }

@@ -243,7 +243,7 @@
                 @endif
             </div>
 
-            <!-- Password -->
+                        <!-- Password -->
             <div class="field">
                 <label for="password" class="label">
                     New Password
@@ -258,6 +258,10 @@
                     autocomplete="new-password"
                     placeholder="Enter your new password"
                 >
+                
+                <div style="font-size: 11px; color: #718078; margin-top: 6px;">
+                    Must be at least 6 characters, include 1 number, and 1 symbol (e.g., !@#$).
+                </div>
 
                 @if ($errors->get('password'))
                     @foreach ($errors->get('password') as $error)
