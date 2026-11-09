@@ -49,20 +49,30 @@ $success = '';
 // ==========================================
 // --- CONFIGURATION FROM ENV ---
 // ==========================================
-$app_url           = env('APP_URL', 'https://carbonwise.up.railway.app');
-$brevo_api_key     = env('BREVO_API_KEY', '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');
-$brevo_api_url     = env('BREVO_API_URL', 'https://api.brevo.com/v3');
-$brevo_from_email   = env('BREVO_FROM_EMAIL', 'noreplycarbonwise@gmail.com');
-$brevo_from_name    = env('BREVO_FROM_NAME', 'CarbonWise');
+$app_url          = env('APP_URL', 'https://carbonwise.up.railway.app');
+$brevo_api_key    = env('BREVO_API_KEY');
+$brevo_api_url    = env('BREVO_API_URL', 'https://api.brevo.com/v3');
+$brevo_from_email = env('BREVO_FROM_EMAIL', env('MAIL_FROM_ADDRESS'));
+$brevo_from_name  = env('BREVO_FROM_NAME', env('MAIL_FROM_NAME', 'CarbonWise'));
 
-$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
-$db_port     = env('DB_PORT', '5432');
-$db_name     = env('DB_DATABASE', 'neondb');
-$db_user     = env('DB_USERNAME', 'neondb_owner'); 
-$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
+$db_host = env('DB_HOST');
+$db_port = env('DB_PORT', '5432');
+$db_name = env('DB_DATABASE');
+$db_user = env('DB_USERNAME');
+$db_pass = env('DB_PASSWORD');
 
-if (empty($db_pass)) {
-    die("Database Connection Error: DB_PASSWORD is missing or could not be loaded from .env.");
+// Fail fast if required secrets are missing (no hardcoded fallbacks on purpose)
+$missing_config = [];
+foreach (['BREVO_API_KEY' => $brevo_api_key, 'DB_HOST' => $db_host, 'DB_DATABASE' => $db_name,
+          'DB_USERNAME' => $db_user, 'DB_PASSWORD' => $db_pass] as $k => $v) {
+    if ($v === '' || $v === null) {
+        $missing_config[] = $k;
+    }
+}
+if (!empty($missing_config)) {
+    error_log('CarbonWise config error: missing ' . implode(', ', $missing_config) . ' in .env');
+    http_response_code(500);
+    die('Server configuration error. Please contact the administrator.');
 }
 
 $endpoint_id = explode('.', $db_host)[0] ?? '';
@@ -247,9 +257,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
         } catch (PDOException $e) {
-            $error = "Database Error: " . $e->getMessage();
+            error_log("Register PDO Error: " . $e->getMessage());
+            $error = "Unable to complete registration right now. Please try again later.";
         } catch (Exception $e) {
-            $error = "System Error: " . $e->getMessage();
+            error_log("Register System Error: " . $e->getMessage());
+            $error = "An unexpected error occurred. Please try again later.";
         }
     }
 }
