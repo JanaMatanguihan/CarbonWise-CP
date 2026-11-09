@@ -432,6 +432,130 @@ $achievements = [
     ],
 ];
 
+// 8b. MONTHLY CERTIFICATES: scored on each calendar month's overall activity, unlocked at month end
+const CW_CERT_WINDOW_DAYS = 3;     // certificate of the running month unlocks during the last N days
+const CW_CERT_MIN_ACTIVITIES = 3;  // minimum logged activities in a month to qualify
+const CW_CERT_ECO_MONTHLY_KG = 80; // "Eco Champion": month total at or below this (kg CO2e)
+
+$certificates     = [];   // earned, available certificates (newest first)
+$cert_current     = null; // status of the running month
+$cert_has_records = ($total_records_count > 0);
+
+$cw_eval_cert = function ($total, $count, $prev_total, $better, $users, $label) {
+    if ($count < CW_CERT_MIN_ACTIVITIES || $total <= 0) { return null; }
+    $top = ($users > 0) ? max(1, (int) ceil((($better + 1) / $users) * 100)) : null;
+    $reduction = ($prev_total !== null && $prev_total > 0 && $total < $prev_total)
+        ? (int) round((($prev_total - $total) / $prev_total) * 100) : 0;
+    $summary = "Logged {$count} activities totaling " . number_format($total, 1) . " kg CO₂e in {$label}";
+
+    if ($top !== null && $users >= 2 && $top <= 10) {
+        return ['tier' => 'Top 10%', 'headline' => 'achieving a ranking of', 'reason' => $summary . '. One of the lowest footprints on campus.'];
+    }
+    if ($top !== null && $users >= 2 && $top <= 25) {
+        return ['tier' => 'Top 25%', 'headline' => 'achieving a ranking of', 'reason' => $summary . '. Lower than most users on campus.'];
+    }
+    if ($reduction > 0) {
+        return ['tier' => $reduction . '% Less CO₂e', 'headline' => 'lowering your monthly emissions by', 'reason' => $summary . '. Down from ' . number_format($prev_total, 1) . ' kg the month before.'];
+    }
+    if ($total <= CW_CERT_ECO_MONTHLY_KG) {
+        return ['tier' => 'Eco Champion', 'headline' => 'keeping your monthly emissions low and earning the title of', 'reason' => $summary . ' (' . CW_CERT_ECO_MONTHLY_KG . ' kg or below).'];
+    }
+    return null;
+};
+
+// Safe default so the banner always has a sensible message, even if the query below fails
+$cw_days_total = (int) date('t');
+$cw_unlock_day = $cw_days_total - CW_CERT_WINDOW_DAYS + 1;
+$cert_current  = [
+    'status' => ((int) date('j') >= $cw_unlock_day) ? 'missed' : 'pending',
+    'unlock' => date('F') . ' ' . $cw_unlock_day . ', ' . date('Y'),
+    'on_track' => null, 'activities' => 0, 'total' => 0,
+];
+
+if ($pdo && $cert_has_records) {
+    try {
+        $min_a = (int) CW_CERT_MIN_ACTIVITIES;
+        $monthly_stmt = $pdo->prepare("
+            WITH per AS (
+                SELECT user_id,
+                       DATE_TRUNC('month', created_at) AS m,
+                       COALESCE(SUM(CAST(NULLIF(REGEXP_REPLACE(COALESCE(total_emission::text, '0'), '[^0-9.]', '', 'g'), '') AS NUMERIC)), 0) AS total,
+                       COUNT(*) AS cnt
+                FROM carbon_records
+                WHERE created_at IS NOT NULL
+                GROUP BY user_id, DATE_TRUNC('month', created_at)
+            )
+            SELECT TO_CHAR(per.m, 'YYYY-MM') AS ym, per.total, per.cnt,
+                   (SELECT COUNT(*) FROM per p2 WHERE p2.m = per.m AND p2.cnt >= {$min_a}) AS users_in_month,
+                   (SELECT COUNT(*) FROM per p2 WHERE p2.m = per.m AND p2.cnt >= {$min_a} AND p2.total < per.total) AS better
+            FROM per
+            WHERE per.user_id = :uid
+            ORDER BY per.m ASC
+        ");
+        $monthly_stmt->execute([':uid' => $user_id]);
+        $monthly_rows = $monthly_stmt->fetchAll();
+
+        $current_ym      = date('Y-m');
+        $days_in_month   = (int) date('t');
+        $window_start    = $days_in_month - CW_CERT_WINDOW_DAYS + 1;
+        $in_window       = ((int) date('j') >= $window_start);
+        $unlock_label    = date('F', strtotime('first day of this month')) . ' ' . $window_start . ', ' . date('Y');
+        $prev_by_month   = [];
+        foreach ($monthly_rows as $r) { $prev_by_month[$r['ym']] = floatval($r['total']); }
+
+        foreach ($monthly_rows as $r) {
+            $ym        = $r['ym'];
+            $first_day = DateTime::createFromFormat('Y-m-d', $ym . '-01');
+            $label     = $first_day->format('F Y');
+            $issued    = (clone $first_day)->modify('last day of this month')->format('F j, Y');
+            $prev_ym   = (clone $first_day)->modify('-1 month')->format('Y-m');
+            $prev_tot  = $prev_by_month[$prev_ym] ?? null;
+
+            $result = $cw_eval_cert(floatval($r['total']), intval($r['cnt']), $prev_tot, intval($r['better']), intval($r['users_in_month']), $label);
+
+            if ($ym === $current_ym) {
+                if ($result && $in_window) {
+                    $cert_current = ['status' => 'available'];
+                } elseif ($in_window) {
+                    $cert_current = ['status' => 'missed', 'activities' => intval($r['cnt']), 'total' => floatval($r['total'])];
+                    $result = null;
+                } else {
+                    $cert_current = [
+                        'status'   => 'pending',
+                        'unlock'   => $unlock_label,
+                        'on_track' => $result ? $result['tier'] : null,
+                        'activities' => intval($r['cnt']),
+                        'total'    => floatval($r['total']),
+                    ];
+                    $result = null;
+                }
+                $issued = (clone $first_day)->modify('last day of this month')->format('F j, Y');
+            }
+
+            if ($result) {
+                $certificates[] = [
+                    'key'      => $ym,
+                    'month'    => $first_day->format('F'),
+                    'year'     => $first_day->format('Y'),
+                    'label'    => $label,
+                    'name'     => $full_name,
+                    'tier'     => $result['tier'],
+                    'headline' => $result['headline'],
+                    'reason'   => $result['reason'],
+                    'issued'   => $issued,
+                    'activities' => intval($r['cnt']),
+                    'total'    => round(floatval($r['total']), 1),
+                    'file'     => 'CarbonWise_Certificate_' . preg_replace('/[^A-Za-z0-9]+/', '_', $full_name) . '_' . $ym,
+                ];
+            }
+        }
+        $certificates = array_reverse($certificates);
+
+    } catch (PDOException $e) {
+        $certificates = [];
+    }
+}
+
 // 9. FETCH RECENT ACTIVITY TIMELINE
 $timeline_records = [];
 if ($pdo) {
@@ -916,6 +1040,50 @@ if (empty($avatar_url)) {
             transition: opacity 0.3s ease;
         }
 
+        /* --- CERTIFICATE OF RECOGNITION --- */
+        .cert-section-sub { font-size: 0.82rem; color: var(--text-muted); margin: -4px 0 16px; line-height: 1.5; }
+        .cert-frame { border: 3px solid #95D5B2; border-radius: 24px; padding: 28px 20px 22px; text-align: center; background: var(--bg-card); }
+        .cert-medal { width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%; background: #E6F4EA; color: #2D8F5E; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; }
+        .cert-kicker { font-size: 0.85rem; font-weight: 700; letter-spacing: 3px; color: var(--accent-green); text-transform: uppercase; }
+        .cert-presented { font-size: 0.8rem; color: var(--text-muted); margin-top: 20px; }
+        .cert-name { font-size: 1.7rem; font-weight: 800; color: var(--text-title); margin: 6px 0 14px; word-break: break-word; }
+        .cert-for { font-size: 0.8rem; color: var(--text-muted); max-width: 420px; margin: 0 auto; line-height: 1.5; }
+        .cert-tier-pill { display: inline-block; margin-top: 12px; padding: 10px 22px; border-radius: 999px; background: #E6F4EA; color: #2D8F5E; font-weight: 800; font-size: 1.05rem; }
+        body.dark-mode .cert-tier-pill, body.dark-mode .cert-medal { background: #123321; color: #38A169; }
+        .cert-reason { font-size: 0.74rem; color: var(--text-muted); margin-top: 10px; }
+        .cert-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 26px; text-align: left; gap: 16px; }
+        .cert-foot small { display: block; font-size: 0.68rem; color: var(--text-muted); }
+        .cert-foot strong { font-size: 0.82rem; color: var(--text-title); }
+        .cert-sign { min-width: 130px; text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; font-style: italic; font-weight: 700; font-size: 0.8rem; color: var(--accent-green); }
+        .cert-download-btn { width: 100%; margin-top: 16px; padding: 15px; border: none; border-radius: 14px; background: #1B4332; color: #fff; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: background-color 0.2s; }
+        .cert-download-btn:hover { background: #2D6A4F; }
+        .cert-locked { text-align: center; padding: 26px 16px; border: 2px dashed var(--border-color); border-radius: 18px; background: var(--achieve-locked-bg); }
+        .cert-locked i { font-size: 1.8rem; color: var(--text-muted); margin-bottom: 10px; }
+        .cert-locked h4 { font-size: 0.95rem; color: var(--text-title); margin-bottom: 6px; }
+        .cert-locked p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.55; max-width: 460px; margin: 0 auto; }
+
+        .cert-banner { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: var(--achieve-locked-bg); border: 1px solid var(--border-color); margin-bottom: 16px; font-size: 0.82rem; color: var(--text-main); line-height: 1.5; }
+        .cert-banner i { color: var(--accent-green); font-size: 1.1rem; margin-top: 2px; }
+        .cert-banner strong { color: var(--text-title); }
+        .cert-month-chip { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--accent-green); background: var(--bell-bg); padding: 5px 14px; border-radius: 999px; margin-top: 14px; }
+        .cert-compilation-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 26px 0 12px; flex-wrap: wrap; }
+        .cert-compilation-head h4 { font-size: 0.95rem; color: var(--text-title); }
+        .cert-compilation-head span { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; margin-left: 6px; }
+        .cert-all-btn { background: transparent; border: 1.5px solid var(--accent-green); color: var(--accent-green); font-weight: 600; font-size: 0.78rem; padding: 8px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+        .cert-all-btn:hover { background: var(--bell-bg); }
+        .cert-list { display: flex; flex-direction: column; gap: 10px; }
+        .cert-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-card); }
+        .cert-row-icon { width: 42px; height: 42px; border-radius: 50%; background: #E6F4EA; color: #2D8F5E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        body.dark-mode .cert-row-icon { background: #123321; color: #38A169; }
+        .cert-row-info { flex: 1; min-width: 0; }
+        .cert-row-info h5 { font-size: 0.88rem; color: var(--text-title); }
+        .cert-row-info p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+        .cert-row-tier { font-size: 0.74rem; font-weight: 800; color: #2D8F5E; background: #E6F4EA; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+        body.dark-mode .cert-row-tier { background: #123321; color: #38A169; }
+        .cert-row-dl { background: #1B4332; color: #fff; border: none; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; flex-shrink: 0; }
+        .cert-row-dl:hover { background: #2D6A4F; }
+        @media (max-width: 600px) { .cert-row { flex-wrap: wrap; } .cert-row-tier { order: 3; } }
+
         /* --- RESPONSIVE MEDIA QUERIES --- */
         @media (max-width: 1024px) {
             .top-navbar { padding: 0 25px; }
@@ -1215,6 +1383,97 @@ if (empty($avatar_url)) {
                 </div>
             </div>
 
+            <!-- MONTHLY CERTIFICATES SECTION -->
+            <div class="single-column-grid">
+                <div class="dash-card">
+                    <div class="dash-card-title" style="font-size: 0.7rem; font-weight: 800; letter-spacing: 1.1px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px;">
+                        Monthly Recognition
+                    </div>
+
+                    <?php if (!$cert_has_records): ?>
+                        <div class="cert-locked">
+                            <i class="fa-solid fa-lock"></i>
+                            <h4>No certificates yet</h4>
+                            <p>Log at least <?= CW_CERT_MIN_ACTIVITIES ?> activities in a month to be considered for that month's certificate.</p>
+                        </div>
+                    <?php else: ?>
+
+                        <?php $cc = $cert_current['status'] ?? 'pending'; ?>
+                        <?php if ($cc === 'pending'): ?>
+                            <div class="cert-banner">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                                <div>
+                                    <strong><?= htmlspecialchars(date('F Y')) ?> certificate unlocks on <?= htmlspecialchars($cert_current['unlock'] ?? '') ?>.</strong><br>
+                                    So far this month: <?= intval($cert_current['activities'] ?? 0) ?> activities, <?= number_format($cert_current['total'] ?? 0, 1) ?> kg CO₂e.
+                                    <?php if (!empty($cert_current['on_track'])): ?>
+                                        You're currently on track for <strong><?= htmlspecialchars($cert_current['on_track']) ?></strong>.
+                                    <?php else: ?>
+                                        Keep logging (minimum <?= CW_CERT_MIN_ACTIVITIES ?> activities) and cut emissions to qualify.
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php elseif ($cc === 'missed'): ?>
+                            <div class="cert-banner">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <div>
+                                    <strong>No <?= htmlspecialchars(date('F Y')) ?> certificate this month.</strong><br>
+                                    Qualify with at least <?= CW_CERT_MIN_ACTIVITIES ?> logged activities and a Top 25% rank, lower emissions than last month, or a monthly total of <?= CW_CERT_ECO_MONTHLY_KG ?> kg CO₂e or below. Your earlier certificates stay below.
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <p class="cert-section-sub">Congratulations! You've earned your <?= htmlspecialchars(date('F Y')) ?> certificate for your sustainability efforts.</p>
+                        <?php endif; ?>
+
+                        <?php if (!empty($certificates)): $latest = $certificates[0]; ?>
+                            <div class="cert-frame">
+                                <div class="cert-medal"><i class="fa-solid fa-award"></i></div>
+                                <div class="cert-kicker">Certificate of Recognition</div>
+                                <div class="cert-month-chip"><?= htmlspecialchars($latest['label']) ?></div>
+                                <div class="cert-presented">This certificate is proudly presented to</div>
+                                <div class="cert-name"><?= htmlspecialchars($latest['name']) ?></div>
+                                <div class="cert-for">For outstanding dedication to reducing your carbon footprint and <?= htmlspecialchars($latest['headline']) ?></div>
+                                <div class="cert-tier-pill"><?= htmlspecialchars($latest['tier']) ?></div>
+                                <div class="cert-reason"><?= htmlspecialchars($latest['reason']) ?></div>
+                                <div class="cert-foot">
+                                    <div><small>Date Issued</small><strong><?= htmlspecialchars($latest['issued']) ?></strong></div>
+                                    <div class="cert-sign">CarbonWise Team</div>
+                                </div>
+                            </div>
+                            <button type="button" class="cert-download-btn" data-cert-index="0">
+                                <i class="fa-solid fa-download"></i> Download <?= htmlspecialchars($latest['label']) ?> Certificate
+                            </button>
+
+                            <div class="cert-compilation-head">
+                                <h4>Certificate Compilation <span><?= count($certificates) ?> earned</span></h4>
+                                <?php if (count($certificates) > 1): ?>
+                                    <button type="button" class="cert-all-btn" id="downloadAllCertsBtn"><i class="fa-solid fa-file-arrow-down"></i> Download all</button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="cert-list">
+                                <?php foreach ($certificates as $i => $c): ?>
+                                    <div class="cert-row">
+                                        <div class="cert-row-icon"><i class="fa-solid fa-award"></i></div>
+                                        <div class="cert-row-info">
+                                            <h5><?= htmlspecialchars($c['label']) ?></h5>
+                                            <p><?= intval($c['activities']) ?> activities · <?= number_format($c['total'], 1) ?> kg CO₂e · Issued <?= htmlspecialchars($c['issued']) ?></p>
+                                        </div>
+                                        <span class="cert-row-tier"><?= htmlspecialchars($c['tier']) ?></span>
+                                        <button type="button" class="cert-row-dl" data-cert-index="<?= $i ?>" aria-label="Download <?= htmlspecialchars($c['label']) ?> certificate"><i class="fa-solid fa-download"></i></button>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="cert-locked">
+                                <i class="fa-solid fa-lock"></i>
+                                <h4>No certificates earned yet</h4>
+                                <p>Certificates are awarded at the end of each month based on your overall activity: a Top 25% rank, lower emissions than the previous month, or a monthly total of <?= CW_CERT_ECO_MONTHLY_KG ?> kg CO₂e or below, with at least <?= CW_CERT_MIN_ACTIVITIES ?> logged activities.</p>
+                            </div>
+                        <?php endif; ?>
+
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- TOTAL IMPACT BREAKDOWN SECTION -->
             <div class="single-column-grid">
                 <div class="dash-card">
@@ -1480,6 +1739,154 @@ if (empty($avatar_url)) {
             window.cwnRefresh = load;
 
             load();
+        })();
+
+        const certificates = <?= json_encode($certificates, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+
+        (function () {
+            if (!certificates.length) return;
+
+            function wrapText(ctx, text, maxWidth) {
+                const words = text.split(' ');
+                const lines = [];
+                let line = '';
+                words.forEach(function (w) {
+                    const test = line ? line + ' ' + w : w;
+                    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+                    else { line = test; }
+                });
+                if (line) lines.push(line);
+                return lines;
+            }
+
+            function roundRect(ctx, x, y, w, h, r) {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            }
+
+            function drawCertificate(cert) {
+                const W = 1600, H = 1130, cx = W / 2;
+                const canvas = document.createElement('canvas');
+                canvas.width = W; canvas.height = H;
+                const ctx = canvas.getContext('2d');
+                const font = "'Inter', 'Segoe UI', Arial, sans-serif";
+
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+                ctx.lineWidth = 14; ctx.strokeStyle = '#95D5B2';
+                roundRect(ctx, 50, 50, W - 100, H - 100, 40); ctx.stroke();
+                ctx.lineWidth = 3; ctx.strokeStyle = '#2D6A4F';
+                roundRect(ctx, 80, 80, W - 160, H - 160, 28); ctx.stroke();
+
+                // Medal
+                ctx.fillStyle = '#E6F4EA';
+                ctx.beginPath(); ctx.arc(cx, 215, 74, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#2D8F5E';
+                ctx.beginPath(); ctx.arc(cx, 206, 42, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(cx - 28, 241); ctx.lineTo(cx - 37, 292); ctx.lineTo(cx, 273);
+                ctx.lineTo(cx + 37, 292); ctx.lineTo(cx + 28, 241); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.font = '700 50px ' + font;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('★', cx, 208);
+                ctx.textBaseline = 'alphabetic';
+
+                // Title
+                ctx.fillStyle = '#2D6A4F'; ctx.font = '700 44px ' + font;
+                if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
+                ctx.fillText('CERTIFICATE OF RECOGNITION', cx + 5, 375);
+                if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+                // Month + year chip
+                ctx.font = '700 34px ' + font;
+                const chipText = cert.month + ' ' + cert.year;
+                const cw = ctx.measureText(chipText).width + 80;
+                ctx.fillStyle = '#E6F4EA'; roundRect(ctx, cx - cw / 2, 400, cw, 64, 32); ctx.fill();
+                ctx.fillStyle = '#2D6A4F'; ctx.fillText(chipText, cx, 445);
+
+                ctx.fillStyle = '#718096'; ctx.font = '400 30px ' + font;
+                ctx.fillText('This certificate is proudly presented to', cx, 530);
+
+                // Name
+                let size = 96;
+                ctx.fillStyle = '#1A202C';
+                do { ctx.font = '800 ' + size + 'px ' + font; size -= 4; }
+                while (ctx.measureText(cert.name).width > W - 300 && size > 40);
+                ctx.fillText(cert.name, cx, 635);
+
+                // Description
+                ctx.fillStyle = '#718096'; ctx.font = '400 30px ' + font;
+                const desc = 'For outstanding dedication to reducing your carbon footprint and ' + cert.headline;
+                let y = 705;
+                wrapText(ctx, desc, W - 420).forEach(function (l) { ctx.fillText(l, cx, y); y += 42; });
+
+                // Tier pill
+                y += 14;
+                ctx.font = '800 54px ' + font;
+                const pw = ctx.measureText(cert.tier).width + 110;
+                ctx.fillStyle = '#E6F4EA'; roundRect(ctx, cx - pw / 2, y, pw, 96, 48); ctx.fill();
+                ctx.fillStyle = '#2D8F5E'; ctx.fillText(cert.tier, cx, y + 66);
+
+                // Reason
+                ctx.fillStyle = '#718096'; ctx.font = '400 24px ' + font;
+                y += 150;
+                wrapText(ctx, cert.reason, W - 380).forEach(function (l) { ctx.fillText(l, cx, y); y += 34; });
+
+                // Footer: date issued (with year) + signature
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#718096'; ctx.font = '400 24px ' + font;
+                ctx.fillText('Date Issued', 170, H - 190);
+                ctx.fillStyle = '#1A202C'; ctx.font = '700 32px ' + font;
+                ctx.fillText(cert.issued, 170, H - 145);
+
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#2D6A4F'; ctx.font = 'italic 700 32px ' + font;
+                ctx.fillText('CarbonWise Team', W - 330, H - 160);
+                ctx.strokeStyle = '#CBD5E0'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(W - 520, H - 140); ctx.lineTo(W - 140, H - 140); ctx.stroke();
+                return canvas;
+            }
+
+            function download(cert) {
+                return new Promise(function (resolve) {
+                    drawCertificate(cert).toBlob(function (blob) {
+                        if (blob) {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url; a.download = cert.file + '.png';
+                            document.body.appendChild(a); a.click(); a.remove();
+                            setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+                        }
+                        resolve();
+                    }, 'image/png');
+                });
+            }
+
+            const ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+
+            document.querySelectorAll('[data-cert-index]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const cert = certificates[parseInt(btn.getAttribute('data-cert-index'), 10)];
+                    if (cert) ready.then(function () { download(cert); });
+                });
+            });
+
+            const allBtn = document.getElementById('downloadAllCertsBtn');
+            if (allBtn) {
+                allBtn.addEventListener('click', function () {
+                    ready.then(function () {
+                        let chain = Promise.resolve();
+                        certificates.forEach(function (c) {
+                            chain = chain.then(function () { return download(c); })
+                                         .then(function () { return new Promise(function (r) { setTimeout(r, 500); }); });
+                        });
+                    });
+                });
+            }
         })();
 
         function switchCategoryTab(element, categoryKey) {
