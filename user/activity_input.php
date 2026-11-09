@@ -523,6 +523,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .route-label-value { font-weight: 600; color: var(--text-main); }
         .route-label-item.pin-target { cursor: pointer; padding: 8px 10px; border-radius: 10px; border: 2px solid transparent; }
         .route-label-item.pin-target.active { border-color: var(--accent-green); }
+        .route-label-item .route-label-title { display: flex; align-items: center; gap: 6px; }
+        .pin-remove-btn { display: none; margin-left: auto; border: none; background: transparent; color: #d64545; cursor: pointer; font-size: 0.8rem; font-weight: 600; padding: 2px 8px; border-radius: 8px; font-family: inherit; }
+        .pin-remove-btn:hover { background: rgba(214, 69, 69, 0.12); }
+        .leaflet-popup-content .popup-remove-btn { display: block; margin-top: 6px; border: none; background: #d64545; color: #fff; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; }
         .ride-clear-btn { background: none; border: none; color: var(--accent-green); font-weight: 600; font-size: 0.8rem; cursor: pointer; align-self: flex-start; padding: 2px 2px; }
         .ride-clear-btn:hover { text-decoration: underline; }
         .ride-name-input { display: none; width: 100%; margin-top: 6px; padding: 8px 10px; font-size: 0.8rem; border: 1px solid var(--input-border); border-radius: 8px; background-color: var(--input-bg); color: var(--text-main); outline: none; }
@@ -963,12 +967,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                             <div class="route-labels-box">
                                 <div class="route-label-item pin-target active" id="startPinBox" onclick="setActivePoint('start')">
-                                    <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point</div>
+                                    <div class="route-label-title" id="startLabelTitle"><i class="fa-solid fa-location-dot"></i> Starting Point<button type="button" class="pin-remove-btn" id="startRemoveBtn" title="Remove this pin" onclick="removePoint('start', event)"><i class="fa-solid fa-xmark"></i> Remove pin</button></div>
                                     <div id="startLabel" class="route-label-value">Click the map or choose a campus</div>
                                     <input type="text" id="startNameInput" class="ride-name-input" maxlength="40" placeholder="Name this place (e.g., Home, Palengke)" oninput="onPointNameInput()">
                                 </div>
                                 <div class="route-label-item pin-target" id="endPinBox" onclick="setActivePoint('end')">
-                                    <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-flag-checkered"></i> Destination</div>
+                                    <div class="route-label-title" id="endLabelTitle"><i class="fa-solid fa-flag-checkered"></i> Destination<button type="button" class="pin-remove-btn" id="endRemoveBtn" title="Remove this pin" onclick="removePoint('end', event)"><i class="fa-solid fa-xmark"></i> Remove pin</button></div>
                                     <div id="endLabel" class="route-label-value">Click the map or choose a campus</div>
                                     <input type="text" id="endNameInput" class="ride-name-input" maxlength="40" placeholder="Name this place (e.g., Home, Palengke)" oninput="onPointNameInput()">
                                 </div>
@@ -1407,6 +1411,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             nameInput.style.display = 'none';
             document.getElementById(which + 'Label').innerText = DEFAULT_POINT_TEXT;
             document.getElementById(which + 'Select').value = 'pin';
+            document.getElementById(which + 'RemoveBtn').style.display = 'none';
+        }
+
+        // Remove a single wrongly-placed pin (the other pin stays)
+        function removePoint(which, ev) {
+            if (ev) ev.stopPropagation();
+            if (!ridePts[which]) return;
+            clearRoute();
+            clearPoint(which);
+            document.getElementById('transportDistance').value = '';
+            setActivePoint(which);   // next map click re-places this pin
         }
 
         function setPoint(which, latlng, name, selectValue) {
@@ -1416,7 +1431,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             const isStart = (which === 'start');
             const marker = L.marker(latlng, { icon: pointIcon(isStart ? 'blue' : 'red') }).addTo(map);
-            marker.bindPopup('<b>' + (isStart ? 'Starting Point' : 'Destination') + ': ' + name + '</b>', { closeButton: false }).openPopup();
+            marker.bindPopup('<b>' + (isStart ? 'Starting Point' : 'Destination') + ': ' + escapeHtml(name) + '</b>' +
+                '<button type="button" class="popup-remove-btn" onclick="removePoint(\'' + which + '\')">Remove pin</button>', { closeButton: false }).openPopup();
 
             ridePts[which] = { latlng: L.latLng(latlng), name: name, selectValue: selectValue, marker: marker };
             document.getElementById(which + 'Select').value = selectValue;
@@ -1430,6 +1446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 nameInput.style.display = 'none';
             }
             refreshPointLabel(which);
+            document.getElementById(which + 'RemoveBtn').style.display = 'inline-block';
             document.getElementById('transportDistance').value = '';
 
             // once one point is set, move on to the other one if it is still empty
