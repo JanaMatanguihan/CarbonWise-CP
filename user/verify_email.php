@@ -46,14 +46,22 @@ $success = '';
 // ==========================================
 // --- CONFIGURATION FROM ENV ---
 // ==========================================
-$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
+$db_host     = env('DB_HOST');
 $db_port     = env('DB_PORT', '5432');
-$db_name     = env('DB_DATABASE', 'neondb');
-$db_user     = env('DB_USERNAME', 'neondb_owner'); 
-$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
-
-if (empty($db_pass)) {
-    die("Database Connection Error: DB_PASSWORD is missing or could not be loaded from .env.");
+$db_name     = env('DB_DATABASE', env('DB_NAME'));
+$db_user     = env('DB_USERNAME', env('DB_USER'));
+$db_pass     = env('DB_PASSWORD', env('DB_PASS'));
+// Fail fast if required settings are missing (no hardcoded fallbacks on purpose)
+$missing_config = [];
+foreach (['DB_HOST' => $db_host, 'DB_DATABASE' => $db_name, 'DB_USERNAME' => $db_user, 'DB_PASSWORD' => $db_pass] as $k => $v) {
+    if ($v === '' || $v === null) {
+        $missing_config[] = $k;
+    }
+}
+if (!empty($missing_config)) {
+    error_log('CarbonWise config error: missing ' . implode(', ', $missing_config));
+    http_response_code(500);
+    die('Server configuration error. Please contact the administrator.');
 }
 
 $endpoint_id = explode('.', $db_host)[0] ?? '';

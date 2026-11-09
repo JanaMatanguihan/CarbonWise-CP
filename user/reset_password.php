@@ -55,16 +55,27 @@ if (empty($token)) {
     $error = "Invalid or missing password reset token.";
 }
 
-$db_host     = env('DB_HOST', 'ep-red-hill-a5erg1sb-pooler.us-east-2.aws.neon.tech');
+$db_host     = env('DB_HOST');
 $db_port     = env('DB_PORT', '5432');
-$db_name     = env('DB_DATABASE', 'neondb');
-$db_user     = env('DB_USERNAME', 'neondb_owner'); 
-$db_pass     = env('DB_PASSWORD', 'npg_B7h4oEQbqJdG'); 
+$db_name     = env('DB_DATABASE', env('DB_NAME'));
+$db_user     = env('DB_USERNAME', env('DB_USER'));
+$db_pass     = env('DB_PASSWORD', env('DB_PASS'));
+// Fail fast if required settings are missing (no hardcoded fallbacks on purpose)
+$config_ok = true;
+foreach (['DB_HOST' => $db_host, 'DB_DATABASE' => $db_name, 'DB_USERNAME' => $db_user, 'DB_PASSWORD' => $db_pass] as $k => $v) {
+    if ($v === '' || $v === null) {
+        error_log('CarbonWise config error: missing ' . $k);
+        $config_ok = false;
+    }
+}
+if (!$config_ok) {
+    $error = "Server configuration error. Please contact the administrator.";
+}
 
 $endpoint_id = explode('.', $db_host)[0] ?? '';
 
 // Handle Password Reset Request
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($token) && $config_ok) {
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
