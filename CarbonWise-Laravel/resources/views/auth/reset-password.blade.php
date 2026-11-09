@@ -85,12 +85,19 @@
             margin-bottom: 8px;
         }
 
+        /* New container to hold the input and the icon */
+        .input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
         .input {
             width: 100%;
             height: 48px;
             border: 1px solid #d6dfd9;
             border-radius: 10px;
-            padding: 0 14px;
+            padding: 0 45px 0 14px; /* Added right padding so text doesn't hit the icon */
             font-size: 14px;
             color: #26382d;
             background: #fafcfb;
@@ -109,10 +116,31 @@
             color: #7b8780;
         }
 
+        /* The Eye Icon */
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            cursor: pointer;
+            color: #9aa59f;
+            font-size: 18px;
+            user-select: none;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: #3aa76d;
+        }
+
         .error {
             margin-top: 6px;
             font-size: 12px;
             color: #c0392b;
+        }
+
+        .helper-text {
+            font-size: 11px; 
+            color: #718078; 
+            margin-top: 6px;
         }
 
         .button {
@@ -243,23 +271,32 @@
                 @endif
             </div>
 
-                        <!-- Password -->
+            <!-- Password -->
             <div class="field">
                 <label for="password" class="label">
                     New Password
                 </label>
 
-                <input
-                    id="password"
-                    class="input"
-                    type="password"
-                    name="password"
-                    required
-                    autocomplete="new-password"
-                    placeholder="Enter your new password"
-                >
+                <div class="input-container">
+                    <input
+                        id="password"
+                        class="input"
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="new-password"
+                        placeholder="Enter your new password"
+                    >
+                    <!-- Eye Icon -->
+                    <span class="toggle-password" onclick="togglePassword('password', 'eye-icon-1')">
+                        <svg id="eye-icon-1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </span>
+                </div>
                 
-                <div style="font-size: 11px; color: #718078; margin-top: 6px;">
+                <div class="helper-text">
                     Must be at least 6 characters, include 1 number, and 1 symbol (e.g., !@#$).
                 </div>
 
@@ -278,15 +315,24 @@
                     Confirm New Password
                 </label>
 
-                <input
-                    id="password_confirmation"
-                    class="input"
-                    type="password"
-                    name="password_confirmation"
-                    required
-                    autocomplete="new-password"
-                    placeholder="Re-enter your new password"
-                >
+                <div class="input-container">
+                    <input
+                        id="password_confirmation"
+                        class="input"
+                        type="password"
+                        name="password_confirmation"
+                        required
+                        autocomplete="new-password"
+                        placeholder="Re-enter your new password"
+                    >
+                    <!-- Eye Icon -->
+                    <span class="toggle-password" onclick="togglePassword('password_confirmation', 'eye-icon-2')">
+                        <svg id="eye-icon-2" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </span>
+                </div>
 
                 @if ($errors->get('password_confirmation'))
                     @foreach ($errors->get('password_confirmation') as $error)
@@ -316,6 +362,24 @@
     </div>
 
 </div>
+
+<!-- Script to toggle password visibility -->
+<script>
+    function togglePassword(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        
+        if (input.type === "password") {
+            input.type = "text";
+            // Change to "Eye Off" SVG (with slash)
+            icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+        } else {
+            input.type = "password";
+            // Change back to normal "Eye" SVG
+            icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        }
+    }
+</script>
 
 </body>
 </html>
