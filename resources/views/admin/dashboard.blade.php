@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return data.map(function (item) {
 
             if (item === null || item === undefined) {
-                return 0;
+                return null;
             }
 
             if (typeof item === 'object') {
@@ -1475,27 +1475,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
         const trendDataSets = {
-
             daily: {
                 labels: dailyLabels,
                 data: dailyData
             },
-
             weekly: {
                 labels: weeklyLabels,
                 data: weeklyData
             },
-
             monthly: {
                 labels: monthlyLabels,
                 data: monthlyData
             }
-
         };
 
+        // Keep the chart and dropdown synchronized.
+        const trendFilter = document.getElementById('trendFilter');
+        const initialTrendType = trendFilter && trendDataSets[trendFilter.value]
+            ? trendFilter.value
+            : 'monthly';
 
-        const initialTrend = trendDataSets.monthly;
-
+        const initialTrend = trendDataSets[initialTrendType];
 
         const trendChart = new Chart(
             trendCanvas,
@@ -1527,7 +1527,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             pointHoverRadius: 5,
 
-                            borderWidth: 2.5
+                            borderWidth: 2.5,
+
+                            spanGaps: true
 
                         }
                     ]
@@ -1648,44 +1650,32 @@ document.addEventListener('DOMContentLoaded', function () {
         );
 
 
-        const trendFilter = document.getElementById(
-            'trendFilter'
-        );
-
-
         if (trendFilter) {
+            // Apply the selected time grouping to the existing chart.
+            function updateTrendChart(selected) {
+                const selectedData = trendDataSets[selected];
 
-            trendFilter.addEventListener(
-                'change',
-                function () {
-
-                    const selected = this.value;
-
-                    const selectedData =
-                        trendDataSets[selected];
-
-                    if (!selectedData) {
-                        return;
-                    }
-
-
-                    trendChart.data.labels =
-                        selectedData.labels;
-
-                    trendChart.data.datasets[0].data =
-                        selectedData.data;
-
-                    trendChart.data.datasets[0].label =
-                        selected.charAt(0).toUpperCase() +
-                        selected.slice(1) +
-                        ' CO₂ Emissions';
-
-
-                    trendChart.update();
-
+                if (!selectedData) {
+                    return;
                 }
-            );
 
+                trendChart.data.labels = selectedData.labels;
+                trendChart.data.datasets[0].data = selectedData.data;
+                trendChart.data.datasets[0].label =
+                    selected.charAt(0).toUpperCase() +
+                    selected.slice(1) +
+                    ' CO₂ Emissions';
+
+                trendChart.update();
+            }
+
+            trendFilter.addEventListener('change', function () {
+                updateTrendChart(this.value);
+            });
+
+            // Ensure the chart initially matches the dropdown selection.
+            trendFilter.value = initialTrendType;
+            updateTrendChart(initialTrendType);
         }
 
     }
