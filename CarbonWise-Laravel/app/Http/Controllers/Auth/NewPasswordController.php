@@ -32,14 +32,15 @@ class NewPasswordController extends Controller
      */
     public function store(Request $request): Response|RedirectResponse
     {
-        $request->validate([
+                $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => [
                 'required', 
                 'confirmed', 
                 'min:6', 
-                'regex:/^(?=.*[0-9])(?=.*[!@#\$&*~_]).{6,}$/_'
+                // Regex: min 6 chars, 1 number, 1 symbol (including underscore)
+                'regex:/^(?=.*[0-9])(?=.*[!@#\$&*~_]).{6,}$/'
             ],
         ], [
             // Custom error messages

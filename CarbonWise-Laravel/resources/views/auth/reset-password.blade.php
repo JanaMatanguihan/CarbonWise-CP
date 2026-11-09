@@ -296,8 +296,8 @@
                     </span>
                 </div>
                 
-                <div class="helper-text">
-                    Must be at least 6 characters, include 1 number, and 1 symbol (e.g., !@#$).
+                                <div class="helper-text">
+                    Must be at least 6 characters, include 1 number, and 1 symbol (e.g., ! @ # $ _).
                 </div>
 
                 @if ($errors->get('password'))
