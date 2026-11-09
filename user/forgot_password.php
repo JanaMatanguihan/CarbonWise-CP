@@ -3,8 +3,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Campus-only access: location must be verified (and match the account's campus)
-require_once __DIR__ . '/require_campus.php';
+// Redirect if already logged in
+if (isset($_SESSION['user_token'])) {
+    header('Location: dashboard.php');
+    exit;
+}
 
 // Force consistent timezone handling
 date_default_timezone_set('UTC');
@@ -20,7 +23,7 @@ function loadEnv($path) {
     foreach ($lines as $line) {
         $line = trim($line);
         if (empty($line) || strpos($line, '#') === 0) continue;
-        
+
         list($name, $value) = explode('=', $line, 2) + [NULL, NULL];
         if ($name && $value !== NULL) {
             $name = trim($name);
@@ -40,10 +43,13 @@ if (file_exists(__DIR__ . '/.env')) {
 
 function env($key, $default = '') {
     $value = $_ENV[$key] ?? getenv($key);
-    return ($value !== false && $value !== null) ? trim($value, '"\'') : $default;
+    if ($value === false || $value === null || $value === '') {
+        return $default;
+    }
+    return trim($value, " \t\n\r\0\x0B\"'");
 }
 
-$error = '';
+$error   = '';
 $success = '';
 
 // ==========================================
@@ -61,40 +67,28 @@ $db_name = env('DB_DATABASE', env('DB_NAME'));
 $db_user = env('DB_USERNAME', env('DB_USER'));
 $db_pass = env('DB_PASSWORD', env('DB_PASS'));
 
-// Fail fast if required secrets are missing (no hardcoded fallbacks on purpose)
+// Show the exact Brevo reason on localhost, or anywhere SHOW_MAIL_ERRORS=true (turn it off once emails work)
+$cw_host       = $_SERVER['HTTP_HOST'] ?? '';
+$cw_is_local   = (strpos($cw_host, 'localhost') === 0 || strpos($cw_host, '127.0.0.1') === 0);
+$show_mail_err = $cw_is_local || strtolower(env('SHOW_MAIL_ERRORS', 'false')) === 'true';
+
+// Fail fast if required settings are missing (no hardcoded fallbacks on purpose)
 $missing_config = [];
-foreach (['BREVO_API_KEY' => $brevo_api_key, 'DB_HOST' => $db_host, 'DB_DATABASE' => $db_name,
-          'DB_USERNAME' => $db_user, 'DB_PASSWORD' => $db_pass] as $k => $v) {
+foreach (['BREVO_API_KEY' => $brevo_api_key, 'BREVO_FROM_EMAIL' => $brevo_from_email, 'DB_HOST' => $db_host,
+          'DB_DATABASE' => $db_name, 'DB_USERNAME' => $db_user, 'DB_PASSWORD' => $db_pass] as $k => $v) {
     if ($v === '' || $v === null) {
         $missing_config[] = $k;
     }
 }
-if (!empty($missing_config)) {
-    error_log('CarbonWise config error: missing ' . implode(', ', $missing_config) . ' in .env');
-    http_response_code(500);
-
-    // On a local machine only, show what is wrong. On the live site the message stays generic.
-    $cw_host = $_SERVER['HTTP_HOST'] ?? '';
-    if (strpos($cw_host, 'localhost') === 0 || strpos($cw_host, '127.0.0.1') === 0) {
-        $cw_paths = [__DIR__ . '/.env', dirname(__DIR__) . '/.env'];
-        $cw_found = array_filter($cw_paths, 'file_exists');
-        echo '<pre style="font-family:monospace;padding:16px">';
-        echo "Server configuration error (shown on localhost only)\n\n";
-        echo 'Missing variables: ' . htmlspecialchars(implode(', ', $missing_config)) . "\n\n";
-        if (empty($cw_found)) {
-            echo "No .env file was found. Looked in:\n  " . htmlspecialchars(implode("\n  ", $cw_paths)) . "\n";
-            echo "Make sure the file is named exactly .env (not _env or .env.txt).\n";
-        } else {
-            echo "Found .env at:\n  " . htmlspecialchars(implode("\n  ", $cw_found)) . "\n";
-            echo "The file exists, but the variables above are missing or empty in it.\n";
-        }
-        echo '</pre>';
-        exit;
-    }
-    die('Server configuration error. Please contact the administrator.');
+$config_ok = empty($missing_config);
+if (!$config_ok) {
+    error_log('CarbonWise config error: missing ' . implode(', ', $missing_config));
+    $error = $show_mail_err
+        ? 'Server configuration error. Missing: ' . implode(', ', $missing_config)
+        : 'Server configuration error. Please contact the administrator.';
 }
 
-$endpoint_id = explode('.', $db_host)[0] ?? '';
+$endpoint_id = explode('.', (string) $db_host)[0] ?? '';
 
 /**
  * Sends a transactional email using Brevo's v3 REST API via cURL.
@@ -106,15 +100,8 @@ function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientE
     $endpoint = rtrim($apiUrl, '/') . '/smtp/email';
 
     $payload = [
-        'sender' => [
-            'name'  => $senderName,
-            'email' => $senderEmail
-        ],
-        'to' => [
-            [
-                'email' => $recipientEmail
-            ]
-        ],
+        'sender'      => ['name' => $senderName, 'email' => $senderEmail],
+        'to'          => [['email' => $recipientEmail]],
         'subject'     => $subject,
         'htmlContent' => $htmlContent
     ];
@@ -184,48 +171,32 @@ function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientE
     return true;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $role          = $_POST['role'] ?? ''; 
-    $full_name     = trim($_POST['name'] ?? ''); 
-    $password      = $_POST['password'] ?? '';
-    $confirm_pwd   = $_POST['confirm_password'] ?? '';
-    $campus        = $_POST['campus'] ?? '';
-    $terms         = $_POST['terms'] ?? '';
-    
-    // Dynamic Role-dependent assignments
-    $sr_code       = ($role === 'student') ? trim($_POST['sr_code'] ?? '') : null;
-    $year_level    = ($role === 'student') ? ($_POST['year_level'] ?? null) : null;
-    $faculty_type  = ($role === 'faculty') ? ($_POST['faculty_type'] ?? null) : null;
-    $office        = ($role === 'staff') ? ($_POST['office'] ?? null) : null;
+// ==========================================
+// --- HANDLE FORGOT PASSWORD REQUEST ---
+// ==========================================
+$submitted_email = '';
 
-    // Handle Department: both Students & Teaching Faculty submit a department
-    if ($role === 'student') {
-        $department = $_POST['department'] ?? null;
-        $email      = $sr_code ? $sr_code . "@g.batstate-u.edu.ph" : '';
-    } elseif ($role === 'faculty') {
-        $department = ($faculty_type === 'Teaching Faculty') ? ($_POST['department'] ?? null) : null;
-        $email      = trim($_POST['email'] ?? '');
-    } else {
-        $department = null;
-        $email      = trim($_POST['email'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $config_ok) {
+    $submitted_email = trim($_POST['email'] ?? '');
+    $email = strtolower($submitted_email);
+
+    // Allow students to type just their SR-Code (e.g. 23-39638)
+    if (preg_match('/^\d{2}-\d{4,6}$/', $email)) {
+        $email .= '@g.batstate-u.edu.ph';
     }
 
-    // --- GUARD CHECK: Validation rules ---
-    if (empty($role)) {
-        $error = "Please choose a role.";
-    } elseif ($role === 'student' && empty($year_level)) {
-        $error = "Please select your year level.";
-    } elseif ($role === 'faculty' && $faculty_type === 'Teaching Faculty' && empty($department)) {
-        $error = "Please select your department college.";
-    } elseif ($password !== $confirm_pwd) {
-        $error = "Passwords do not match. Please verify your entries.";
-    } elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long.";
-    } elseif (empty($terms)) {
-        $error = "You must agree to the Terms and Conditions to register.";
-    } elseif (!campus_matches($campus, $_SESSION['campus_name'] ?? '')) {
-        $error = "You can only register for the campus you are currently on (detected: " . ($_SESSION['campus_name'] ?? 'unknown') . ").";
+    $now = time();
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Please enter a valid email address.";
+    } elseif (!empty($_SESSION['fp_last_request']) && ($now - (int) $_SESSION['fp_last_request']) < 60) {
+        $error = "Please wait a minute before requesting another link.";
     } else {
+        $_SESSION['fp_last_request'] = $now;
+
+        // Same message whether or not the account exists, so nobody can find out who is registered
+        $success = "If an account exists for that email, we have sent a message with the next steps. Please check your inbox (and your Spam folder).";
+
         try {
             $dsn_options = "sslmode=require";
             if (!empty($endpoint_id)) {
@@ -233,105 +204,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $dsn = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};{$dsn_options}";
-            $options = [
+            $pdo = new PDO($dsn, $db_user, $db_pass, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false
-            ];
+            ]);
 
-            $pdo = new PDO($dsn, $db_user, $db_pass, $options);
+            $stmt = $pdo->prepare("SELECT id, name, email, status, remember_token FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1");
+            $stmt->execute([':email' => $email]);
+            $user = $stmt->fetch();
 
-            // --- STEP 1: CHECK IF EMAIL ALREADY EXISTS ---
-            $check_stmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1");
-            $check_stmt->execute([':email' => $email]);
-            
-            if ($check_stmt->fetch()) {
-                $error = "You already have an account registered with this email address. Please log in instead.";
-            } else {
-                // --- STEP 2: SECURE BCRYPT PASSWORD HASHING & TOKEN GENERATION ---
-                $hashed_password     = password_hash($password, PASSWORD_BCRYPT);
-                $verification_token  = bin2hex(random_bytes(32));
-                $current_time        = date('Y-m-d H:i:s');
+            if ($user) {
+                $base_domain = rtrim($app_url, '/');
+                $safe_name   = htmlspecialchars((string) $user['name'], ENT_QUOTES, 'UTF-8');
+                $is_pending  = (strcasecmp(trim((string) ($user['status'] ?? '')), 'Pending Verification') === 0);
 
-                // --- STEP 3: INSERT INTO NEON POSTGRESQL TABLE ---
-                $insert_sql = "INSERT INTO users 
-                    (name, email, password, role, sr_code, campus, year_level, department, faculty_type, office, status, remember_token, created_at, updated_at) 
-                    VALUES 
-                    (:name, :email, :password, :role, :sr_code, :campus, :year_level, :department, :faculty_type, :office, 'Pending Verification', :remember_token, :created_at, :updated_at)";
+                if ($is_pending) {
+                    // Account was never verified: resend the verification link instead of a reset link
+                    // (a reset would wipe the verification token and leave the account stuck).
+                    $token = !empty($user['remember_token']) ? $user['remember_token'] : bin2hex(random_bytes(32));
 
-                $insert_stmt = $pdo->prepare($insert_sql);
-                $insert_stmt->execute([
-                    ':name'             => $full_name,
-                    ':email'            => $email,
-                    ':password'         => $hashed_password,
-                    ':role'             => $role,
-                    ':sr_code'          => $sr_code,
-                    ':campus'           => $campus,
-                    ':year_level'       => $year_level,
-                    ':department'       => $department,
-                    ':faculty_type'     => $faculty_type,
-                    ':office'           => $office,
-                    ':remember_token'   => $verification_token,
-                    ':created_at'       => $current_time,
-                    ':updated_at'       => $current_time
-                ]);
-
-                // Construct production verification link targeted to verify_email.php
-                $base_domain  = rtrim($app_url, '/');
-                $verify_link = "{$base_domain}/verify_email.php?token={$verification_token}";
-
-                // HTML Body for Brevo Email
-                $subject = "CarbonWise - Verify Your Email Address";
-                $htmlBody = "
-                    <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
-                        <h2 style='color: #098a38;'>Welcome to CarbonWise!</h2>
-                        <p>Hello " . htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8') . ",</p>
-                        <p>Thank you for signing up. Please verify your email address by clicking the button below to activate your account.</p>
-                        <p style='margin: 30px 0;'>
-                            <a href='{$verify_link}' style='background-color: #098a38; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Verify Email Address</a>
-                        </p>
-                        <p>If the button above does not work, copy and paste this link into your browser:</p>
-                        <p><a href='{$verify_link}'>{$verify_link}</a></p>
-                        <hr style='border: none; border-top: 1px solid #eee; margin-top: 20px;'>
-                        <p style='font-size: 12px; color: #777;'>If you did not create a CarbonWise account, you can safely ignore this email.</p>
-                    </div>
-                ";
-
-                // Send email via Brevo REST API
-                $mailSent = sendBrevoEmail(
-                    $brevo_api_key, 
-                    $brevo_api_url, 
-                    $brevo_from_email, 
-                    $brevo_from_name, 
-                    $email, 
-                    $subject, 
-                    $htmlBody
-                );
-
-                if ($mailSent) {
-                    $_SESSION['reg_success_message'] = "Registration successful! A verification link has been sent to {$email}. Please check your inbox.";
-                } else {
-                    $failMsg = "Account created, but failed to send verification email. Please check Brevo settings or logs.";
-
-                    // On a local machine only, show the exact reason so it can be fixed quickly.
-                    $cw_host_now = $_SERVER['HTTP_HOST'] ?? '';
-                    if ((strpos($cw_host_now, 'localhost') === 0 || strpos($cw_host_now, '127.0.0.1') === 0) && !empty($GLOBALS['brevo_last_error'])) {
-                        $failMsg .= " Reason: " . $GLOBALS['brevo_last_error'];
+                    if (empty($user['remember_token'])) {
+                        $upd = $pdo->prepare("UPDATE users SET remember_token = :token, updated_at = :now WHERE id = :id");
+                        $upd->execute([':token' => $token, ':now' => date('Y-m-d H:i:s'), ':id' => $user['id']]);
                     }
 
-                    $_SESSION['reg_success_message'] = $failMsg;
+                    $link    = "{$base_domain}/verify_email.php?token={$token}";
+                    $subject = "CarbonWise - Verify Your Email Address";
+                    $html = "
+                        <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
+                            <h2 style='color: #098a38;'>Verify your CarbonWise account</h2>
+                            <p>Hello {$safe_name},</p>
+                            <p>We received a request to reset your password, but your email address has not been verified yet. Please verify it first by clicking the button below.</p>
+                            <p style='margin: 30px 0;'>
+                                <a href='{$link}' style='background-color: #098a38; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Verify Email Address</a>
+                            </p>
+                            <p>If the button does not work, copy and paste this link into your browser:</p>
+                            <p><a href='{$link}'>{$link}</a></p>
+                            <hr style='border: none; border-top: 1px solid #eee; margin-top: 20px;'>
+                            <p style='font-size: 12px; color: #777;'>If you did not make this request, you can safely ignore this email.</p>
+                        </div>";
+                } else {
+                    // Verified account: create a reset token (reset_password.php reads it from remember_token)
+                    $token = bin2hex(random_bytes(32));
+                    $upd = $pdo->prepare("UPDATE users SET remember_token = :token, updated_at = :now WHERE id = :id");
+                    $upd->execute([':token' => $token, ':now' => date('Y-m-d H:i:s'), ':id' => $user['id']]);
+
+                    $link    = "{$base_domain}/reset_password.php?token={$token}";
+                    $subject = "CarbonWise - Reset Your Password";
+                    $html = "
+                        <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
+                            <h2 style='color: #098a38;'>Reset your CarbonWise password</h2>
+                            <p>Hello {$safe_name},</p>
+                            <p>We received a request to reset the password for your CarbonWise account. Click the button below to choose a new password.</p>
+                            <p style='margin: 30px 0;'>
+                                <a href='{$link}' style='background-color: #098a38; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Reset Password</a>
+                            </p>
+                            <p>If the button does not work, copy and paste this link into your browser:</p>
+                            <p><a href='{$link}'>{$link}</a></p>
+                            <hr style='border: none; border-top: 1px solid #eee; margin-top: 20px;'>
+                            <p style='font-size: 12px; color: #777;'>If you did not request a password reset, you can safely ignore this email. Your password will not change.</p>
+                        </div>";
                 }
 
-                unset($_POST);
-                header('Location: login.php');
-                exit;
+                $mailSent = sendBrevoEmail(
+                    $brevo_api_key,
+                    $brevo_api_url,
+                    $brevo_from_email,
+                    $brevo_from_name,
+                    $user['email'],
+                    $subject,
+                    $html
+                );
+
+                if (!$mailSent && $show_mail_err && !empty($GLOBALS['brevo_last_error'])) {
+                    $success .= " [Debug] " . $GLOBALS['brevo_last_error'];
+                }
             }
 
         } catch (PDOException $e) {
-            error_log("Register PDO Error: " . $e->getMessage());
-            $error = "Unable to complete registration right now. Please try again later.";
+            error_log("Forgot Password PDO Error: " . $e->getMessage());
+            $success = '';
+            $error = "Unable to process your request right now. Please try again later.";
         } catch (Exception $e) {
-            error_log("Register System Error: " . $e->getMessage());
+            error_log("Forgot Password System Error: " . $e->getMessage());
+            $success = '';
             $error = "An unexpected error occurred. Please try again later.";
         }
     }
@@ -343,24 +300,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CarbonWise - Register</title>
+    <title>CarbonWise - Forgot Password</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <style>
-        /* CSS Reset & Global Layout Rules */
-        *, *::before, *::after {
+        :root {
+            --primary-color: #2D6A4F;
+            --primary-hover: #1B4332;
+            --bg-body: #F4F6F6;
+            --card-bg: #FFFFFF;
+            --text-dark: #1A202C;
+            --text-muted: #718096;
+            --border-color: #E2E8F0;
+        }
+
+        * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
 
         body {
-            margin: 0;
-            padding: 0;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
         }
 
         .navbar {
@@ -368,254 +335,181 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             top: 0;
             left: 0;
             width: 100%;
+            height: 70px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 5%;
             z-index: 1000;
-            padding: 12px 24px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-container img {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            letter-spacing: 0.5px;
         }
 
         .page-container {
-            width: 100%;
-            max-width: 520px;
-            margin: 0 auto;
-            padding: 90px 16px 40px 16px;
+            flex: 1;
             display: flex;
-            justify-content: center;
             align-items: center;
-            flex-grow: 1;
+            justify-content: center;
+            padding: 90px 20px 40px 20px;
         }
 
         .auth-card {
+            background: var(--card-bg);
             width: 100%;
+            max-width: 440px;
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
         }
 
-        .password-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        .password-wrapper input {
-            width: 100%;
-            padding-right: 40px;
-        }
-        .toggle-password-btn {
-            position: absolute;
-            right: 12px;
-            cursor: pointer;
-            color: #666;
-            font-size: 16px;
-            user-select: none;
-            display: none;
-            transition: color 0.2s;
-        }
-        .toggle-password-btn:hover {
-            color: #098a38;
-        }
-        .terms-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 20px 0;
-            font-size: 0.9rem;
-            color: #4b5563;
-        }
-        .terms-container input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #3AA76D;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        .terms-container a {
-            color: #3AA76D;
-            text-decoration: underline;
-        }
-        .terms-container a:hover {
-            color: #2D6A4F;
-        }
-
-        /* Terms Modal Styling */
-        .terms-modal-container {
-            text-align: left;
-            font-family: inherit;
-        }
-        .terms-header-bg {
-            background-color: #EAF6EE;
-            padding: 24px 20px;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            text-align: center;
-            margin: -20px -24px 15px -24px;
-        }
-        .terms-icon-circle {
+        .auth-icon {
             width: 56px;
             height: 56px;
-            background-color: #ffffff;
+            margin: 0 auto 16px auto;
             border-radius: 50%;
+            background: #EAF6EE;
+            color: var(--primary-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 12px auto;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            font-size: 24px;
         }
-        .terms-icon-circle i {
-            color: #3AA76D;
-            font-size: 26px;
-        }
-        .terms-header-title {
-            font-size: 20px;
+
+        .auth-card h2 {
+            font-size: 1.5rem;
             font-weight: 700;
-            color: #1F2933;
-            margin: 0 0 4px 0;
-        }
-        .terms-header-subtitle {
-            font-size: 13px;
-            color: #666;
-            margin: 0;
-        }
-        .terms-scroll-body {
-            max-height: 380px;
-            overflow-y: auto;
-            padding-right: 8px;
-            margin-bottom: 15px;
-        }
-        .terms-section-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 700;
-            color: #1F2933;
-            margin-top: 16px;
+            color: var(--text-dark);
             margin-bottom: 8px;
+            text-align: center;
         }
-        .terms-title-indicator {
-            width: 4px;
-            height: 16px;
-            background-color: #3AA76D;
-            border-radius: 2px;
-            display: inline-block;
+
+        .auth-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            text-align: center;
+            line-height: 1.4;
         }
-        .terms-body-text {
-            font-size: 13px;
-            line-height: 1.55;
-            color: #4B5563;
-            margin: 0 0 8px 0;
-        }
-        .terms-bullet-item {
+
+        .form-group {
+            margin-bottom: 20px;
             display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 13px;
-            line-height: 1.5;
-            color: #4B5563;
-            margin-bottom: 6px;
+            flex-direction: column;
+            gap: 6px;
         }
-        .terms-bullet-dot {
-            width: 6px;
-            height: 6px;
-            background-color: #3AA76D;
-            border-radius: 50%;
-            margin-top: 6px;
-            flex-shrink: 0;
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dark);
         }
-        .terms-checkbox-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 0 0 0;
-            border-top: 1px solid #E5E7EB;
-            cursor: pointer;
-            user-select: none;
-        }
-        .terms-checkbox-row input {
-            width: 20px;
-            height: 20px;
-            accent-color: #3AA76D;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        .terms-checkbox-row label {
-            font-size: 13px;
-            color: #1F2933;
-            cursor: pointer;
-            margin: 0;
-            line-height: 1.3;
-        }
-        .swal2-popup.terms-swal-popup {
-            border-radius: 24px !important;
-            padding: 20px 24px !important;
-            width: 480px !important;
-            max-width: 92vw !important;
-        }
-        .swal2-actions.terms-swal-actions {
+
+        .form-group input {
             width: 100%;
-            display: flex;
-            gap: 12px;
-            margin-top: 15px !important;
-            padding: 0;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #FAFAFA;
         }
-        .terms-btn-cancel {
-            flex: 1;
-            background-color: #ffffff !important;
-            color: #6B7280 !important;
-            border: 1.5px solid #D1D5DB !important;
-            border-radius: 12px !important;
-            height: 46px;
-            font-weight: 700 !important;
-            font-size: 14px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
+
+        .form-group input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
+            background-color: #FFFFFF;
         }
-        .terms-btn-agree {
-            flex: 2;
-            background-color: #3AA76D !important;
-            color: #ffffff !important;
-            border: none !important;
-            border-radius: 12px !important;
-            height: 46px;
-            font-weight: 700 !important;
-            font-size: 14px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
+
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
         }
-        .terms-btn-agree:disabled {
-            background-color: rgba(58, 167, 109, 0.35) !important;
-            color: rgba(255, 255, 255, 0.7) !important;
+
+        .submit-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
             cursor: not-allowed;
         }
 
-        /* Responsive Breakpoints & Adapters */
-        @media screen and (max-width: 768px) {
-            .page-container {
-                padding-top: 80px;
-                padding-left: 12px;
-                padding-right: 12px;
-            }
-            .terms-header-bg {
-                padding: 18px 14px;
-                margin: -20px -24px 12px -24px;
-            }
-            .terms-scroll-body {
-                max-height: 280px;
-            }
-            .swal2-actions.terms-swal-actions {
-                flex-direction: column-reverse;
-                gap: 8px;
-            }
-            .terms-btn-cancel, .terms-btn-agree {
-                width: 100% !important;
-                flex: none;
-            }
+        .switch-route-text {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.875rem;
         }
 
-        @media screen and (max-width: 480px) {
-            .navbar img {
-                height: 34px !important;
+        .switch-route-text a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .switch-route-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 600px) {
+            .navbar {
+                padding: 0 16px;
+                height: 60px;
             }
+
+            .logo-container img {
+                height: 32px;
+            }
+
             .logo-text {
                 font-size: 1.1rem;
             }
-            .terms-container {
-                font-size: 0.82rem;
+
+            .page-container {
+                padding: 75px 16px 20px 16px;
+            }
+
+            .auth-card {
+                padding: 24px 20px;
+                border-radius: 12px;
+            }
+
+            .auth-card h2 {
+                font-size: 1.3rem;
+            }
+
+            .auth-subtitle {
+                font-size: 0.8rem;
+                margin-bottom: 20px;
             }
         }
     </style>
@@ -625,181 +519,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
     <div class="navbar">
-        <div class="logo-container" style="display: flex; align-items: center; gap: 12px;">
-            <img src="logo.png" alt="CarbonWise Logo" style="height: 42px; width: auto; object-fit: contain;">
+        <div class="logo-container">
+            <img src="logo.png" alt="CarbonWise Logo">
             <span class="logo-text">CarbonWise</span>
         </div>
     </div>
 
     <div class="page-container">
         <div class="auth-card">
-            <h2>Get Started with CarbonWise</h2>
-            <p class="auth-subtitle">Create your account and start your journey today!</p>
+            <div class="auth-icon"><i class="fa-solid fa-key"></i></div>
+            <h2>Forgot Password?</h2>
+            <p class="auth-subtitle">Enter your email or SR-Code and we will send you a link to reset your password.</p>
 
-            <form action="register.php" method="POST" id="registrationForm">
-                <!-- 1. Role Selection -->
+            <form action="forgot_password.php" method="POST" id="forgotForm">
                 <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" id="roleSelector" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                        <option value="" disabled <?= !isset($_POST['role']) || $_POST['role'] === '' ? 'selected' : '' ?>>Click to choose role</option>
-                        <option value="student" <?= (isset($_POST['role']) && $_POST['role'] === 'student') ? 'selected' : '' ?>>Student</option>
-                        <option value="faculty" <?= (isset($_POST['role']) && $_POST['role'] === 'faculty') ? 'selected' : '' ?>>Faculty</option>
-                        <option value="staff" <?= (isset($_POST['role']) && $_POST['role'] === 'staff') ? 'selected' : '' ?>>Non-Teaching Staff</option>
-                    </select>
+                    <label for="emailField">Email or SR-Code</label>
+                    <input type="text" id="emailField" name="email" placeholder="00-00000@g.batstate-u.edu.ph" value="<?= htmlspecialchars($submitted_email, ENT_QUOTES, 'UTF-8') ?>" autocomplete="email" required autofocus>
                 </div>
 
-                <!-- 2. Dynamic SR-Code Field (Students only) -->
-                <div id="studentSrContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>SR-Code</label>
-                        <input type="text" name="sr_code" id="srCodeField" placeholder="xx-xxxxx" value="<?= isset($_POST['sr_code']) ? htmlspecialchars($_POST['sr_code']) : '' ?>">
-                    </div>
-                </div>
-
-                <!-- 3. Name Field -->
-                <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" name="name" id="nameField" placeholder="Enter your full name" value="<?= isset($_POST['name']) ? htmlspecialchars($_POST['name']) : '' ?>" required>
-                </div>
-
-                <!-- 4. Dynamic Email Field -->
-                <div class="form-group">
-                    <label id="emailLabel">Email</label>
-                    <input type="email" name="email" id="emailField" placeholder="Enter your email" value="<?= isset($_POST['email']) ? htmlspecialchars($_POST['email']) : '' ?>">
-                </div>
-
-                <!-- 5. Password -->
-                <div class="form-group">
-                    <label>Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" name="password" id="passwordInput" placeholder="Password" oninput="checkInputLength(this, 'togglePwdIcon')" required>
-                        <i id="togglePwdIcon" class="fa-solid fa-eye-slash toggle-password-btn" onclick="toggleVisibility('passwordInput', this)"></i>
-                    </div>
-                </div>
-
-                <!-- 6. Confirm Password -->
-                <div class="form-group">
-                    <label>Confirm Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" name="confirm_password" id="confirmPasswordInput" placeholder="Confirm password" oninput="checkInputLength(this, 'toggleConfirmPwdIcon')" required>
-                        <i id="toggleConfirmPwdIcon" class="fa-solid fa-eye-slash toggle-password-btn" onclick="toggleVisibility('confirmPasswordInput', this)"></i>
-                    </div>
-                </div>
-
-                <!-- 7. Campus -->
-                <div class="form-group">
-                    <label>Campus</label>
-                    <select name="campus" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                        <option value="">Choose Campus</option>
-                        <?php foreach (CAMPUS_LOCATIONS as $cw_c): ?>
-                            <option value="<?= htmlspecialchars($cw_c['name'], ENT_QUOTES, 'UTF-8') ?>" <?= (($_POST['campus'] ?? '') === $cw_c['name']) ? 'selected' : '' ?>><?= htmlspecialchars($cw_c['name'], ENT_QUOTES, 'UTF-8') ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <!-- Dynamic Bottom Fields for Students -->
-                <div id="studentBottomContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Year Level</label>
-                        <select name="year_level" id="yearLevelField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                            <option value="">Choose Year Level</option>
-                            <option value="1st Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '1st Year') ? 'selected' : '' ?>>1st Year</option>
-                            <option value="2nd Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '2nd Year') ? 'selected' : '' ?>>2nd Year</option>
-                            <option value="3rd Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '3rd Year') ? 'selected' : '' ?>>3rd Year</option>
-                            <option value="4th Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '4th Year') ? 'selected' : '' ?>>4th Year</option>
-                            <option value="5th Year" <?= (isset($_POST['year_level']) && $_POST['year_level'] == '5th Year') ? 'selected' : '' ?>>5th Year</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Shared Department Field Container -->
-                <div id="departmentContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Department</label>
-                        <select name="department" id="departmentField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                            <option value="">Choose Department</option>
-                            <option value="College of Informatics and Computing Sciences" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Informatics and Computing Sciences') ? 'selected' : '' ?>>College of Informatics and Computing Sciences</option>
-                            <option value="College of Teacher Education" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Teacher Education') ? 'selected' : '' ?>>College of Teacher Education</option>
-                            <option value="College of Arts and Sciences" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Arts and Sciences') ? 'selected' : '' ?>>College of Arts and Sciences</option>
-                            <option value="College of Engineering and Technology" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Engineering and Technology') ? 'selected' : '' ?>>College of Engineering and Technology</option>
-                            <option value="College of Business, Accountancy, and Economics" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Business, Accountancy, and Economics') ? 'selected' : '' ?>>College of Business, Accountancy, and Economics</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Dynamic Bottom Field for Faculty -->
-                <div id="facultyContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Faculty Type</label>
-                        <select name="faculty_type" id="facultyTypeField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                            <option value="">Choose Faculty Type</option>
-                            <option value="Teaching Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Teaching Faculty') ? 'selected' : '' ?>>Teaching Faculty</option>
-                            <option value="Administrative Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Administrative Faculty') ? 'selected' : '' ?>>Administrative Faculty</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Dynamic Bottom Field for Staff -->
-                <div id="staffContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Office</label>
-                        <select name="office" id="officeField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                            <option value="">Choose Office</option>
-                            <option value="Office of the Chancellor" <?= (isset($_POST['office']) && $_POST['office'] === 'Office of the Chancellor') ? 'selected' : '' ?>>Office of the Chancellor</option>
-                            <option value="Internal Audit" <?= (isset($_POST['office']) && $_POST['office'] === 'Internal Audit') ? 'selected' : '' ?>>Internal Audit</option>
-                            <option value="Quality Assurance Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Quality Assurance Management') ? 'selected' : '' ?>>Quality Assurance Management</option>
-                            <option value="Sustainable Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Sustainable Development') ? 'selected' : '' ?>>Sustainable Development</option>
-                            <option value="Vice Chancellor for Development and External Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Development and External Affairs') ? 'selected' : '' ?>>Vice Chancellor for Development and External Affairs</option>
-                            <option value="Planning and Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Planning and Development') ? 'selected' : '' ?>>Planning and Development</option>
-                            <option value="External Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'External Affairs') ? 'selected' : '' ?>>External Affairs</option>
-                            <option value="Resource Generation" <?= (isset($_POST['office']) && $_POST['office'] === 'Resource Generation') ? 'selected' : '' ?>>Resource Generation</option>
-                            <option value="ICT Services" <?= (isset($_POST['office']) && $_POST['office'] === 'ICT Services') ? 'selected' : '' ?>>ICT Services</option>
-                            <option value="Vice Chancellor for Academic Affairs" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Academic Affairs') ? 'selected' : '' ?>>Vice Chancellor for Academic Affairs</option>
-                            <option value="College of Arts and Sciences" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Arts and Sciences') ? 'selected' : '' ?>>College of Arts and Sciences</option>
-                            <option value="College of Accountancy, Business and Economics" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Accountancy, Business and Economics') ? 'selected' : '' ?>>College of Accountancy, Business and Economics</option>
-                            <option value="College of Informatics and Computing Sciences" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Informatics and Computing Sciences') ? 'selected' : '' ?>>College of Informatics and Computing Sciences</option>
-                            <option value="College of Engineering Technology" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Engineering Technology') ? 'selected' : '' ?>>College of Engineering Technology</option>
-                            <option value="College of Teacher Education" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Teacher Education') ? 'selected' : '' ?>>College of Teacher Education</option>
-                            <option value="College of Engineering" <?= (isset($_POST['office']) && $_POST['office'] === 'College of Engineering') ? 'selected' : '' ?>>College of Engineering</option>
-                            <option value="Culture and Arts" <?= (isset($_POST['office']) && $_POST['office'] === 'Culture and Arts') ? 'selected' : '' ?>>Culture and Arts</option>
-                            <option value="Testing and Admission" <?= (isset($_POST['office']) && $_POST['office'] === 'Testing and Admission') ? 'selected' : '' ?>>Testing and Admission</option>
-                            <option value="Registration Services" <?= (isset($_POST['office']) && $_POST['office'] === 'Registration Services') ? 'selected' : '' ?>>Registration Services</option>
-                            <option value="Scholarship and Financial Assistance" <?= (isset($_POST['office']) && $_POST['office'] === 'Scholarship and Financial Assistance') ? 'selected' : '' ?>>Scholarship and Financial Assistance</option>
-                            <option value="Guidance and Counseling" <?= (isset($_POST['office']) && $_POST['office'] === 'Guidance and Counseling') ? 'selected' : '' ?>>Guidance and Counseling</option>
-                            <option value="Library Services" <?= (isset($_POST['office']) && $_POST['office'] === 'Library Services') ? 'selected' : '' ?>>Library Services</option>
-                            <option value="Student Organization and Activities" <?= (isset($_POST['office']) && $_POST['office'] === 'Student Organization and Activities') ? 'selected' : '' ?>>Student Organization and Activities</option>
-                            <option value="Student Discipline" <?= (isset($_POST['office']) && $_POST['office'] === 'Student Discipline') ? 'selected' : '' ?>>Student Discipline</option>
-                            <option value="Sports and Development" <?= (isset($_POST['office']) && $_POST['office'] === 'Sports and Development') ? 'selected' : '' ?>>Sports and Development</option>
-                            <option value="OJT" <?= (isset($_POST['office']) && $_POST['office'] === 'OJT') ? 'selected' : '' ?>>OJT</option>
-                            <option value="National Service Training Program" <?= (isset($_POST['office']) && $_POST['office'] === 'National Service Training Program') ? 'selected' : '' ?>>National Service Training Program</option>
-                            <option value="Vice Chancellor for Administration and Finance" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Administration and Finance') ? 'selected' : '' ?>>Vice Chancellor for Administration and Finance</option>
-                            <option value="Human Resource Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Human Resource Management') ? 'selected' : '' ?>>Human Resource Management</option>
-                            <option value="Records Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Records Management') ? 'selected' : '' ?>>Records Management</option>
-                            <option value="Procurement" <?= (isset($_POST['office']) && $_POST['office'] === 'Procurement') ? 'selected' : '' ?>>Procurement</option>
-                            <option value="Budget" <?= (isset($_POST['office']) && $_POST['office'] === 'Budget') ? 'selected' : '' ?>>Budget</option>
-                            <option value="Cashiering/Disbursing" <?= (isset($_POST['office']) && $_POST['office'] === 'Cashiering/Disbursing') ? 'selected' : '' ?>>Cashiering/Disbursing</option>
-                            <option value="Accounting" <?= (isset($_POST['office']) && $_POST['office'] === 'Accounting') ? 'selected' : '' ?>>Accounting</option>
-                            <option value="Project Facilities and Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Project Facilities and Management') ? 'selected' : '' ?>>Project Facilities and Management</option>
-                            <option value="Environment Management Unit" <?= (isset($_POST['office']) && $_POST['office'] === 'Environment Management Unit') ? 'selected' : '' ?>>Environment Management Unit</option>
-                            <option value="Property and Supply Management" <?= (isset($_POST['office']) && $_POST['office'] === 'Property and Supply Management') ? 'selected' : '' ?>>Property and Supply Management</option>
-                            <option value="General Services" <?= (isset($_POST['office']) && $_POST['office'] === 'General Services') ? 'selected' : '' ?>>General Services</option>
-                            <option value="Vice Chancellor for Research, Development and Extension Services" <?= (isset($_POST['office']) && $_POST['office'] === 'Vice Chancellor for Research, Development and Extension Services') ? 'selected' : '' ?>>Vice Chancellor for Research, Development and Extension Services</option>
-                            <option value="Extension" <?= (isset($_POST['office']) && $_POST['office'] === 'Extension') ? 'selected' : '' ?>>Extension</option>
-                            <option value="Research" <?= (isset($_POST['office']) && $_POST['office'] === 'Research') ? 'selected' : '' ?>>Research</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="terms-container">
-                    <input type="checkbox" name="terms" id="termsCheckbox" required <?= isset($_POST['terms']) ? 'checked' : '' ?>>
-                    <label for="termsCheckbox" style="margin-bottom: 0; cursor: pointer;">
-                        I agree to the <a href="#" onclick="showTermsModal(event)">Terms and Conditions</a> & Privacy Policy.
-                    </label>
-                </div>
-
-                <button type="submit" class="submit-btn">Sign Up</button>
+                <button type="submit" class="submit-btn" id="submitBtn">Send Reset Link</button>
             </form>
-            <p class="switch-route-text" style="margin-top: 15px;">Already have an account? <a href="login.php">Log In</a>.</p>
+
+            <p class="switch-route-text"><a href="login.php">Back to Login</a></p>
         </div>
     </div>
 
@@ -807,249 +548,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <script>
             Swal.fire({
                 icon: 'warning',
-                title: 'Registration Alert',
-                text: '<?= addslashes(htmlspecialchars($error)) ?>',
-                confirmButtonColor: '#098a38',
-                confirmButtonText: 'Review Fields'
+                title: 'Unable to Continue',
+                text: <?= json_encode($error) ?>,
+                confirmButtonColor: '#098a38'
+            });
+        </script>
+    <?php endif; ?>
+
+    <?php if (!empty($success)): ?>
+        <script>
+            Swal.fire({
+                icon: 'success',
+                title: 'Check Your Email',
+                text: <?= json_encode($success) ?>,
+                confirmButtonColor: '#098a38'
             });
         </script>
     <?php endif; ?>
 
     <script>
-        function showTermsModal(e) {
-            if (e) e.preventDefault();
-            
-            const termsCheckbox = document.getElementById('termsCheckbox');
-            const isInitiallyChecked = termsCheckbox ? termsCheckbox.checked : false;
-
-            Swal.fire({
-                html: `
-                    <div class="terms-modal-container">
-                        <!-- HEADER -->
-                        <div class="terms-header-bg">
-                            <div class="terms-icon-circle">
-                                <i class="fa-solid fa-file-lines"></i>
-                            </div>
-                            <h3 class="terms-header-title">Terms & Conditions</h3>
-                            <p class="terms-header-subtitle">Please read carefully before continuing.</p>
-                        </div>
-
-                        <!-- SCROLLABLE CONTENT -->
-                        <div class="terms-scroll-body">
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                Welcome to CarbonWise
-                            </div>
-                            <p class="terms-body-text">By creating an account, you agree to the terms below. CarbonWise helps you track your carbon footprint, compare with peers, and access personalized insights.</p>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                Your Responsibilities
-                            </div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Provide accurate personal information.</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Use the platform responsibly and ethically.</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Keep your login credentials secure.</span></div>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                Data We Collect
-                            </div>
-                            <p class="terms-body-text">CarbonWise collects the following information:</p>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Name</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Student Number / SR-Code</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>G-Suite Email</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Department & Campus</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Profile Picture (optional)</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Carbon Emission Records</span></div>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                How Your Data Is Used
-                            </div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Carbon emission tracking</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>CarbonWise score computation</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Rankings and comparisons</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Reports and analytics</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>AI-based forecasting</span></div>
-                            <div class="terms-bullet-item"><span class="terms-bullet-dot"></span><span>Academic research</span></div>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                Data Privacy
-                            </div>
-                            <p class="terms-body-text">Your personal information will not be shared with unauthorized third parties. All data is stored securely and handled according to applicable privacy regulations.</p>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                AI Forecast Disclaimer
-                            </div>
-                            <p class="terms-body-text">Carbon forecasts generated by the AI are estimates based on historical patterns. They should be used as guidance only, not as professional advice.</p>
-
-                            <div class="terms-section-title">
-                                <span class="terms-title-indicator"></span>
-                                Acknowledgement
-                            </div>
-                            <p class="terms-body-text">By continuing, you acknowledge that you have read, understood, and accepted these Terms and Conditions.</p>
-                        </div>
-
-                        <!-- FOOTER (CHECKBOX) -->
-                        <div class="terms-checkbox-row" id="modalCheckboxRow">
-                            <input type="checkbox" id="modalAgreedCheckbox" ${isInitiallyChecked ? 'checked' : ''}>
-                            <label for="modalAgreedCheckbox">I have read and agree to the Terms & Conditions</label>
-                        </div>
-                    </div>
-                `,
-                showCancelButton: true,
-                confirmButtonText: 'I Agree',
-                cancelButtonText: 'Cancel',
-                buttonsStyling: false,
-                customClass: {
-                    popup: 'terms-swal-popup',
-                    actions: 'terms-swal-actions',
-                    confirmButton: 'terms-btn-agree',
-                    cancelButton: 'terms-btn-cancel'
-                },
-                didOpen: () => {
-                    const confirmBtn = Swal.getConfirmButton();
-                    const modalCheckbox = document.getElementById('modalAgreedCheckbox');
-                    const modalCheckboxRow = document.getElementById('modalCheckboxRow');
-
-                    confirmBtn.disabled = !modalCheckbox.checked;
-
-                    modalCheckbox.addEventListener('change', () => {
-                        confirmBtn.disabled = !modalCheckbox.checked;
-                    });
-
-                    modalCheckboxRow.addEventListener('click', (e) => {
-                        if (e.target !== modalCheckbox) {
-                            modalCheckbox.checked = !modalCheckbox.checked;
-                            confirmBtn.disabled = !modalCheckbox.checked;
-                        }
-                    });
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    if (termsCheckbox) termsCheckbox.checked = true;
-                }
-            });
-        }
-
-        function checkInputLength(inputElement, iconId) {
-            const icon = document.getElementById(iconId);
-            if (inputElement.value.trim().length > 0) {
-                icon.style.display = 'block';
-            } else {
-                icon.style.display = 'none';
-            }
-        }
-
-        function toggleVisibility(fieldId, iconElement) {
-            const inputField = document.getElementById(fieldId);
-            if (inputField.type === "password") {
-                inputField.type = "text";
-                iconElement.classList.remove("fa-eye-slash");
-                iconElement.classList.add("fa-eye");
-            } else {
-                inputField.type = "password";
-                iconElement.classList.remove("fa-eye");
-                iconElement.classList.add("fa-eye-slash");
-            }
-        }
-
-        const roleSelector = document.getElementById('roleSelector');
-        const studentSrContainer = document.getElementById('studentSrContainer');
-        const studentBottomContainer = document.getElementById('studentBottomContainer');
-        const departmentContainer = document.getElementById('departmentContainer');
-        const facultyContainer = document.getElementById('facultyContainer');
-        const staffContainer = document.getElementById('staffContainer');
-
-        const srCodeField = document.getElementById('srCodeField');
-        const nameField = document.getElementById('nameField');
-        const emailLabel = document.getElementById('emailLabel');
-        const emailField = document.getElementById('emailField');
-        const yearLevelField = document.getElementById('yearLevelField');
-        const departmentField = document.getElementById('departmentField');
-        const facultyTypeField = document.getElementById('facultyTypeField');
-        const officeField = document.getElementById('officeField');
-
-        function updateStudentEmail() {
-            if (roleSelector.value === 'student') {
-                const srValue = srCodeField.value.trim();
-                emailField.value = srValue ? srValue + "@g.batstate-u.edu.ph" : "00-00000@g.batstate-u.edu.ph";
-            }
-        }
-
-        function toggleDepartmentVisibility() {
-            const role = roleSelector.value;
-            const facultyType = facultyTypeField.value;
-
-            if (role === 'student' || (role === 'faculty' && facultyType === 'Teaching Faculty')) {
-                departmentContainer.style.display = 'block';
-                departmentField.setAttribute('required', 'required');
-            } else {
-                departmentContainer.style.display = 'none';
-                departmentField.removeAttribute('required');
-                departmentField.value = '';
-            }
-        }
-
-        srCodeField.addEventListener('input', updateStudentEmail);
-        facultyTypeField.addEventListener('change', toggleDepartmentVisibility);
-
-        function updateFormUI() {
-            const role = roleSelector.value;
-
-            studentSrContainer.style.display = 'none';
-            studentBottomContainer.style.display = 'none';
-            facultyContainer.style.display = 'none';
-            staffContainer.style.display = 'none';
-
-            srCodeField.removeAttribute('required');
-            yearLevelField.removeAttribute('required');
-            facultyTypeField.removeAttribute('required');
-            officeField.removeAttribute('required');
-
-            if (role === 'student') {
-                studentSrContainer.style.display = 'block';
-                studentBottomContainer.style.display = 'block';
-
-                nameField.placeholder = "Enter your name";
-                emailLabel.textContent = "G-Suite Email";
-                emailField.placeholder = "00-00000@g.batstate-u.edu.ph";
-                updateStudentEmail();
-                emailField.readOnly = true;
-
-                srCodeField.setAttribute('required', 'required');
-                yearLevelField.setAttribute('required', 'required');
-            } else if (role === 'faculty') {
-                facultyContainer.style.display = 'block';
-
-                nameField.placeholder = "Enter your full name";
-                emailLabel.textContent = "G-Suite Email";
-                emailField.placeholder = "example@g.batstate-u.edu.ph";
-                emailField.value = "";
-                emailField.readOnly = false;
-                emailField.setAttribute('required', 'required');
-
-                facultyTypeField.setAttribute('required', 'required');
-            } else if (role === 'staff') {
-                staffContainer.style.display = 'block';
-
-                nameField.placeholder = "Enter your full name";
-                emailLabel.textContent = "Email";
-                emailField.placeholder = "Enter your email";
-                emailField.value = "";
-                emailField.readOnly = false;
-                emailField.setAttribute('required', 'required');
-
-                officeField.setAttribute('required', 'required');
-            }
-
-            toggleDepartmentVisibility();
-        }
-
-        roleSelector.addEventListener('change', updateFormUI);
-        window.addEventListener('DOMContentLoaded', updateFormUI);
+        // Prevent double submits
+        document.getElementById('forgotForm').addEventListener('submit', function () {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+        });
     </script>
 
     <script src="pwa-register.js"></script>
