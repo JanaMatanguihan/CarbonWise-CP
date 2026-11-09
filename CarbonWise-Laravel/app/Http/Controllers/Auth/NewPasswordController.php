@@ -39,12 +39,12 @@ class NewPasswordController extends Controller
                 'required', 
                 'confirmed', 
                 'min:6', 
-                'regex:/^(?=.*[0-9])(?=.*[!@#\$&*~]).{6,}$/'
+                'regex:/^(?=.*[0-9])(?=.*[!@#\$&*~_]).{6,}$/_'
             ],
         ], [
             // Custom error messages
             'password.min' => 'Your new password must be at least 6 characters long.',
-            'password.regex' => 'Your password must contain at least 1 number and 1 symbol (e.g., !, @, #, $).',
+            'password.regex' => 'Your password must contain at least 1 number and 1 symbol (e.g., !, @, #, $, _).',
         ]);
 
         $status = Password::reset(

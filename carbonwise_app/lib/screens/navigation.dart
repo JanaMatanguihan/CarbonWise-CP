@@ -34,9 +34,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   double _toDouble(dynamic value) =>
       double.tryParse(value?.toString() ?? '0') ?? 0.0;
 
-  // ============================================================
   // PAGE TITLES
-  // ============================================================
 
   final List<String> _pageTitles = [
     '',
@@ -48,9 +46,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
   final Set<int> _visitedIndices = {0};
 
-  // ============================================================
   // GREETING
-  // ============================================================
 
   String getGreeting() {
     final hour = DateTime.now().hour;
@@ -64,9 +60,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
     }
   }
 
-  // ============================================================
   // INITIALIZATION
-  // ============================================================
 
   @override
   void initState() {
@@ -263,9 +257,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                   mainAxisSize: MainAxisSize.min,
 
                   children: [
-                    // ==================================================
                     // GREETING + ACTIONS
-                    // ==================================================
                     Row(
                       children: [
                         Expanded(
@@ -316,9 +308,8 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
                     const SizedBox(height: 16),
 
-                    // ==================================================
+                    //
                     // CARBON SCORE
-                    // ==================================================
                     Container(
                       width: double.infinity,
 
@@ -393,9 +384,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
               ),
             ),
 
-      // ==========================================================
       // BODY
-      // ==========================================================
       body: SafeArea(
         top: isProfilePage,
 
@@ -423,9 +412,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
         ),
       ),
 
-      // ==========================================================
       // BOTTOM NAVIGATION
-      // ==========================================================
       bottomNavigationBar: Container(
         height: 78,
 
@@ -488,9 +475,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
               ],
             ),
 
-            // ======================================================
             // CENTER INPUT BUTTON
-            // ======================================================
             Positioned(
               top: -24,
 
@@ -944,7 +929,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
               final hasMinLength = newPass.length >= 6;
               final hasNumber = newPass.contains(RegExp(r'[0-9]'));
               final hasLetter = newPass.contains(RegExp(r'[a-zA-Z]'));
-              final hasSymbol = newPass.contains(RegExp(r'[!@#\$&*~]'));
+              final hasSymbol = newPass.contains(RegExp(r'[!@#\$&*~_]'));
 
               return Dialog(
                 shape: RoundedRectangleBorder(
@@ -963,9 +948,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ============================
                           // HEADER
-                          // ============================
                           Row(
                             children: [
                               Container(
@@ -1021,9 +1004,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
                           const SizedBox(height: 20),
 
-                          // ============================
                           // CURRENT PASSWORD
-                          // ============================
                           _passwordField(
                             controller: currentPasswordController,
                             label: 'Current Password',
@@ -1037,13 +1018,11 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
                           const SizedBox(height: 16),
 
-                          // ============================
                           // NEW PASSWORD
-                          // ============================
                           _passwordField(
                             controller: passwordController,
                             label: 'New Password',
-                            hint: 'At least 8 characters',
+                            hint: 'At least 6 characters',
                             obscure: obscureNew,
                             enabled: !isLoading,
                             onChanged: (_) => setDialogState(() {}),
@@ -1093,10 +1072,6 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                                   'At least 6 characters',
                                   hasMinLength,
                                 ),
-                                _requirement(
-                                  'At least 6 characters',
-                                  hasMinLength,
-                                ),
                                 const SizedBox(height: 4),
                                 _requirement('Contains a letter', hasLetter),
                                 const SizedBox(height: 4),
@@ -1107,9 +1082,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
                           const SizedBox(height: 16),
 
-                          // ============================
                           // CONFIRM PASSWORD
-                          // ============================
                           _passwordField(
                             controller: confirmPasswordController,
                             label: 'Confirm New Password',
@@ -1182,9 +1155,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
 
                           const SizedBox(height: 22),
 
-                          // ============================
                           // ACTIONS
-                          // ============================
                           Row(
                             children: [
                               Expanded(
@@ -1250,7 +1221,7 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
                                           if (newPass.length < 6) {
                                             setDialogState(() {
                                               errorMessage =
-                                                  'New password must be at least 8 characters.';
+                                                  'New password must be at least 6 characters.';
                                             });
                                             return;
                                           }
@@ -1370,14 +1341,22 @@ class _CustomMainNavigationState extends State<CustomMainNavigation> {
   // Password strength: 0.0 to 1.0
   double _passwordStrength(String password) {
     if (password.isEmpty) return 0;
-    double score = 0;
-    if (password.length >= 8) score += 0.25;
-    if (password.length >= 12) score += 0.15;
-    if (password.contains(RegExp(r'[a-z]'))) score += 0.15;
-    if (password.contains(RegExp(r'[A-Z]'))) score += 0.15;
-    if (password.contains(RegExp(r'[0-9]'))) score += 0.15;
-    if (password.contains(RegExp(r'[^a-zA-Z0-9]'))) score += 0.15;
-    return score.clamp(0.0, 1.0);
+
+    int passedRules = 0;
+
+    // Rule 1: At least 6 characters
+    if (password.length >= 6) passedRules++;
+
+    // Rule 2: Contains a number
+    if (password.contains(RegExp(r'[0-9]'))) passedRules++;
+
+    // Rule 3: Contains a symbol
+    if (password.contains(RegExp(r'[^a-zA-Z0-9]'))) passedRules++;
+
+    // 3 rules = 1.0 (full bar)
+    // 2 rules = 0.66 (orange)
+    // 1 rule  = 0.33 (red)
+    return passedRules / 3.0;
   }
 
   Color _passwordStrengthColor(double strength) {
