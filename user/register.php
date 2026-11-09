@@ -97,9 +97,12 @@ if (!empty($missing_config)) {
 $endpoint_id = explode('.', $db_host)[0] ?? '';
 
 /**
- * Sends a transactional email using Brevo's v3 REST API via cURL
+ * Sends a transactional email using Brevo's v3 REST API via cURL.
+ * Returns true on success. On failure it returns false and stores the exact
+ * reason in $GLOBALS['brevo_last_error'] (also written to the PHP error log).
  */
 function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientEmail, $subject, $htmlContent) {
+    $GLOBALS['brevo_last_error'] = '';
     $endpoint = rtrim($apiUrl, '/') . '/smtp/email';
 
     $payload = [
@@ -116,28 +119,69 @@ function sendBrevoEmail($apiKey, $apiUrl, $senderEmail, $senderName, $recipientE
         'htmlContent' => $htmlContent
     ];
 
-    $ch = curl_init($endpoint);
-    curl_setopt_array($ch, [
+    $curlOptions = [
         CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => [
             'accept: application/json',
-            'api-key: ' . $apiKey,
+            'api-key: ' . trim($apiKey),
             'content-type: application/json'
         ],
         CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_TIMEOUT        => 10
-    ]);
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT        => 20
+    ];
 
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode !== 200 && $httpCode !== 201) {
-        error_log("Brevo API Email Error [HTTP {$httpCode}]: " . $response);
+    // XAMPP on Windows often has no CA bundle configured, which makes HTTPS calls fail
+    // with "SSL certificate problem". If php.ini has none, try the common XAMPP locations.
+    if (!ini_get('curl.cainfo') && !ini_get('openssl.cafile')) {
+        $caCandidates = [
+            'C:\\xampp\\php\\extras\\ssl\\cacert.pem',
+            'C:\\xampp\\apache\\bin\\curl-ca-bundle.crt',
+            'C:\\xampp\\php\\cacert.pem',
+            'C:\\xampp\\cacert.pem',
+            __DIR__ . '/cacert.pem'
+        ];
+        foreach ($caCandidates as $caFile) {
+            if (is_file($caFile)) {
+                $curlOptions[CURLOPT_CAINFO] = $caFile;
+                break;
+            }
+        }
     }
 
-    return ($httpCode === 201 || $httpCode === 200);
+    if (!function_exists('curl_init')) {
+        $GLOBALS['brevo_last_error'] = 'The PHP cURL extension is not enabled (enable extension=curl in php.ini and restart Apache).';
+        error_log('Brevo API Email Error: ' . $GLOBALS['brevo_last_error']);
+        return false;
+    }
+
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, $curlOptions);
+
+    $response  = curl_exec($ch);
+    $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrNo = curl_errno($ch);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $curlErrNo !== 0) {
+        $GLOBALS['brevo_last_error'] = "Could not reach Brevo (cURL error {$curlErrNo}): {$curlError}";
+        error_log('Brevo API Email Error: ' . $GLOBALS['brevo_last_error']);
+        return false;
+    }
+
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        $decoded = json_decode($response, true);
+        $detail  = is_array($decoded)
+            ? trim(($decoded['code'] ?? '') . ': ' . ($decoded['message'] ?? ''), ': ')
+            : substr((string) $response, 0, 300);
+        $GLOBALS['brevo_last_error'] = "Brevo rejected the request (HTTP {$httpCode}) " . $detail;
+        error_log('Brevo API Email Error: ' . $GLOBALS['brevo_last_error']);
+        return false;
+    }
+
+    return true;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -267,7 +311,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($mailSent) {
                     $_SESSION['reg_success_message'] = "Registration successful! A verification link has been sent to {$email}. Please check your inbox.";
                 } else {
-                    $_SESSION['reg_success_message'] = "Account created, but failed to send verification email. Please check Brevo settings or logs.";
+                    $failMsg = "Account created, but failed to send verification email. Please check Brevo settings or logs.";
+
+                    // Show the exact reason on localhost, or on any site where SHOW_MAIL_ERRORS=true (turn it off once emails work).
+                    $cw_host_now = $_SERVER['HTTP_HOST'] ?? '';
+                    $cw_is_local   = (strpos($cw_host_now, 'localhost') === 0 || strpos($cw_host_now, '127.0.0.1') === 0);
+                    $cw_show_error = $cw_is_local || strtolower(env('SHOW_MAIL_ERRORS', 'false')) === 'true';
+                    if ($cw_show_error && !empty($GLOBALS['brevo_last_error'])) {
+                        $failMsg .= " Reason: " . $GLOBALS['brevo_last_error'];
+                    }
+
+                    $_SESSION['reg_success_message'] = $failMsg;
                 }
 
                 unset($_POST);
