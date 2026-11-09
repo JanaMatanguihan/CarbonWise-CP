@@ -24,6 +24,7 @@ class ActivityInputScreen extends StatefulWidget {
 
 class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final ApiService _apiService = ApiService();
+  final MapController _mapController = MapController();
   // Form State Values
   String? _selectedTransportType;
   String? _selectedOfficeResourceCategory;
@@ -46,6 +47,7 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   final LocationService _locationService = LocationService();
   double? _distanceKm;
   List<LatLng> _routePoints = const [];
+  LatLng? _startPoint; // To hold the exact coordinate of the entered address
   bool _isCalculatingDistance = false;
   bool _isSavingCarbonRecord = false;
   bool _isCheckingCampus = false;
@@ -618,12 +620,11 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Future<void> _calculateDistance() async {
-    if (_homeAddressController.text.trim().isEmpty || _selectedCampus == null) {
+    if (_selectedCampus == null) {
       DialogHelper.showWarning(
         context: context,
         title: "Incomplete Information",
-        message:
-            "Please enter your starting address and select a destination campus.",
+        message: "Please select a destination campus.",
       );
       return;
     }
@@ -637,15 +638,41 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
     final campusAddress = campusAddresses[_selectedCampus];
 
     try {
-      final route = await _locationService.calculateRoute(
-        homeAddress: _homeAddressController.text,
-        campusAddress: campusAddress!,
-      );
+      RouteResult route;
+
+      if (_startPoint != null) {
+        route = await _locationService.calculateRouteFromCoords(
+          homePoint: _startPoint!,
+          campusAddress: campusAddress!,
+        );
+      } else if (_homeAddressController.text.trim().isNotEmpty) {
+        // Fallback to text if they typed manually
+        route = await _locationService.calculateRoute(
+          homeAddress: _homeAddressController.text,
+          campusAddress: campusAddress!,
+        );
+      } else {
+        throw Exception(
+          "Please type an address or pin your location on the map.",
+        );
+      }
 
       setState(() {
         _distanceKm = route.distanceKm;
         _routePoints = route.points;
+        _startPoint = route.startPoint;
         _isCalculatingDistance = false;
+      });
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_routePoints.isNotEmpty) {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints(_routePoints),
+              padding: const EdgeInsets.all(40),
+            ),
+          );
+        }
       });
     } catch (e) {
       setState(() {
@@ -1630,38 +1657,24 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
   }
 
   Widget _buildDistancePreview() {
+    // Default to Batangas City if no start point is set yet
+    final defaultCenter = _startPoint ?? const LatLng(13.7565, 121.0583);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _distanceKm == null
-            ? const Color(0xFFF8FBF9)
-            : const Color(0xFFE8F6ED),
+        color: const Color(0xFFF8FBF9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _distanceKm == null
-              ? const Color(0xFFD9E8DE)
-              : primaryGreen.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: const Color(0xFFD9E8DE)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: primaryGreen.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.map_outlined,
-                  color: primaryGreen,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
+              const Icon(Icons.map_outlined, color: primaryGreen, size: 20),
+              const SizedBox(width: 8),
               const Expanded(
                 child: Text(
                   "Map Distance Window",
@@ -1672,75 +1685,32 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
                   ),
                 ),
               ),
-              if (_distanceKm != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: primaryGreen,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    "Route Computed",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (_routePoints.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 180,
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: _routePoints[_routePoints.length ~/ 2],
-                    initialZoom: 13,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.carbonwise_app',
-                    ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: _routePoints,
-                          strokeWidth: 4,
-                          color: primaryGreen,
-                        ),
-                      ],
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _routePoints.first,
-                          width: 36,
-                          height: 36,
-                          child: const Icon(Icons.home, color: darkGreen),
-                        ),
-                        Marker(
-                          point: _routePoints.last,
-                          width: 36,
-                          height: 36,
-                          child: const Icon(Icons.school, color: primaryGreen),
-                        ),
-                      ],
-                    ),
-                  ],
+              TextButton.icon(
+                onPressed: _showFullScreenMap,
+                icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                label: const Text("Expand", style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  padding: EdgeInsets.zero,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Small Map Window
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 160,
+              child: _buildMapWidget(
+                isFullScreen: false,
+                defaultCenter: defaultCenter,
+              ),
             ),
-          ],
-          const Divider(height: 20),
+          ),
+
+          const Divider(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1762,6 +1732,216 @@ class _ActivityInputScreenState extends State<ActivityInputScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showFullScreenMap() {
+    final defaultCenter = _startPoint ?? const LatLng(13.7565, 121.0583);
+    LatLng tempPoint = defaultCenter;
+
+    final MapController dialogMapController = MapController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Pin Exact Location",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: darkGreen,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      "Tap the map or drag the blue pin to your exact starting location.",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      child: _buildMapWidget(
+                        isFullScreen: true,
+                        defaultCenter: tempPoint,
+                        fullScreenMapController: dialogMapController,
+                        onPointChanged: (newPoint) {
+                          setDialogState(() {
+                            tempPoint = newPoint;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          setState(() {
+                            _startPoint = tempPoint; // Save the exact point
+                            _distanceKm = null;
+                            _routePoints = const [];
+                          });
+
+                          final address = await _locationService.reverseGeocode(
+                            tempPoint,
+                          );
+                          _homeAddressController.text = address;
+
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+
+                          // 👇 Force the small map to center perfectly on the confirmed pin
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            _mapController.move(_startPoint!, 16.0);
+                          });
+                        },
+                        child: const Text(
+                          "Confirm Location",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMapWidget({
+    required bool isFullScreen,
+    required LatLng defaultCenter,
+    Function(LatLng)? onPointChanged,
+    MapController? fullScreenMapController,
+  }) {
+    return FlutterMap(
+      mapController: isFullScreen ? fullScreenMapController : _mapController,
+      options: MapOptions(
+        initialCenter: defaultCenter,
+        initialZoom: 16,
+        onTap: (tapPosition, point) {
+          if (onPointChanged != null) {
+            onPointChanged(point);
+          } else {
+            setState(() {
+              _startPoint = point;
+              _distanceKm = null;
+              _routePoints = const [];
+            });
+          }
+        },
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.carbonwise_app',
+        ),
+        if (_routePoints.isNotEmpty && !isFullScreen)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 5,
+                color: primaryGreen,
+              ),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            // 👇 Draggable Pin Logic
+            Marker(
+              point: isFullScreen
+                  ? defaultCenter
+                  : (_startPoint ?? defaultCenter),
+              width: 50,
+              height: 50,
+              // Use flutter_map's built-in dragging logic
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  // Only allow dragging in full screen mode to prevent jumping
+                  if (!isFullScreen) return;
+
+                  final RenderBox box = context.findRenderObject() as RenderBox;
+                  final localPosition = box.globalToLocal(
+                    details.globalPosition,
+                  );
+
+                  // Convert screen touch to map coordinates
+                  final LatLng newPoint =
+                      (isFullScreen ? fullScreenMapController : _mapController)!
+                          .camera
+                          .screenOffsetToLatLng(localPosition);
+
+                  if (onPointChanged != null) {
+                    onPointChanged(newPoint);
+                  }
+                },
+                child: const Icon(
+                  Icons.my_location,
+                  color: Colors.blue,
+                  size: 40,
+                ),
+              ),
+            ),
+
+            if (_routePoints.isNotEmpty && !isFullScreen)
+              Marker(
+                point: _routePoints.last,
+                width: 40,
+                height: 40,
+                child: const Icon(Icons.school, color: darkGreen, size: 30),
+              ),
+          ],
+        ),
+      ],
     );
   }
 

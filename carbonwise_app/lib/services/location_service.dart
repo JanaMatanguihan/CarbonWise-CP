@@ -68,7 +68,12 @@ class LocationService {
       throw Exception('The route coordinates are invalid.');
     }
 
-    return RouteResult(distanceKm: distanceMeters / 1000, points: points);
+    // At the end of calculateRoute
+    return RouteResult(
+      distanceKm: distanceMeters / 1000,
+      points: points,
+      startPoint: LatLng(home[1], home[0]),
+    );
   }
 
   Future<LatLng> geocodeAddress(String address) async {
@@ -106,11 +111,126 @@ class LocationService {
       (coords[1] as num).toDouble(), // latitude
     ];
   }
+
+  Future<String> reverseGeocode(LatLng point) async {
+    final url = Uri.parse(
+      "https://api.openrouteservice.org/geocode/reverse"
+      "?api_key=${ApiConstants.orsApiKey}"
+      "&point.lat=${point.latitude}"
+      "&point.lon=${point.longitude}",
+    );
+
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final features = data['features'];
+
+        if (features is List && features.isNotEmpty) {
+          final properties = features[0]['properties'];
+
+          final street = properties['street'] ?? '';
+          final locality =
+              properties['locality'] ?? properties['localadmin'] ?? '';
+          final region = properties['region'] ?? '';
+
+          List<String> parts = [];
+          if (street.isNotEmpty) parts.add(street);
+          if (locality.isNotEmpty) parts.add(locality);
+          if (region.isNotEmpty) parts.add(region);
+
+          if (parts.isNotEmpty) {
+            return parts.join(', ');
+          }
+
+          // Fallback to the full label if we can't parse it
+          return properties['label'] ?? 'Pinned Location';
+        }
+      }
+    } catch (_) {}
+
+    // Fallback if API fails entirely
+    return 'Pinned Location (${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)})';
+  }
+
+  Future<RouteResult> calculateRouteFromCoords({
+    required LatLng homePoint,
+    required String campusAddress,
+  }) async {
+    final campus = await _geocode(campusAddress);
+
+    final url = Uri.parse(
+      "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+    );
+
+    final response = await http
+        .post(
+          url,
+          headers: {
+            "Authorization": ApiConstants.orsApiKey,
+            "Content-Type": "application/json",
+          },
+          body: jsonEncode({
+            "coordinates": [
+              [homePoint.longitude, homePoint.latitude],
+              [campus[0], campus[1]],
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(response.body);
+    }
+
+    final data = jsonDecode(response.body);
+    final features = data['features'];
+    if (features is! List || features.isEmpty) {
+      throw Exception('No driving route was found.');
+    }
+
+    final route = features[0];
+    final distanceMeters =
+        (route['properties']?['summary']?['distance'] as num?)?.toDouble();
+    if (distanceMeters == null) {
+      throw Exception('The route response did not include a distance.');
+    }
+
+    final geometry = route['geometry']?['coordinates'];
+    if (geometry is! List || geometry.isEmpty) {
+      throw Exception('The route response did not include map coordinates.');
+    }
+
+    final points = geometry
+        .whereType<List>()
+        .where((coordinates) => coordinates.length >= 2)
+        .map(
+          (coordinates) => LatLng(
+            (coordinates[1] as num).toDouble(),
+            (coordinates[0] as num).toDouble(),
+          ),
+        )
+        .toList();
+    if (points.isEmpty) {
+      throw Exception('The route coordinates are invalid.');
+    }
+
+    return RouteResult(
+      distanceKm: distanceMeters / 1000,
+      points: points,
+      startPoint: homePoint,
+    );
+  }
 }
 
 class RouteResult {
-  const RouteResult({required this.distanceKm, required this.points});
+  const RouteResult({
+    required this.distanceKm,
+    required this.points,
+    required this.startPoint,
+  });
 
   final double distanceKm;
   final List<LatLng> points;
+  final LatLng startPoint;
 }
