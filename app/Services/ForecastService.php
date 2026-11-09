@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use App\Models\CarbonRecord;
@@ -12,20 +13,29 @@ class ForecastService
         set_time_limit(0);
 
         /*
-         * COMMUNITY DATA CUTOFF
-         *
-         * July 20, 2026 is the last verified date containing
-         * community-level aggregated emission data.
-         *
-         * Records after this date belong to the newer test-user
-         * submissions and must not be mixed with community totals.
-         */
+        |--------------------------------------------------------------------------
+        | COMMUNITY DATA CUTOFF
+        |--------------------------------------------------------------------------
+        |
+        | July 20, 2026 is the last verified date containing
+        | community-level aggregated emission data.
+        |
+        | Records after this date belong to newer test-user
+        | submissions and must not be mixed with community totals.
+        |
+        */
+
         $communityDataCutoff = '2026-07-20';
 
         /*
-         * Retrieve only verified community-level historical data.
-         * Aggregate all users by date.
-         */
+        |--------------------------------------------------------------------------
+        | RETRIEVE HISTORICAL COMMUNITY DATA
+        |--------------------------------------------------------------------------
+        |
+        | Aggregate all users' carbon records by date.
+        |
+        */
+
         $records = CarbonRecord::query()
             ->whereDate('record_date', '<=', $communityDataCutoff)
             ->select('record_date')
@@ -38,10 +48,15 @@ class ForecastService
             ->get();
 
         /*
-         * Prepare continuous daily records for the TFT API.
-         * Missing dates are forward-filled temporarily.
-         * No database records are created or modified.
-         */
+        |--------------------------------------------------------------------------
+        | PREPARE CONTINUOUS DAILY RECORDS
+        |--------------------------------------------------------------------------
+        |
+        | Missing dates are forward-filled temporarily.
+        | No database records are created or modified.
+        |
+        */
+
         $forecastRecords = collect();
 
         if ($records->isNotEmpty()) {
@@ -90,15 +105,34 @@ class ForecastService
         }
 
         /*
-         * Request the 30-day TFT forecast.
-         */
+        |--------------------------------------------------------------------------
+        | TFT V6 API CONFIGURATION
+        |--------------------------------------------------------------------------
+        |
+        | Read the API URL from Laravel configuration.
+        | This allows local V6 testing without hardcoding
+        | the API address in this service.
+        |
+        */
+
         $forecast = collect();
+
         $predictionInterval = null;
+        $modelUsed = null;
 
         $tftApiUrl = rtrim(
-            env('TFT_API_URL', ''),
+            (string) config('services.tft.url', ''),
             '/'
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | REQUEST TFT V6 FORECAST
+        |--------------------------------------------------------------------------
+        |
+        | Send historical community records to the API.
+        |
+        */
 
         if (
             $forecastRecords->isNotEmpty() &&
@@ -117,12 +151,35 @@ class ForecastService
 
                 if ($response->successful()) {
 
+                    /*
+                     * Retrieve TFT V6 forecast results.
+                     */
+
                     $forecast = collect(
                         $response->json('forecast', [])
                     );
 
+                    /*
+                     * Retrieve prediction interval.
+                     */
+
                     $predictionInterval = $response->json(
                         'prediction_interval'
+                    );
+
+                    /*
+                     * Retrieve model name returned by FastAPI.
+                     */
+
+                    $modelUsed = $response->json('model');
+
+                    Log::info(
+                        'TFT Forecast API request successful.',
+                        [
+                            'model' => $modelUsed,
+                            'forecast_count' => $forecast->count(),
+                            'prediction_interval' => $predictionInterval,
+                        ]
                     );
 
                 } else {
@@ -145,9 +202,14 @@ class ForecastService
         }
 
         /*
-         * Historical chart data:
-         * Latest 30 verified community-level dates only.
-         */
+        |--------------------------------------------------------------------------
+        | HISTORICAL CHART DATA
+        |--------------------------------------------------------------------------
+        |
+        | Latest 30 verified community-level dates only.
+        |
+        */
+
         $historicalRecords = $records
             ->sortByDesc('record_date')
             ->take(30)
@@ -155,8 +217,11 @@ class ForecastService
             ->values();
 
         /*
-         * Forecast summary calculations.
-         */
+        |--------------------------------------------------------------------------
+        | FORECAST SUMMARY CALCULATIONS
+        |--------------------------------------------------------------------------
+        */
+
         $predictedEmissions = $forecast->sum('forecast');
 
         $predictedDailyAverage = $forecast->isNotEmpty()
@@ -164,23 +229,41 @@ class ForecastService
             : null;
 
         /*
-         * Actual V2 validation metrics.
-         *
-         * Source:
-         * tft_v2_validation_predictions.csv
-         *
-         * Validation period:
-         * January 1 - June 29, 2026
-         *
-         * Number of validation records: 180
-         */
-        $rmse = 248.6474;
-        $mae = 172.5523;
-        $r2 = 0.5132;
+        |--------------------------------------------------------------------------
+        | TFT V6 MODEL EVALUATION METRICS
+        |--------------------------------------------------------------------------
+        |
+        | Source: Previously evaluated V6 validation results.
+        |
+        | Validation period: January 1 - June 29, 2026
+        | Number of validation records: 180 days
+        |
+        | These are historical validation metrics.
+        | They are not calculated from the current forecast.
+        |
+        | July 1 - July 20, 2026 test results are separate
+        | and must not be represented by these values.
+        |
+        */
+
+        $rmse = 122.26;
+        $mae = 93.02;
+        $r2 = 0.8823;
+
+        $evaluationModel = 'Temporal Fusion Transformer V6';
+
+        $evaluationPeriod = 'V6 Validation | 180 Days';
+
+        /*
+        |--------------------------------------------------------------------------
+        | RETURN DATA TO THE FORECASTING DASHBOARD
+        |--------------------------------------------------------------------------
+        */
 
         return [
 
             // Historical community emissions
+
             'records' => $historicalRecords,
 
             'labels' => $historicalRecords->pluck(
@@ -198,7 +281,7 @@ class ForecastService
             )->total_emission ?? 0,
 
             'averageEmission' => round(
-                $historicalRecords->avg('total_emission'),
+                $historicalRecords->avg('total_emission') ?? 0,
                 2
             ),
 
@@ -206,15 +289,42 @@ class ForecastService
                 'total_emission'
             ),
 
-            // TFT forecast
+            // TFT V6 forecast
+
             'forecast' => $forecast,
 
             'forecastLabels' => $forecast->pluck(
                 'record_date'
             ),
 
+            // TFT V6 median forecast values
+
             'forecastValues' => $forecast->pluck(
                 'forecast'
+            ),
+
+            /*
+            |--------------------------------------------------------------------------
+            | ML INTEGRATION: TFT V6 PREDICTION BOUNDARIES
+            |--------------------------------------------------------------------------
+            |
+            | These values are generated by the trained TFT V6
+            | model and returned by the FastAPI service.
+            |
+            | lower_bound: Lower prediction boundary.
+            | upper_bound: Upper prediction boundary.
+            |
+            | Laravel passes these values to the Blade view
+            | for visualization using ApexCharts.
+            |
+            */
+
+            'lowerBoundValues' => $forecast->pluck(
+                'lower_bound'
+            ),
+
+            'upperBoundValues' => $forecast->pluck(
+                'upper_bound'
             ),
 
             'predictedEmissions' => round(
@@ -227,16 +337,24 @@ class ForecastService
                 : null,
 
             'modelUsed' => $forecast->isNotEmpty()
-                ? 'Temporal Fusion Transformer (TFT)'
+                ? ($modelUsed ?? 'Temporal Fusion Transformer V6')
                 : null,
 
             // Prediction interval
+
             'confidenceLevel' => $predictionInterval,
 
-            // V2 validation metrics
+            // TFT V6 evaluation metrics
+
             'rmse' => $rmse,
             'mae' => $mae,
             'r2' => $r2,
+
+            // Evaluation information
+
+            'evaluationModel' => $evaluationModel,
+            'evaluationPeriod' => $evaluationPeriod,
+
         ];
     }
 }
