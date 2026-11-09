@@ -57,9 +57,9 @@ $brevo_from_name  = env('BREVO_FROM_NAME', env('MAIL_FROM_NAME', 'CarbonWise'));
 
 $db_host = env('DB_HOST');
 $db_port = env('DB_PORT', '5432');
-$db_name = env('DB_DATABASE');
-$db_user = env('DB_USERNAME');
-$db_pass = env('DB_PASSWORD');
+$db_name = env('DB_DATABASE', env('DB_NAME'));
+$db_user = env('DB_USERNAME', env('DB_USER'));
+$db_pass = env('DB_PASSWORD', env('DB_PASS'));
 
 // Fail fast if required secrets are missing (no hardcoded fallbacks on purpose)
 $missing_config = [];
