@@ -1,10 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:gal/gal.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:typed_data';
 
 class DepartmentRanking {
   final String name;
@@ -53,17 +48,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _campusRank = "-";
   String _userCampus = "";
   String _userDepartmentLabel = 'Department';
-  String _userName = "Eco Warrior"; // Added for certificate
 
   bool _isLoading = true;
 
   String _rankingPeriod = 'weekly';
 
   List<CampusRanking> _campusRankings = [];
-
-  // Certificate Controllers & State
-  final ScreenshotController _screenshotController = ScreenshotController();
-  bool _isDownloading = false;
 
   double _toDouble(dynamic value) =>
       double.tryParse(value?.toString() ?? '0') ?? 0.0;
@@ -104,7 +94,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Map<String, dynamic> user = {};
       try {
         user = await ApiService.getUserProfile();
-        _userName = user['name'] ?? user['full_name'] ?? "Eco Warrior";
       } catch (e) {
         print('Dashboard: profile fetch failed: $e');
       }
@@ -303,56 +292,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ==========================================
-  // CERTIFICATE DOWNLOAD LOGIC
-  // ==========================================
-  Future<void> _downloadCertificate() async {
-    if (_isDownloading) return;
-    setState(() => _isDownloading = true);
-
-    try {
-      // 1. Capture the widget
-      final image = await _screenshotController.capture();
-
-      // 2. Check if the image is null
-      if (image == null) {
-        throw Exception("Could not capture the certificate image.");
-      }
-
-      // 3. Save to temporary file
-      final directory = await getTemporaryDirectory();
-      final imagePath = await File(
-        '${directory.path}/carbonwise_certificate.png',
-      ).create();
-
-      // 4. Write the bytes. We use 'image.buffer.asUint8List()' to ensure
-      // it's a standard List<int> that the file system accepts.
-      await imagePath.writeAsBytes(image.buffer.asUint8List());
-
-      // 5. Save to Gallery
-      await Gal.putImage(imagePath.path);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Certificate saved to your gallery!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to download: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isDownloading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final isRecognitionDay = true; // TEMPORARY: forced to true for testing
-
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -532,261 +473,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
             ),
 
-            const SizedBox(height: 28),
-
-            // ==========================================
-            // RECOGNITION / CERTIFICATE SECTION
-            // ==========================================
-            const Text(
-              "Monthly Recognition",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isRecognitionDay
-                  ? "Congratulations! You've earned a certificate for your sustainability efforts this month."
-                  : "Your monthly certificate unlocks on the 28th. Keep up the great work!",
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 14),
-
-            // SCREENSHOT WRAPPER
-            Screenshot(
-              controller: _screenshotController,
-              child: _buildCertificate(isRecognitionDay),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Download Button
-            if (isRecognitionDay)
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _isDownloading ? null : _downloadCertificate,
-                  icon: _isDownloading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Icons.download_rounded),
-                  label: Text(
-                    _isDownloading ? "Saving..." : "Download Certificate",
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF265D3B),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-
             const SizedBox(height: 24),
           ],
         ),
-      ),
-    );
-  }
-
-  // ==========================================
-  // CERTIFICATE UI
-  // ==========================================
-  Widget _buildCertificate(bool isUnlocked) {
-    // If it's not the 28th, show a blank/locked certificate
-    final String displayName = isUnlocked ? _userName : "???";
-    final String displayRank = isUnlocked ? _currentRanking : "Pending";
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isUnlocked ? const Color(0xFFFDFDFD) : const Color(0xFFF0F0F0),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isUnlocked
-              ? const Color(0xFF3AA76D).withValues(alpha: 0.5)
-              : Colors.grey.shade400,
-          width: 3,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Column(
-            children: [
-              // Logo/Icon
-              Icon(
-                Icons.workspace_premium_rounded,
-                color: isUnlocked
-                    ? const Color(0xFF3AA76D)
-                    : Colors.grey.shade400,
-                size: 48,
-              ),
-              const SizedBox(height: 12),
-
-              // Title
-              Text(
-                "CERTIFICATE OF RECOGNITION",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2.0,
-                  color: isUnlocked
-                      ? const Color(0xFF265D3B)
-                      : Colors.grey.shade500,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              Text(
-                "This certificate is proudly presented to",
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 8),
-
-              // User Name
-              Text(
-                displayName,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isUnlocked
-                      ? const Color(0xFF1F2933)
-                      : Colors.grey.shade500,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              Text(
-                "For outstanding dedication to reducing your carbon footprint and achieving a ranking of",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Rank
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: isUnlocked
-                      ? const Color(0xFFEAF6EE)
-                      : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  displayRank,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isUnlocked
-                        ? const Color(0xFF3AA76D)
-                        : Colors.grey.shade600,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Date & Signature area
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Date",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isUnlocked
-                            ? "${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}"
-                            : "Available on the 28th",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isUnlocked
-                              ? Colors.black87
-                              : Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        "CarbonWise Team",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isUnlocked
-                              ? const Color(0xFF265D3B)
-                              : Colors.grey.shade500,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        width: 100,
-                        height: 1,
-                        color: Colors.grey.shade400,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Lock Overlay for locked state
-          if (!isUnlocked)
-            Positioned(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.lock_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

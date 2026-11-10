@@ -4,59 +4,12 @@ import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/dialog_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:carbonwise_app/widgets/terms_conditions_dialog.dart';
-import 'package:app_links/app_links.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const CarbonWiseApp());
-}
-
-void _handleDeepLink(Uri uri) {
-  debugPrint('Deep link received: $uri');
-
-  if (uri.scheme != 'carbonwise') return;
-  if (uri.host != 'open') return;
-
-  final source = uri.queryParameters['source'] ?? '';
-
-  if (source == 'email_verify') {
-    final status = uri.queryParameters['status'] ?? 'unknown';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = navigatorKey.currentContext;
-      if (context == null) return;
-
-      if (status == 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email verified! You can now log in to CarbonWise.'),
-            backgroundColor: Color(0xFF3AA76D),
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    });
-    return;
-  }
-
-  if (source == 'password_reset_success') {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = navigatorKey.currentContext;
-      if (context == null) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Password reset! Please log in with your new password.',
-          ),
-          backgroundColor: Color(0xFF3AA76D),
-          duration: Duration(seconds: 5),
-        ),
-      );
-    });
-    return;
-  }
 }
 
 class CarbonWiseApp extends StatelessWidget {
@@ -391,8 +344,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final data = await ApiService.login(email, password);
-
-      print('TOKEN AFTER LOGIN: ${ApiService.token}');
 
       final user = data['user'];
 

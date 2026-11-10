@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/utils/strategy_notifier.dart';
 import 'package:carbonwise_app/services/gemini_service.dart';
+import 'package:carbonwise_app/utils/dialog_helper.dart'; // 👈 Added
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class StrategiesScreen extends StatefulWidget {
@@ -16,20 +18,17 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
   String _aiRecommendation =
       "Loading your personalized sustainability recommendation...";
-
   String _highestCategory = "";
-
   static const Color primaryGreen = Color(0xFF3AA76D);
 
-  List<String> _recommendedStrategies = [];
+  List<Map<String, dynamic>> _recommendedStrategies = [];
 
   // CACHE
   static String? _cachedRecommendation;
   static String? _cachedCategory;
-  static List<String>? _cachedStrategies;
+  static List<Map<String, dynamic>>? _cachedStrategies;
   static DateTime? _cachedAt;
   static const Duration _cacheDuration = Duration(minutes: 15);
-
   static DateTime? _lastForceRefreshAt;
 
   bool _isLoadingRecommendation = false;
@@ -60,7 +59,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
   void _writeCache(
     String recommendation,
     String category,
-    List<String> strategies,
+    List<Map<String, dynamic>> strategies,
   ) {
     _cachedRecommendation = recommendation;
     _cachedCategory = category;
@@ -68,15 +67,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     _cachedAt = DateTime.now();
   }
 
-  // static void clearCache() {
-  //   _cachedRecommendation = null;
-  //   _cachedCategory = null;
-  //   _cachedStrategies = null;
-  //   _cachedAt = null;
-  //   _lastForceRefreshAt = null;
-  // }
-
-  // BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -91,7 +81,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              // PAGE TITLE
               const Text(
                 "Your Strategies",
                 style: TextStyle(
@@ -100,14 +89,11 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                   color: Color(0xFF1F2933),
                 ),
               ),
-
               const SizedBox(height: 4),
-
               const Text(
                 "Personalized tips to help reduce your carbon footprint.",
                 style: TextStyle(fontSize: 13, color: Colors.black54),
               ),
-
               const SizedBox(height: 20),
 
               // AI COACH CARD
@@ -122,7 +108,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       children: [
                         Container(
@@ -138,9 +123,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                             size: 21,
                           ),
                         ),
-
                         const SizedBox(width: 12),
-
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,9 +136,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                                   color: Color(0xFF1F2933),
                                 ),
                               ),
-
                               SizedBox(height: 2),
-
                               Text(
                                 "Personalized insights based on your latest activity",
                                 style: TextStyle(
@@ -166,8 +147,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                             ],
                           ),
                         ),
-
-                        // Manual refresh button
                         if (!_isLoadingRecommendation)
                           IconButton(
                             splashRadius: 20,
@@ -182,10 +161,8 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                           ),
                       ],
                     ),
-
                     const SizedBox(height: 18),
 
-                    // Recommended category
                     if (_highestCategory.isNotEmpty)
                       Container(
                         width: double.infinity,
@@ -201,9 +178,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                               color: primaryGreen,
                               size: 20,
                             ),
-
                             const SizedBox(width: 10),
-
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,9 +190,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                                       color: Colors.black54,
                                     ),
                                   ),
-
                                   const SizedBox(height: 2),
-
                                   Text(
                                     _highestCategory,
                                     style: const TextStyle(
@@ -232,7 +205,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                           ],
                         ),
                       ),
-
                     if (_highestCategory.isNotEmpty) const SizedBox(height: 20),
 
                     const Text(
@@ -243,7 +215,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                         color: Color(0xFF1F2933),
                       ),
                     ),
-
                     const SizedBox(height: 10),
 
                     if (_isLoadingRecommendation)
@@ -286,9 +257,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
 
               const SizedBox(height: 20),
 
-              // =========================
-              // QUICK TIP SECTION
-              // =========================
               if (_recommendedStrategies.isNotEmpty) ...[
                 const Text(
                   "Recommended Strategies",
@@ -298,9 +266,7 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
                     color: Color(0xFF1F2933),
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 ..._recommendedStrategies.map(
                   (strategy) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -315,13 +281,23 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     );
   }
 
-  Widget _buildStrategyCard(String strategy) {
+  Widget _buildStrategyCard(Map<String, dynamic> strategy) {
+    final isPriority = strategy['priority'] == true;
+    final iconStr = strategy['icon']?.toString() ?? '⚡';
+    final category = strategy['category']?.toString() ?? '';
+    final freq = strategy['frequency']?.toString() ?? '';
+    final impact = strategy['impact']?.toString() ?? '';
+    final unit = strategy['unit']?.toString() ?? '';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: isPriority
+            ? Border.all(color: primaryGreen.withValues(alpha: 0.5), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -340,23 +316,83 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
               color: const Color(0xFFEAF6EE),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.eco_outlined,
-              color: primaryGreen,
-              size: 20,
+            child: Center(
+              child: Text(iconStr, style: const TextStyle(fontSize: 20)),
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
-            child: Text(
-              strategy,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: Color(0xFF1F2933),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        strategy['title']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2933),
+                        ),
+                      ),
+                    ),
+                    if (isPriority)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "Priority",
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  strategy['description']?.toString() ?? '',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (category.isNotEmpty)
+                      _buildPill(
+                        category,
+                        const Color(0xFFF0FDF4),
+                        const Color(0xFF166534),
+                      ),
+                    if (freq.isNotEmpty)
+                      _buildPill(
+                        freq,
+                        const Color(0xFFEFF6FF),
+                        const Color(0xFF1E3A8A),
+                      ),
+                    if (impact.isNotEmpty)
+                      _buildPill(
+                        "$impact $unit",
+                        const Color(0xFFFFF7ED),
+                        const Color(0xFF9A3412),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -364,9 +400,26 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     );
   }
 
+  Widget _buildPill(String text, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+
   // RECOMMENDATION LOADING
   Future<void> _loadRecommendation({bool forceRefresh = false}) async {
-    // 1. Serve from cache if valid and not forced.
     if (!forceRefresh && _cacheIsValid) {
       if (mounted) {
         setState(() {
@@ -379,7 +432,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       return;
     }
 
-    // 2. Guard against spamming Gemini after a 503
     if (forceRefresh &&
         _lastForceRefreshAt != null &&
         DateTime.now().difference(_lastForceRefreshAt!) <
@@ -391,21 +443,19 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
           _recommendedStrategies = _cachedStrategies ?? [];
           _isLoadingRecommendation = false;
         });
-        _showSnack("Please wait a moment before refreshing again.");
+
+        DialogHelper.showWarning(
+          context: context,
+          title: "Please Wait",
+          message: "Please wait a moment before refreshing again.",
+        );
         return;
       }
     }
 
-    if (forceRefresh) {
-      _lastForceRefreshAt = DateTime.now();
-    }
+    if (forceRefresh) _lastForceRefreshAt = DateTime.now();
 
-    // 3. Show loading state.
-    if (mounted) {
-      setState(() {
-        _isLoadingRecommendation = true;
-      });
-    }
+    if (mounted) setState(() => _isLoadingRecommendation = true);
 
     try {
       final email = await ApiService.getCurrentUserEmail();
@@ -426,7 +476,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         return;
       }
 
-      // Aggregate the user's recorded activity.
       double transportation = 0;
       double electricity = 0;
       double food = 0;
@@ -439,7 +488,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         food += double.tryParse(record['food']?.toString() ?? '0') ?? 0.0;
       }
 
-      // Determine highest category.
       String category;
       if (transportation >= electricity && transportation >= food) {
         category = "Transport";
@@ -449,43 +497,87 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
         category = "Food Consumption";
       }
 
-      // Call Gemini with retry + backoff.
       final gemini = GeminiService();
-      final recommendation = await _generateWithRetry(
-        call: () => gemini.generateStrategies(
-          transportation: transportation,
-          electricity: electricity,
-          food: food,
-        ),
-      );
+      String? aiRecommendation;
+
+      try {
+        aiRecommendation = await _generateWithRetry(
+          call: () => gemini.generateStrategies(
+            transportation: transportation,
+            electricity: electricity,
+            food: food,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        _showError(e);
+        return;
+      }
 
       if (!mounted) return;
 
       _highestCategory = category;
-      _parseRecommendation(recommendation);
+
+      try {
+        final cleanJson = aiRecommendation
+            .replaceAll(RegExp(r'```json\s*|\s*```'), '')
+            .trim();
+        final Map<String, dynamic> json = _parseJson(cleanJson);
+
+        final insight =
+            json['insight_summary']?.toString() ??
+            "Here are your recommendations.";
+        final rawStrategies = json['strategies'] as List? ?? [];
+
+        final List<Map<String, dynamic>> parsedStrategies = [];
+        for (var s in rawStrategies) {
+          if (s is Map) parsedStrategies.add(Map<String, dynamic>.from(s));
+        }
+
+        _writeCache(insight, category, parsedStrategies);
+        setState(() {
+          _aiRecommendation = insight;
+          _recommendedStrategies = parsedStrategies;
+        });
+
+        if (forceRefresh && mounted) {
+          DialogHelper.showSuccess(
+            context: context,
+            title: "Strategies Updated",
+            message:
+                "Your personalized AI strategies have been refreshed successfully.",
+          );
+        }
+      } catch (parseError) {
+        _showError("The AI returned an unexpected format. Please try again.");
+      }
     } catch (e) {
       if (!mounted) return;
       _showError(e);
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingRecommendation = false);
-      }
+      if (mounted) setState(() => _isLoadingRecommendation = false);
     }
   }
 
-  // RETRY WITH BACKOFF (handles 503 / 429 from Gemini)
+  Map<String, dynamic> _parseJson(String text) {
+    final start = text.indexOf('{');
+    final end = text.lastIndexOf('}');
+    if (start != -1 && end != -1) {
+      return jsonDecode(text.substring(start, end + 1));
+    }
+    return jsonDecode(text);
+  }
+
   Future<String> _generateWithRetry({
     required Future<String> Function() call,
     int maxAttempts = 3,
   }) async {
     Duration delay = const Duration(seconds: 2);
-
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await call();
       } catch (e) {
         final message = e.toString().toLowerCase();
-
         final isTransient =
             message.contains('503') ||
             message.contains('unavailable') ||
@@ -493,39 +585,26 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
             message.contains('overloaded') ||
             message.contains('429') ||
             message.contains('resource_exhausted');
-
         if (!isTransient || attempt == maxAttempts) rethrow;
-
         await Future.delayed(delay);
         delay *= 2;
       }
     }
-
     throw Exception("AI service unavailable after $maxAttempts attempts.");
   }
 
-  // ERROR + FALLBACK HANDLING
   void _showError(Object e) {
-    final message = e.toString();
+    if (!mounted) return;
 
     String userMessage;
-    if (message.contains('503') || message.contains('UNAVAILABLE')) {
+    final message = e.toString().toLowerCase();
+
+    if (message.contains('503') || message.contains('unavailable')) {
       userMessage =
-          "Our AI coach is briefly overloaded. Please pull down to refresh in a moment.";
-    } else if (message.contains('429') ||
-        message.contains('RESOURCE_EXHAUSTED')) {
+          "Our AI coach is currently experiencing high demand. Please try again later.";
+    } else if (message.contains('429')) {
       userMessage =
           "You've reached today's AI request limit. Please try again later.";
-    } else if (message.contains('401') ||
-        message.contains('API key') ||
-        message.contains('permission')) {
-      userMessage =
-          "The AI service is temporarily unavailable. Please try again later.";
-    } else if (message.contains('SocketException') ||
-        message.contains('TimeoutException') ||
-        message.contains('Failed host lookup')) {
-      userMessage =
-          "Couldn't reach the AI service. Please check your internet and try again.";
     } else {
       userMessage =
           "Unable to generate recommendations right now. Please try again.";
@@ -534,12 +613,16 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
     if (_cachedRecommendation != null && _cachedRecommendation!.isNotEmpty) {
       setState(() {
         _aiRecommendation =
-            "Showing your last recommendation — we couldn't reach the AI coach just now.\n\n"
-            "$_cachedRecommendation";
+            "Showing your last recommendation — we couldn't reach the AI coach just now.\n\n$_cachedRecommendation";
         _highestCategory = _cachedCategory ?? '';
         _recommendedStrategies = _cachedStrategies ?? [];
       });
-      _showSnack(userMessage);
+
+      DialogHelper.showWarning(
+        context: context,
+        title: "AI Service Busy",
+        message: userMessage,
+      );
       return;
     }
 
@@ -548,6 +631,12 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       _recommendedStrategies = [];
       _highestCategory = '';
     });
+
+    DialogHelper.showError(
+      context: context,
+      title: "Recommendation Failed",
+      message: userMessage,
+    );
   }
 
   void _setMessage(String message) {
@@ -557,47 +646,6 @@ class _StrategiesScreenState extends State<StrategiesScreen> {
       _recommendedStrategies = [];
       _highestCategory = '';
       _isLoadingRecommendation = false;
-    });
-  }
-
-  void _showSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          backgroundColor: const Color(0xFF1F2933),
-        ),
-      );
-  }
-
-  // PARSING
-  void _parseRecommendation(String recommendation) {
-    final parts = recommendation.split("STRATEGIES:");
-
-    String mainRecommendation = recommendation;
-    List<String> strategies = [];
-
-    if (parts.length > 1) {
-      mainRecommendation = parts[0].replaceFirst("RECOMMENDATION:", "").trim();
-
-      strategies = parts[1]
-          .split("\n")
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .map((item) => item.replaceFirst(RegExp(r'^[-•\d.]+\s*'), '').trim())
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-
-    _writeCache(mainRecommendation, _highestCategory, strategies);
-
-    setState(() {
-      _aiRecommendation = mainRecommendation;
-      _recommendedStrategies = strategies;
     });
   }
 }

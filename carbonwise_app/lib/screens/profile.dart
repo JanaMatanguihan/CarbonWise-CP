@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:carbonwise_app/services/api_service.dart';
 import 'package:carbonwise_app/screens/edit_profile.dart';
 import 'package:carbonwise_app/utils/profile_refresh_notifier.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:carbonwise_app/utils/dialog_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,6 +19,10 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
+
+  // Certificate Controllers & State
+  final ScreenshotController _screenshotController = ScreenshotController();
+  bool _isDownloading = false;
 
   double _toDouble(dynamic value) =>
       double.tryParse(value?.toString() ?? '0') ?? 0.0;
@@ -33,57 +42,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   double getAverageEmission() {
     if (last4Weeks.isEmpty) return 0;
-
     final now = DateTime.now();
-
     final monthlyRecords = last4Weeks.where((record) {
       final recordDate = DateTime.parse(record["record_date"]);
-
       return recordDate.year == now.year && recordDate.month == now.month;
     }).toList();
 
     if (monthlyRecords.isEmpty) return 0;
 
     double total = 0;
-
     for (final record in monthlyRecords) {
       total += _toDouble(record["total_emission"] ?? 0);
     }
-
     return total / monthlyRecords.length;
   }
 
   String getSustainabilityLevel() {
     final avg = getAverageEmission();
-
-    if (avg <= 5) {
-      return "Eco Champion";
-    } else if (avg <= 10) {
-      return "Green Advocate";
-    } else if (avg <= 20) {
-      return "Conscious User";
-    } else {
-      return "Sustainability Builder";
-    }
+    if (avg <= 5) return "Eco Champion";
+    if (avg <= 10) return "Green Advocate";
+    if (avg <= 20) return "Conscious User";
+    return "Sustainability Builder";
   }
 
   String getSustainabilityMessage() {
     final avg = getAverageEmission();
-
-    if (avg <= 5) {
-      return "Excellent! Your emissions are consistently very low.";
-    } else if (avg <= 10) {
-      return "Great job! You're maintaining sustainable habits.";
-    } else if (avg <= 20) {
-      return "You're making progress. Every small action counts.";
-    } else {
-      return "You're improving. Try lowering this week's emissions.";
-    }
+    if (avg <= 5) return "Excellent! Your emissions are consistently very low.";
+    if (avg <= 10) return "Great job! You're maintaining sustainable habits.";
+    if (avg <= 20) return "You're making progress. Every small action counts.";
+    return "You're improving. Try lowering this week's emissions.";
   }
 
   double getSustainabilityProgress() {
     final avg = getAverageEmission();
-
     if (avg <= 5) return 1.0;
     if (avg <= 10) return 0.75;
     if (avg <= 20) return 0.50;
@@ -92,7 +83,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Color getSustainabilityColor() {
     final avg = getAverageEmission();
-
     if (avg <= 5) return Colors.green;
     if (avg <= 10) return primaryGreen;
     if (avg <= 20) return Colors.orange;
@@ -101,23 +91,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   IconData getSustainabilityIcon() {
     final avg = getAverageEmission();
-
-    if (avg <= 5) {
-      return Icons.emoji_events;
-    } else if (avg <= 10) {
-      return Icons.eco;
-    } else if (avg <= 20) {
-      return Icons.energy_savings_leaf;
-    } else {
-      return Icons.trending_up;
-    }
+    if (avg <= 5) return Icons.emoji_events;
+    if (avg <= 10) return Icons.eco;
+    if (avg <= 20) return Icons.energy_savings_leaf;
+    return Icons.trending_up;
   }
 
   String? getFullImageUrl(String? path) {
     if (path == null || path.isEmpty) return null;
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
 
     final rootUri = Uri.parse(ApiService.baseUrl);
     final origin = '${rootUri.scheme}://${rootUri.authority}';
@@ -131,11 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoadingTimeline = true;
 
   double carbonScore = 0.0;
-  double lastWeekCarbonScore = 0.0;
-  double grandTotalCarbon = 0.0;
-
   String carbonTrendText = "Starting your green track!";
-
   bool isLoadingScore = true;
 
   double transportationEmission = 0;
@@ -154,13 +132,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (_selectedBreakdown) {
       case "Transportation":
         return Icons.directions_bus;
-
       case "Office Resource":
         return Icons.computer;
-
       case "Food Consumption":
         return Icons.restaurant;
-
       default:
         return Icons.eco;
     }
@@ -170,13 +145,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (_selectedBreakdown) {
       case "Transportation":
         return "Transportation";
-
       case "Office Resource":
         return "Office Resource";
-
       case "Food Consumption":
         return "Food Consumption";
-
       default:
         return "";
     }
@@ -186,13 +158,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (_selectedBreakdown) {
       case "Transportation":
         return transportationEmission;
-
       case "Office Resource":
         return officeEmission;
-
       case "Food Consumption":
         return foodEmission;
-
       default:
         return 0;
     }
@@ -200,35 +169,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<Map<String, dynamic>> last4Weeks = [];
 
-  bool hasStartedJourney() {
-    return carbonScore > 0;
-  }
-
-  bool hasEcoCommute() {
-    return transportationEmission > 0 && transportationEmission <= 5;
-  }
-
+  bool hasStartedJourney() => carbonScore > 0;
+  bool hasEcoCommute() =>
+      transportationEmission > 0 && transportationEmission <= 5;
   bool hasGreenStreak() {
     final uniqueDates = <String>{};
-
     for (final activity in recentActivities) {
       uniqueDates.add(activity["time"]);
     }
-
     return uniqueDates.length >= 7;
   }
 
-  bool hasEnergySaver() {
-    return officeEmission > 0 && officeEmission <= 10;
-  }
-
-  bool hasPlantLover() {
-    return foodEmission > 0 && foodEmission <= 8;
-  }
-
-  bool hasEcoChampion() {
-    return carbonScore > 0 && carbonScore <= 20;
-  }
+  bool hasEnergySaver() => officeEmission > 0 && officeEmission <= 10;
+  bool hasPlantLover() => foodEmission > 0 && foodEmission <= 8;
+  bool hasEcoChampion() => carbonScore > 0 && carbonScore <= 20;
 
   @override
   void initState() {
@@ -244,43 +198,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _refreshProfileData() {
-    if (mounted) {
-      _loadUserInfo();
-    }
+    if (mounted) _loadUserInfo();
   }
 
   Future<void> _loadAllProfileData() async {
     await _loadUserInfo();
     if (!mounted) return;
-
     await _loadCarbonScore();
     if (!mounted) return;
-
     await _loadRecentActivities();
     if (!mounted) return;
-
     await _loadLast4Weeks();
   }
 
   Future<void> _loadRecentActivities() async {
     try {
       final email = await ApiService.getCurrentUserEmail();
-
       if (email == null) return;
 
       final records = await _apiService.getRecentActivities(email);
-
       List<Map<String, dynamic>> activities = [];
 
       for (final record in records) {
         final date = record['record_date']?.toString() ?? '';
-
         final transportation =
             double.tryParse(record['transportation'].toString()) ?? 0.0;
-
         final electricity =
             double.tryParse(record['electricity'].toString()) ?? 0.0;
-
         final food = double.tryParse(record['food'].toString()) ?? 0.0;
 
         if (transportation > 0) {
@@ -293,7 +237,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'color': Colors.blue,
           });
         }
-
         if (electricity > 0) {
           activities.add({
             'category': 'Office Resource',
@@ -304,7 +247,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'color': Colors.amber,
           });
         }
-
         if (food > 0) {
           activities.add({
             'category': 'Food Consumption',
@@ -323,32 +265,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } catch (e) {
       print("Timeline Error: $e");
-
-      setState(() {
-        isLoadingTimeline = false;
-      });
+      setState(() => isLoadingTimeline = false);
     }
   }
 
   Future<void> _loadCarbonScore() async {
     try {
       final email = await ApiService.getCurrentUserEmail();
-
-      print("Current user email: $email");
-
       if (email == null) {
         if (!mounted) return;
-
-        setState(() {
-          isLoadingScore = false;
-        });
-
+        setState(() => isLoadingScore = false);
         return;
       }
 
-      // Get all carbon records for the authenticated user.
       final records = await _apiService.getCarbonRecords(email);
-
       final now = DateTime.now();
 
       final currentWeekStart = now.subtract(const Duration(days: 7));
@@ -358,8 +288,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       double currentWeek = 0.0;
       double lastWeek = 0.0;
       double grandTotal = 0.0;
-
-      // CARBON BREAKDOWN
 
       double totalTransportation = 0.0;
       double totalOfficeResource = 0.0;
@@ -374,25 +302,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       int latestFoodRecordId = -1;
 
       for (final record in records) {
-        // TOTAL CATEGORY EMISSIONS
-
         final transportation = _toDouble(record['transportation']);
-
         final electricity = _toDouble(record['electricity']);
-
         final food = _toDouble(record['food']);
 
         totalTransportation += transportation;
         totalOfficeResource += electricity;
         totalFoodConsumption += food;
 
-        // LATEST ACTIVITY DESCRIPTION
-
         final recordId = int.tryParse(record['id']?.toString() ?? '') ?? 0;
 
         if (transportation > 0 && recordId >= latestTransportRecordId) {
           final item = record['transport_item']?.toString() ?? '';
-
           if (item.trim().isNotEmpty) {
             latestTransportItem = _formatActivityName(item);
             latestTransportRecordId = recordId;
@@ -401,7 +322,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (electricity > 0 && recordId >= latestOfficeRecordId) {
           final item = record['office_item']?.toString() ?? '';
-
           if (item.trim().isNotEmpty) {
             latestOfficeItem = _formatActivityName(item);
             latestOfficeRecordId = recordId;
@@ -410,30 +330,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (food > 0 && recordId >= latestFoodRecordId) {
           final item = record['food_item']?.toString() ?? '';
-
           if (item.trim().isNotEmpty) {
             latestFoodItem = _formatActivityName(item);
             latestFoodRecordId = recordId;
           }
         }
 
-        // CARBON SCORE CALCULATION
-
         final totalEmission = _toDouble(record['total_emission']);
-
-        // Lifetime total
         grandTotal += totalEmission;
 
         final recordDateString =
             record['created_at']?.toString() ??
             record['record_date']?.toString();
-
-        if (recordDateString == null || recordDateString.isEmpty) {
-          continue;
-        }
+        if (recordDateString == null || recordDateString.isEmpty) continue;
 
         DateTime? recordDate;
-
         try {
           recordDate = DateTime.parse(recordDateString);
         } catch (_) {
@@ -448,22 +359,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // CARBON SCORE
       final calculatedScore = currentWeek > 0 ? currentWeek : grandTotal;
 
-      // TREND
-
       String trendText = "Starting your green track!";
-
       if (calculatedScore > 0) {
         if (lastWeek > 0) {
           if (calculatedScore < lastWeek) {
             final percentage = ((lastWeek - calculatedScore) / lastWeek) * 100;
-
             trendText = "${percentage.round()}% less than last week";
           } else if (calculatedScore > lastWeek) {
             final percentage = ((calculatedScore - lastWeek) / lastWeek) * 100;
-
             trendText = "${percentage.round()}% more than last week";
           } else {
             trendText = "Same emissions as last week";
@@ -476,59 +381,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       setState(() {
-        // Carbon Score
         carbonScore = double.parse(calculatedScore.toStringAsFixed(1));
-
-        // Carbon Breakdown
         transportationEmission = totalTransportation;
         officeEmission = totalOfficeResource;
         foodEmission = totalFoodConsumption;
-
-        // Latest activity descriptions
         _transportItem = latestTransportItem;
         _officeItem = latestOfficeItem;
         _foodItem = latestFoodItem;
-
         carbonTrendText = trendText;
-
         isLoadingScore = false;
       });
-
-      print("==========================================");
-      print("CARBON SCORE");
-      print("Current 7 days: $currentWeek");
-      print("Previous 7 days: $lastWeek");
-      print("Lifetime total: $grandTotal");
-      print("Carbon Score: $carbonScore");
-      print("Trend: $carbonTrendText");
-      print("------------------------------------------");
-      print("CARBON BREAKDOWN");
-      print("Transportation: $totalTransportation");
-      print("Office Resource: $totalOfficeResource");
-      print("Food Consumption: $totalFoodConsumption");
-      print("Transport Item: $latestTransportItem");
-      print("Office Item: $latestOfficeItem");
-      print("Food Item: $latestFoodItem");
-      print("==========================================");
     } catch (e) {
-      print("Carbon Score / Breakdown Error: $e");
-
       if (!mounted) return;
-
-      setState(() {
-        isLoadingScore = false;
-      });
+      setState(() => isLoadingScore = false);
     }
   }
 
   Future<void> _loadUserInfo() async {
     try {
       final email = await ApiService.getCurrentUserEmail();
-
       if (email == null) {
         if (mounted) {
           setState(() {
-            userInfo = {};
+            userInfo = {'name': 'Profile Unavailable'};
             isLoadingProfile = false;
           });
         }
@@ -547,9 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print("Profile Loading Error: $e");
       if (mounted) {
         setState(() {
-          userInfo = {
-            'name': 'Profile Unavailable',
-          }; // Prevents permanent "Loading..."
+          userInfo = {'name': 'Profile Unavailable'};
           isLoadingProfile = false;
         });
       }
@@ -559,7 +432,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadLast4Weeks() async {
     try {
       final email = await ApiService.getCurrentUserEmail();
-
       if (email == null) return;
 
       final data = await _apiService.getLast4WeeksRecords(email);
@@ -573,6 +445,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       print("Last 4 Weeks Error: $e");
+    }
+  }
+
+  Future<void> _downloadCertificate() async {
+    if (_isDownloading) return;
+    setState(() => _isDownloading = true);
+
+    try {
+      final image = await _screenshotController.capture();
+      if (image == null) {
+        throw Exception("Could not capture the certificate image.");
+      }
+
+      final directory = await getTemporaryDirectory();
+      final imagePath = await File(
+        '${directory.path}/carbonwise_certificate.png',
+      ).create();
+      await imagePath.writeAsBytes(image.buffer.asUint8List());
+
+      await Gal.putImage(imagePath.path);
+
+      if (mounted) {
+        DialogHelper.showSuccess(
+          context: context,
+          title: "Certificate Saved",
+          message:
+              "Your certificate has been successfully downloaded to your gallery.",
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        DialogHelper.showError(
+          context: context,
+          title: "Download Failed",
+          message: "Could not save the certificate. $e",
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
@@ -600,15 +511,331 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 12),
                   _buildCarbonBreakdownCard(),
                   const SizedBox(height: 12),
+
+                  _buildCertificateSection(),
+                  const SizedBox(height: 12),
+
                   _buildAchievementsCard(),
                   const SizedBox(height: 12),
                   _buildPatternsAndTimelineRow(),
-                  const SizedBox(height: 12), // Bottom breathing room
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // CERTIFICATE SECTION UI
+  Widget _buildCertificateSection() {
+    String displayRank = "Top 100%";
+    if (carbonScore > 0) {
+      if (carbonScore <= 10)
+        displayRank = "Top 5%";
+      else if (carbonScore <= 20)
+        displayRank = "Top 15%";
+      else if (carbonScore <= 40)
+        displayRank = "Top 30%";
+      else
+        displayRank = "Top 50%";
+    }
+
+    String displayName =
+        userInfo?['name'] ?? userInfo?['full_name'] ?? "Eco Warrior";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFE5EEE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded, color: primaryGreen, size: 18),
+              const SizedBox(width: 6),
+              const Text(
+                'MONTHLY RECOGNITION',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Here is your official certificate for your sustainability efforts!",
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 16),
+
+          // Certificate UI wrapped in Screenshot
+          Screenshot(
+            controller: _screenshotController,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFDFB),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: primaryGreen.withValues(alpha: 0.4),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryGreen.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: primaryGreen.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Top Award Badge Icon
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: primaryGreen.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: primaryGreen,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "CERTIFICATE OF RECOGNITION",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.2,
+                        color: darkGreen,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 40,
+                      height: 2,
+                      color: primaryGreen.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      "This certificate is proudly presented to",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Display Name using standard fallback serif style
+                    Text(
+                      displayName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'serif',
+                        color: Color(0xFF162A1E),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        "For outstanding dedication to reducing carbon footprint and reaching the top tier of sustainability performance.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Rank Badge Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFEAF6EE),
+                            primaryGreen.withValues(alpha: 0.15),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: primaryGreen.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.eco_rounded,
+                            size: 16,
+                            color: primaryGreen,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            displayRank,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: darkGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Footer Section (Date & Signature)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 80,
+                              height: 1,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "DATE ISSUED",
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              "SDO CarbonWise",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: darkGreen,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 100,
+                              height: 1,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "OFFICIAL ISSUER",
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Action Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isDownloading ? null : _downloadCertificate,
+              icon: _isDownloading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.file_download_outlined),
+              label: Text(
+                _isDownloading
+                    ? "Saving Certificate..."
+                    : "Download Certificate",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -623,11 +850,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String rawRole = userInfo?['role'] ?? '';
     final String facultyType = userInfo?['faculty_type'] ?? '';
 
-    // Dynamically format the role to reflect Teaching/Administrative Faculty
     String role = rawRole;
     if (rawRole.toLowerCase() == 'faculty' && facultyType.isNotEmpty) {
-      role =
-          facultyType; // e.g., "Teaching Faculty" or "Administrative Faculty"
+      role = facultyType;
     } else if (rawRole.toLowerCase() == 'student') {
       role = 'Student';
     } else if (rawRole.toLowerCase() == 'staff' ||
@@ -637,7 +862,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       role = rawRole[0].toUpperCase() + rawRole.substring(1);
     }
 
-    // Fallback to check both department and office fields depending on user type
     final String department =
         userInfo?['department'] ?? userInfo?['office'] ?? '';
     final String campus = userInfo?['campus'] ?? '';
@@ -648,7 +872,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
       child: Column(
         children: [
-          // PAGE TITLE
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -660,10 +883,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // PROFILE CARD
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
@@ -681,7 +901,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Column(
               children: [
-                // PROFILE PICTURE CONTAINER WITH BORDER & SHADOW
                 Container(
                   width: 112,
                   height: 112,
@@ -742,10 +961,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // NAME
                 Text(
                   isLoadingProfile ? 'Loading...' : fullName,
                   textAlign: TextAlign.center,
@@ -755,10 +971,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Color(0xFF1F2933),
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
-                // ROLE & CAMPUS SUB-INFO
                 if (!isLoadingProfile && (role.isNotEmpty || campus.isNotEmpty))
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -796,26 +1009,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                     ],
                   ),
-
                 const SizedBox(height: 4),
-
-                // DEPARTMENT / OFFICE SUB-INFO
                 if (!isLoadingProfile && department.isNotEmpty)
                   Text(
                     department,
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-
                 const SizedBox(height: 20),
-
-                // EDIT PROFILE BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       if (userInfo == null) return;
-
                       final updated = await showDialog<bool>(
                         context: context,
                         builder: (_) => EditProfileDialog(
@@ -834,11 +1040,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           profilePicture: userInfo!['profile_picture'],
                         ),
                       );
-
                       if (updated == true) {
-                        setState(() {
-                          _profilePictureVersion++;
-                        });
+                        setState(() => _profilePictureVersion++);
                         await _loadUserInfo();
                         await _loadCarbonScore();
                         await _loadRecentActivities();
@@ -873,7 +1076,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 2. Sustainability Summary
   Widget _buildScoreRow() {
     final sustainabilityColor = getSustainabilityColor();
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -894,10 +1096,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: textMuted,
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // CARBON SCORE
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -914,9 +1113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   size: 23,
                 ),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,9 +1126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Color(0xFF1F2933),
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 4,
@@ -946,16 +1141,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: darkGreen,
                           ),
                         ),
-
                         const Text(
                           'kg CO₂ / week',
                           style: TextStyle(fontSize: 11, color: textMuted),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
                       isLoadingScore
                           ? 'Calculating your weekly trend...'
@@ -973,13 +1165,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(height: 1, color: Color(0xFFE5EEE8)),
           ),
-
-          // SUSTAINABILITY LEVEL
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -998,7 +1187,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
-
                   Icon(
                     getSustainabilityIcon(),
                     color: sustainabilityColor,
@@ -1006,9 +1194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1021,9 +1207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Color(0xFF1F2933),
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
                       getSustainabilityLevel(),
                       style: TextStyle(
@@ -1032,21 +1216,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: sustainabilityColor,
                       ),
                     ),
-
                     const SizedBox(height: 2),
-
                     Text(
                       getSustainabilityMessage(),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 11, color: textMuted),
                     ),
-
                     const SizedBox(height: 5),
-
                     Text(
-                      "${DateFormat('MMMM').format(DateTime.now())} Average: "
-                      "${getAverageEmission().toStringAsFixed(1)} kg CO₂",
+                      "${DateFormat('MMMM').format(DateTime.now())} Average: ${getAverageEmission().toStringAsFixed(1)} kg CO₂",
                       style: const TextStyle(
                         fontSize: 10,
                         fontStyle: FontStyle.italic,
@@ -1066,46 +1245,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 3. Carbon Emission Breakdown Card
   Widget _buildCarbonBreakdownCard() {
     String currentTitle = "";
-
     switch (_selectedBreakdown) {
       case "Transportation":
         currentTitle = _transportItem;
         break;
-
       case "Office Resource":
         currentTitle = _officeItem;
         break;
-
       case "Food Consumption":
         currentTitle = _foodItem;
         break;
-    }
-
-    double maxEmission = 1;
-
-    for (final item in last4Weeks) {
-      double value;
-
-      switch (_selectedBreakdown) {
-        case "Transportation":
-          value = _toDouble(item["transportation"] ?? 0);
-          break;
-
-        case "Office Resource":
-          value = _toDouble(item["electricity"] ?? 0);
-          break;
-
-        case "Food Consumption":
-          value = _toDouble(item["food"] ?? 0);
-          break;
-
-        default:
-          value = _toDouble(item["total_emission"] ?? 0);
-      }
-
-      if (value > maxEmission) {
-        maxEmission = value;
-      }
     }
 
     return Container(
@@ -1128,10 +1277,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: textMuted,
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // CATEGORY TABS
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1139,43 +1285,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildSubTab(
                   'Transportation',
                   _selectedBreakdown == "Transportation",
-                  onTap: () {
-                    setState(() {
-                      _selectedBreakdown = "Transportation";
-                    });
-                  },
+                  onTap: () =>
+                      setState(() => _selectedBreakdown = "Transportation"),
                 ),
-
                 const SizedBox(width: 8),
-
                 _buildSubTab(
                   'Office Resource',
                   _selectedBreakdown == "Office Resource",
-                  onTap: () {
-                    setState(() {
-                      _selectedBreakdown = "Office Resource";
-                    });
-                  },
+                  onTap: () =>
+                      setState(() => _selectedBreakdown = "Office Resource"),
                 ),
-
                 const SizedBox(width: 8),
-
                 _buildSubTab(
                   'Food Consumption',
                   _selectedBreakdown == "Food Consumption",
-                  onTap: () {
-                    setState(() {
-                      _selectedBreakdown = "Food Consumption";
-                    });
-                  },
+                  onTap: () =>
+                      setState(() => _selectedBreakdown = "Food Consumption"),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 18),
-
-          // THIS WEEK
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
@@ -1195,9 +1325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: textMuted,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 4,
@@ -1212,16 +1340,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: primaryGreen,
                       ),
                     ),
-
                     const Text(
                       'kg CO₂',
                       style: TextStyle(fontSize: 12, color: textMuted),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   isLoadingScore
                       ? 'Loading your emission data...'
@@ -1235,10 +1360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // TOP CONTRIBUTOR
           Row(
             children: [
               Container(
@@ -1250,9 +1372,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Icon(currentIcon, color: darkGreen, size: 20),
               ),
-
               const SizedBox(width: 10),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1265,9 +1385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: textMuted,
                       ),
                     ),
-
                     const SizedBox(height: 2),
-
                     Text(
                       currentTitle.isEmpty ? "No data yet" : currentTitle,
                       maxLines: 1,
@@ -1278,9 +1396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Color(0xFF1F2933),
                       ),
                     ),
-
                     const SizedBox(height: 2),
-
                     const Text(
                       'Your highest-impact tracked item.',
                       style: TextStyle(fontSize: 10, color: textMuted),
@@ -1290,7 +1406,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(height: 1, color: Color(0xFFE5EEE8)),
@@ -1325,9 +1440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 14),
-
           SizedBox(
             height: 155,
             child: ListView(
@@ -1341,9 +1454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   hasStartedJourney(),
                   "Log your first carbon emission.",
                 ),
-
                 const SizedBox(width: 10),
-
                 _buildAchievementItem(
                   "Eco Commuter",
                   "Transportation emissions kept below 5 kg CO₂.",
@@ -1351,9 +1462,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   hasEcoCommute(),
                   "Keep transportation emissions below 5 kg CO₂.",
                 ),
-
                 const SizedBox(width: 10),
-
                 _buildAchievementItem(
                   "Energy Saver",
                   "You kept your office resource emissions low!",
@@ -1361,9 +1470,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   hasEnergySaver(),
                   "Keep your Office Resource emissions below 10 kg CO₂.",
                 ),
-
                 const SizedBox(width: 10),
-
                 _buildAchievementItem(
                   "Plant Lover",
                   "Excellent food choices this month!",
@@ -1371,9 +1478,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   hasPlantLover(),
                   "Keep your Food Consumption emissions below 8 kg CO₂.",
                 ),
-
                 const SizedBox(width: 10),
-
                 _buildAchievementItem(
                   "Eco Champion",
                   "Outstanding carbon footprint!",
@@ -1393,7 +1498,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildPatternsAndTimelineRow() {
     return Column(
       children: [
-        // ACTIVITY TIMELINE
         _buildSectionCard(
           title: 'Recent Activity',
           child: Column(
@@ -1411,9 +1515,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       Icon(Icons.history_rounded, size: 38, color: textMuted),
-
                       SizedBox(height: 8),
-
                       Text(
                         'No recent activity',
                         style: TextStyle(
@@ -1421,14 +1523,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1F2933),
                         ),
-                      ),
-
-                      SizedBox(height: 4),
-
-                      Text(
-                        'Your carbon activities will appear here.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, color: textMuted),
                       ),
                     ],
                   ),
@@ -1444,19 +1538,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     activity['color'],
                   ),
                 ),
-
               if (!isLoadingTimeline && recentActivities.isNotEmpty) ...[
                 const SizedBox(height: 8),
-
                 const Divider(),
-
                 const SizedBox(height: 4),
-
                 InkWell(
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () {
-                    _showFullTimeline();
-                  },
+                  onTap: () => _showFullTimeline(),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(
@@ -1470,9 +1558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(width: 5),
-
                         Icon(
                           Icons.arrow_forward_rounded,
                           size: 15,
@@ -1568,7 +1654,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 125,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-
         onTap: () {
           showDialog(
             context: context,
@@ -1577,7 +1662,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-
                 title: Row(
                   children: [
                     Container(
@@ -1597,9 +1681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         size: 20,
                       ),
                     ),
-
                     const SizedBox(width: 10),
-
                     Expanded(
                       child: Text(
                         title,
@@ -1611,17 +1693,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
-
                 content: Text(
                   unlocked ? unlockedDescription : unlockRequirement,
                   style: const TextStyle(fontSize: 13, height: 1.4),
                 ),
-
                 actions: [
                   TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                     child: const Text(
                       "Got it",
                       style: TextStyle(
@@ -1635,25 +1713,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           );
         },
-
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 250),
           opacity: unlocked ? 1 : 0.55,
-
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
             decoration: BoxDecoration(
               color: unlocked ? const Color(0xFFF8FCF9) : Colors.grey.shade100,
-
               borderRadius: BorderRadius.circular(16),
-
               border: Border.all(
                 color: unlocked
                     ? primaryGreen.withValues(alpha: 0.25)
                     : Colors.grey.shade300,
               ),
             ),
-
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1675,7 +1748,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         size: 26,
                       ),
                     ),
-
                     if (!unlocked)
                       Container(
                         width: 22,
@@ -1693,9 +1765,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -1707,9 +1777,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: unlocked ? darkGreen : Colors.grey,
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   unlocked ? "Unlocked" : "Locked",
                   style: TextStyle(
@@ -1744,7 +1812,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          // Activity Icon
           Container(
             width: 42,
             height: 42,
@@ -1754,10 +1821,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Icon(icon, color: color, size: 21),
           ),
-
           const SizedBox(width: 12),
-
-          // Activity Information
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1772,9 +1836,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: color,
                   ),
                 ),
-
                 const SizedBox(height: 2),
-
                 Text(
                   title,
                   maxLines: 1,
@@ -1785,9 +1847,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Color(0xFF1F2933),
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   time,
                   maxLines: 1,
@@ -1797,10 +1857,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-
           const SizedBox(width: 8),
-
-          // Carbon Impact
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1814,9 +1871,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: darkGreen,
                 ),
               ),
-
               const SizedBox(height: 3),
-
               const Text(
                 'CO₂ impact',
                 style: TextStyle(fontSize: 9, color: textMuted),
@@ -1847,8 +1902,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 10),
-
-                  // Drag handle
                   Container(
                     width: 42,
                     height: 4,
@@ -1857,9 +1910,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
                   const Text(
                     'Activity Timeline',
                     style: TextStyle(
@@ -1868,9 +1919,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Color(0xFF1F2933),
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
                   Expanded(
                     child: isLoadingTimeline
                         ? const Center(
@@ -1896,15 +1945,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Your recent carbon activities will appear here.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: textMuted,
-                                  ),
-                                ),
                               ],
                             ),
                           )
@@ -1914,7 +1954,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             itemCount: recentActivities.length,
                             itemBuilder: (context, index) {
                               final activity = recentActivities[index];
-
                               return _buildTimelineItem(
                                 activity['category'],
                                 activity['title'],
