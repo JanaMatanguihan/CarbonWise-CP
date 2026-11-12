@@ -714,6 +714,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
+                <!-- Dynamic Bottom Field for Faculty -->
+                <div id="facultyContainer" style="display: none;">
+                    <div class="form-group">
+                        <label>Faculty Type</label>
+                        <select name="faculty_type" id="facultyTypeField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
+                            <option value="">Choose Faculty Type</option>
+                            <option value="Teaching Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Teaching Faculty') ? 'selected' : '' ?>>Teaching Faculty</option>
+                            <option value="Administrative Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Administrative Faculty') ? 'selected' : '' ?>>Administrative Faculty</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Shared Department Field Container -->
                 <div id="departmentContainer" style="display: none;">
                     <div class="form-group">
@@ -725,18 +737,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="College of Arts and Sciences" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Arts and Sciences') ? 'selected' : '' ?>>College of Arts and Sciences</option>
                             <option value="College of Engineering and Technology" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Engineering and Technology') ? 'selected' : '' ?>>College of Engineering and Technology</option>
                             <option value="College of Business, Accountancy, and Economics" <?= (isset($_POST['department']) && $_POST['department'] === 'College of Business, Accountancy, and Economics') ? 'selected' : '' ?>>College of Business, Accountancy, and Economics</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Dynamic Bottom Field for Faculty -->
-                <div id="facultyContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Faculty Type</label>
-                        <select name="faculty_type" id="facultyTypeField" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #fff;">
-                            <option value="">Choose Faculty Type</option>
-                            <option value="Teaching Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Teaching Faculty') ? 'selected' : '' ?>>Teaching Faculty</option>
-                            <option value="Administrative Faculty" <?= (isset($_POST['faculty_type']) && $_POST['faculty_type'] === 'Administrative Faculty') ? 'selected' : '' ?>>Administrative Faculty</option>
                         </select>
                     </div>
                 </div>
