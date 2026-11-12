@@ -1784,44 +1784,44 @@ if (empty($avatar_url)) {
 
                 // Medal
                 ctx.fillStyle = '#E6F4EA';
-                ctx.beginPath(); ctx.arc(cx, 215, 74, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx, 180, 74, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#2D8F5E';
-                ctx.beginPath(); ctx.arc(cx, 206, 42, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx, 171, 42, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath();
-                ctx.moveTo(cx - 28, 241); ctx.lineTo(cx - 37, 292); ctx.lineTo(cx, 273);
-                ctx.lineTo(cx + 37, 292); ctx.lineTo(cx + 28, 241); ctx.closePath(); ctx.fill();
+                ctx.moveTo(cx - 28, 206); ctx.lineTo(cx - 37, 257); ctx.lineTo(cx, 238);
+                ctx.lineTo(cx + 37, 257); ctx.lineTo(cx + 28, 206); ctx.closePath(); ctx.fill();
                 ctx.fillStyle = '#ffffff'; ctx.font = '700 50px ' + font;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('★', cx, 208);
+                ctx.fillText('★', cx, 173);
                 ctx.textBaseline = 'alphabetic';
 
                 // Title
                 ctx.fillStyle = '#2D6A4F'; ctx.font = '700 44px ' + font;
                 if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
-                ctx.fillText('CERTIFICATE OF RECOGNITION', cx + 5, 375);
+                ctx.fillText('CERTIFICATE OF RECOGNITION', cx + 5, 335);
                 if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 
                 // Month + year chip
                 ctx.font = '700 34px ' + font;
                 const chipText = cert.month + ' ' + cert.year;
                 const cw = ctx.measureText(chipText).width + 80;
-                ctx.fillStyle = '#E6F4EA'; roundRect(ctx, cx - cw / 2, 400, cw, 64, 32); ctx.fill();
-                ctx.fillStyle = '#2D6A4F'; ctx.fillText(chipText, cx, 445);
+                ctx.fillStyle = '#E6F4EA'; roundRect(ctx, cx - cw / 2, 360, cw, 64, 32); ctx.fill();
+                ctx.fillStyle = '#2D6A4F'; ctx.fillText(chipText, cx, 405);
 
                 ctx.fillStyle = '#718096'; ctx.font = '400 30px ' + font;
-                ctx.fillText('This certificate is proudly presented to', cx, 530);
+                ctx.fillText('This certificate is proudly presented to', cx, 490);
 
                 // Name
                 let size = 96;
                 ctx.fillStyle = '#1A202C';
                 do { ctx.font = '800 ' + size + 'px ' + font; size -= 4; }
                 while (ctx.measureText(cert.name).width > W - 300 && size > 40);
-                ctx.fillText(cert.name, cx, 635);
+                ctx.fillText(cert.name, cx, 595);
 
                 // Description
                 ctx.fillStyle = '#718096'; ctx.font = '400 30px ' + font;
                 const desc = 'For outstanding dedication to reducing your carbon footprint and ' + cert.headline;
-                let y = 705;
+                let y = 665;
                 wrapText(ctx, desc, W - 420).forEach(function (l) { ctx.fillText(l, cx, y); y += 42; });
 
                 // Tier pill
@@ -1833,21 +1833,21 @@ if (empty($avatar_url)) {
 
                 // Reason
                 ctx.fillStyle = '#718096'; ctx.font = '400 24px ' + font;
-                y += 150;
+                y += 138;
                 wrapText(ctx, cert.reason, W - 380).forEach(function (l) { ctx.fillText(l, cx, y); y += 34; });
 
                 // Footer: date issued (with year) + signature
                 ctx.textAlign = 'left';
                 ctx.fillStyle = '#718096'; ctx.font = '400 24px ' + font;
-                ctx.fillText('Date Issued', 170, H - 190);
+                ctx.fillText('Date Issued', 170, H - 160);
                 ctx.fillStyle = '#1A202C'; ctx.font = '700 32px ' + font;
-                ctx.fillText(cert.issued, 170, H - 145);
+                ctx.fillText(cert.issued, 170, H - 118);
 
                 ctx.textAlign = 'center';
                 ctx.fillStyle = '#2D6A4F'; ctx.font = 'italic 700 32px ' + font;
-                ctx.fillText('CarbonWise Team', W - 330, H - 160);
+                ctx.fillText('CarbonWise Team', W - 330, H - 128);
                 ctx.strokeStyle = '#CBD5E0'; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(W - 520, H - 140); ctx.lineTo(W - 140, H - 140); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(W - 520, H - 108); ctx.lineTo(W - 140, H - 108); ctx.stroke();
                 return canvas;
             }
 
