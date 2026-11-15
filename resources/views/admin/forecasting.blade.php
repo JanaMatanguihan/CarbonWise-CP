@@ -344,7 +344,7 @@
         </div>
 
 
-        <!-- =================================================
+            <!-- =================================================
              ML INTEGRATION POINT 1: FORECAST DATA FROM LARAVEL
              =================================================
 
@@ -354,17 +354,11 @@
              Laravel ForecastService.php sends historical carbon
              records to the TFT API and receives the forecast.
 
-             The following Blade variables are supplied by Laravel:
-
              $labels          = Historical dates
              $values          = Historical emissions
              $forecastLabels  = TFT forecast dates
              $forecastValues  = TFT forecast predictions
-
-             This Blade file only displays the returned data.
-             It does not train or execute the ML model.
-
-        -->
+             -->
 
         <div
             id="forecastData"

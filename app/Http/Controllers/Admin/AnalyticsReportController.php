@@ -13,6 +13,9 @@ use Carbon\Carbon;
 
 class AnalyticsReportController extends Controller
 {
+    /**
+     * Display Analytics and Reports dashboard.
+     */
     public function index()
     {
         // Filters
@@ -134,20 +137,194 @@ class AnalyticsReportController extends Controller
     /**
      * Export PDF Report.
      *
-     * Limits the number of detail rows rendered by DomPDF
-     * to help prevent timeouts with large datasets.
+     * Exports the latest 500 carbon records,
+     * including the associated user's email.
      */
     public function exportPDF()
     {
+        /*
+         * Retrieve carbon records and join the users table.
+         * The email is selected as user_email for the PDF view.
+         */
         $records = CarbonRecord::query()
-            ->orderByDesc('record_date')
-            ->orderByDesc('id')
+            ->leftJoin(
+                'users',
+                'carbon_records.user_id',
+                '=',
+                'users.id'
+            )
+            ->select([
+                'carbon_records.*',
+                'users.email as user_email',
+            ])
+            ->orderByDesc('carbon_records.record_date')
+            ->orderByDesc('carbon_records.id')
             ->limit(500)
             ->get();
 
+        /*
+         * Overall report statistics.
+         */
+        $recordCount = $records->count();
+
+        // Sum of the total_emission column.
+        $totalEmissions = (float) $records->sum('total_emission');
+
+        // Average total emission per carbon record.
+        $averageEmissionPerRecord = $recordCount > 0
+            ? $totalEmissions / $recordCount
+            : 0;
+
+        /*
+         * Calculate emissions by source.
+         */
+        $sourceTotals = [
+            'Transportation' => (float) $records->sum('transportation'),
+            'Electricity' => (float) $records->sum('electricity'),
+            'Food' => (float) $records->sum('food'),
+        ];
+
+        /*
+         * Combined source emissions.
+         */
+        $combinedSourceTotal = array_sum($sourceTotals);
+
+        /*
+         * Rank sources from highest to lowest.
+         */
+        $rankedSources = $sourceTotals;
+
+        arsort($rankedSources);
+
+        /*
+         * Identify the highest contributing source.
+         */
+        $highestSource = null;
+        $highestPercentage = 0;
+
+        if ($combinedSourceTotal > 0) {
+            $highestSource = array_key_first($rankedSources);
+
+            $highestPercentage =
+                ($rankedSources[$highestSource] / $combinedSourceTotal) * 100;
+        }
+
+        /*
+         * Calculate each source's percentage contribution.
+         */
+        $sourcePercentages = [];
+
+        foreach ($sourceTotals as $source => $value) {
+            $sourcePercentages[$source] = $combinedSourceTotal > 0
+                ? ($value / $combinedSourceTotal) * 100
+                : 0;
+        }
+
+        /*
+         * Compare total_emission with the sum of the
+         * three source columns.
+         *
+         * A difference may indicate that total_emission
+         * includes other components or uses different
+         * calculation logic.
+         */
+        $emissionDifference = $totalEmissions - $combinedSourceTotal;
+
+        /*
+         * Source-specific mitigation recommendations.
+         */
+        $recommendations = [
+            'Transportation' =>
+                'Encourage public transportation, carpooling, walking, ' .
+                'cycling, and more efficient travel practices.',
+
+            'Electricity' =>
+                'Promote energy-efficient appliances, switch off unused ' .
+                'equipment, and practice responsible electricity consumption.',
+
+            'Food' =>
+                'Encourage sustainable food choices, reduce food waste, ' .
+                'and promote responsible food consumption.',
+        ];
+
+        $recommendation = $highestSource !== null
+            ? $recommendations[$highestSource]
+            : 'No recommendation can be generated because no emission data is available.';
+
+        /*
+         * Overall source interpretation.
+         */
+        if ($highestSource !== null) {
+            $interpretation =
+                $highestSource .
+                ' is the leading emission source, contributing ' .
+                number_format($highestPercentage, 2) .
+                '% of the combined source emissions. ' .
+                'It has the largest share among the three monitored ' .
+                'categories. Prioritizing reduction efforts in this ' .
+                'category may help address a substantial portion of ' .
+                'the recorded source emissions.';
+        } else {
+            $interpretation =
+                'No source emission data is available for the exported records.';
+        }
+
+        /*
+         * Total emissions interpretation.
+         */
+        if ($recordCount > 0) {
+            $totalInterpretation =
+                'The ' . number_format($recordCount) .
+                ' exported carbon records contain a total of ' .
+                number_format($totalEmissions, 2) .
+                ' kg CO2e based on the total_emission field. ' .
+                'The average emission per carbon record is ' .
+                number_format($averageEmissionPerRecord, 2) .
+                ' kg CO2e.';
+        } else {
+            $totalInterpretation =
+                'No carbon records are available for this report.';
+        }
+
+        /*
+         * Source comparison interpretation.
+         */
+        if ($combinedSourceTotal > 0) {
+            $sourceComparisonInterpretation =
+                'Transportation contributes ' .
+                number_format($sourcePercentages['Transportation'], 2) .
+                '%, Electricity contributes ' .
+                number_format($sourcePercentages['Electricity'], 2) .
+                '%, and Food contributes ' .
+                number_format($sourcePercentages['Food'], 2) .
+                '% of the combined source emissions.';
+        } else {
+            $sourceComparisonInterpretation =
+                'No source contributions are available for comparison.';
+        }
+
+        /*
+         * Prepare data for the PDF Blade template.
+         */
         $pdf = Pdf::loadView(
             'admin.analytics-pdf',
-            compact('records')
+            compact(
+                'records',
+                'recordCount',
+                'totalEmissions',
+                'averageEmissionPerRecord',
+                'sourceTotals',
+                'combinedSourceTotal',
+                'rankedSources',
+                'sourcePercentages',
+                'highestSource',
+                'highestPercentage',
+                'emissionDifference',
+                'interpretation',
+                'totalInterpretation',
+                'sourceComparisonInterpretation',
+                'recommendation'
+            )
         )->setPaper('a4', 'landscape');
 
         return $pdf->download(

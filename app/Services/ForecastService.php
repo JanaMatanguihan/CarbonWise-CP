@@ -13,9 +13,7 @@ class ForecastService
         set_time_limit(0);
 
         /*
-        |--------------------------------------------------------------------------
         | COMMUNITY DATA CUTOFF
-        |--------------------------------------------------------------------------
         |
         | July 20, 2026 is the last verified date containing
         | community-level aggregated emission data.
@@ -25,17 +23,16 @@ class ForecastService
         |
         */
 
+        // Keep community-level forecasting data within the verified cutoff.
         $communityDataCutoff = '2026-07-20';
 
         /*
-        |--------------------------------------------------------------------------
         | RETRIEVE HISTORICAL COMMUNITY DATA
-        |--------------------------------------------------------------------------
-        |
         | Aggregate all users' carbon records by date.
         |
         */
 
+        // Aggregate all users' emissions into one daily community time series.
         $records = CarbonRecord::query()
             ->whereDate('record_date', '<=', $communityDataCutoff)
             ->select('record_date')
@@ -48,9 +45,7 @@ class ForecastService
             ->get();
 
         /*
-        |--------------------------------------------------------------------------
         | PREPARE CONTINUOUS DAILY RECORDS
-        |--------------------------------------------------------------------------
         |
         | Missing dates are forward-filled temporarily.
         | No database records are created or modified.
@@ -105,9 +100,7 @@ class ForecastService
         }
 
         /*
-        |--------------------------------------------------------------------------
         | TFT V6 API CONFIGURATION
-        |--------------------------------------------------------------------------
         |
         | Read the API URL from Laravel configuration.
         | This allows local V6 testing without hardcoding
@@ -120,15 +113,14 @@ class ForecastService
         $predictionInterval = null;
         $modelUsed = null;
 
+        // Read the FastAPI endpoint from Laravel's services configuration.
         $tftApiUrl = rtrim(
             (string) config('services.tft.url', ''),
             '/'
         );
 
         /*
-        |--------------------------------------------------------------------------
         | REQUEST TFT V6 FORECAST
-        |--------------------------------------------------------------------------
         |
         | Send historical community records to the API.
         |
@@ -141,6 +133,7 @@ class ForecastService
 
             try {
 
+                // Send the prepared historical records to the TFT V6 service.
                 $response = Http::timeout(120)
                     ->post(
                         $tftApiUrl . '/forecast',
@@ -216,12 +209,9 @@ class ForecastService
             ->sortBy('record_date')
             ->values();
 
-        /*
-        |--------------------------------------------------------------------------
-        | FORECAST SUMMARY CALCULATIONS
-        |--------------------------------------------------------------------------
-        */
+        /*FORECAST SUMMARY CALCULATIONS*/
 
+        // Summarize the returned median forecasts for the dashboard.
         $predictedEmissions = $forecast->sum('forecast');
 
         $predictedDailyAverage = $forecast->isNotEmpty()
@@ -229,9 +219,7 @@ class ForecastService
             : null;
 
         /*
-        |--------------------------------------------------------------------------
         | TFT V6 MODEL EVALUATION METRICS
-        |--------------------------------------------------------------------------
         |
         | Source: Previously evaluated V6 validation results.
         |
@@ -246,6 +234,7 @@ class ForecastService
         |
         */
 
+        // Previously computed validation metrics; these are not recalculated here.
         $rmse = 122.26;
         $mae = 93.02;
         $r2 = 0.8823;
@@ -254,12 +243,9 @@ class ForecastService
 
         $evaluationPeriod = 'V6 Validation | 180 Days';
 
-        /*
-        |--------------------------------------------------------------------------
-        | RETURN DATA TO THE FORECASTING DASHBOARD
-        |--------------------------------------------------------------------------
-        */
+        /* RETURN DATA TO THE FORECASTING DASHBOARD*/
 
+        // Pass historical data, forecasts, and evaluation details to the Blade view.
         return [
 
             // Historical community emissions
@@ -303,10 +289,7 @@ class ForecastService
                 'forecast'
             ),
 
-            /*
-            |--------------------------------------------------------------------------
-            | ML INTEGRATION: TFT V6 PREDICTION BOUNDARIES
-            |--------------------------------------------------------------------------
+            /* ML INTEGRATION: TFT V6 PREDICTION BOUNDARIES
             |
             | These values are generated by the trained TFT V6
             | model and returned by the FastAPI service.
