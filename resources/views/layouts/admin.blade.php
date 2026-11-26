@@ -1115,7 +1115,7 @@
 
             <!-- Logout -->
 
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route('logout') }}" id="carbonLogoutForm">
                 @csrf
 
                 <button type="submit" class="carbon-logout-button">
@@ -1385,6 +1385,36 @@
 
         const exportDropdown = document.getElementById('carbonExportDropdown');
         const exportButton = document.getElementById('carbonExportButton');
+
+        /* Logout confirmation using SweetAlert2 */
+
+        const logoutForm = document.getElementById('carbonLogoutForm');
+
+        if (logoutForm) {
+            logoutForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: 'You will be logged out of your CarbonWise administrator account.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#15803d',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Yes, log out',
+                    cancelButtonText: 'Cancel',
+                    reverseButtons: true,
+                    focusCancel: true,
+                    customClass: {
+                        popup: 'carbon-swal-popup'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        logoutForm.submit();
+                    }
+                });
+            });
+        }
 
         /* Export dropdown */
 
