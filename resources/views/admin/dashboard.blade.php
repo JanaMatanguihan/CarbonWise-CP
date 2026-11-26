@@ -436,7 +436,7 @@
 
     {{-- Top statistics --}}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 
         {{-- Total Users --}}
 
@@ -524,37 +524,12 @@
 
         </div>
 
-
-        {{-- Mitigation Actions --}}
-
-        <div class="overview-card px-5 py-4 flex items-center gap-4 min-h-[104px]">
-
-            <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <img
-                    src="{{ asset('icons/leaf.png') }}"
-                    class="w-6 h-6 object-contain"
-                    alt="Mitigation"
-                >
-            </div>
-
-            <div>
-                <p class="overview-stat-label">
-                    Mitigation Actions
-                </p>
-
-                <h2 class="overview-stat-value">
-                    {{ $mitigationCount }}
-                </h2>
-            </div>
-
-        </div>
-
     </div>
 
 
     {{-- Emissions section --}}
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 
         {{-- Emissions Trend --}}
 
@@ -799,7 +774,7 @@
 
     {{-- Forecast and activity section --}}
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
         {{-- Forecasted Emissions --}}
 
@@ -945,167 +920,6 @@
 
         </div>
 
-
-        {{-- Recent Alerts --}}
-
-        <div class="overview-card p-5">
-
-            <div class="mb-4">
-
-                <h3 class="overview-card-title">
-                    Recent Alerts
-                </h3>
-
-                <p class="overview-card-description mt-1">
-                    Latest system notifications
-                </p>
-
-            </div>
-
-            @if($recentAlerts->isEmpty())
-
-                <div class="overview-empty">
-
-                    <p class="overview-small">
-                        No alerts available.
-                    </p>
-
-                </div>
-
-            @else
-
-                <div class="space-y-4">
-
-                    @foreach($recentAlerts as $alert)
-
-                        <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-
-                            <div class="flex items-center gap-3 min-w-0">
-
-                                @if($alert->severity === 'critical')
-
-                                    <div class="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                                        <span class="text-red-600 font-bold">
-                                            !
-                                        </span>
-                                    </div>
-
-                                @elseif($alert->severity === 'warning')
-
-                                    <div class="w-9 h-9 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                                        <span class="text-yellow-600 font-bold">
-                                            !
-                                        </span>
-                                    </div>
-
-                                @else
-
-                                    <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                        <span class="text-blue-600 font-semibold">
-                                            i
-                                        </span>
-                                    </div>
-
-                                @endif
-
-                                <div class="min-w-0">
-
-                                    <p class="overview-alert-title truncate">
-                                        {{ $alert->title }}
-                                    </p>
-
-                                    <p class="overview-alert-message truncate">
-                                        {{ Str::limit($alert->message, 45) }}
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-                            <span class="overview-alert-time">
-                                {{ $alert->created_at->diffForHumans() }}
-                            </span>
-
-                        </div>
-
-                    @endforeach
-
-                </div>
-
-            @endif
-
-        </div>
-
-    </div>
-
-
-    {{-- Recommended mitigation strategies --}}
-
-    <div class="overview-card p-5">
-
-        <div class="mb-4">
-
-            <h3 class="overview-card-title">
-                Recommended Mitigation Strategies
-            </h3>
-
-            <p class="overview-card-description mt-1">
-                Suggested actions for reducing carbon emissions
-            </p>
-
-        </div>
-
-        @if($recommendedStrategies->isEmpty())
-
-            <p class="overview-small">
-                No mitigation strategies available.
-            </p>
-
-        @else
-
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-
-                @foreach($recommendedStrategies as $strategy)
-
-                    <div class="flex items-start gap-3 border-r last:border-r-0 pr-4">
-
-                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-
-                            <img
-                                src="{{ asset('icons/leaf.png') }}"
-                                class="w-5 h-5 object-contain"
-                                alt="Mitigation"
-                            >
-
-                        </div>
-
-                        <div class="min-w-0">
-
-                            <h4 class="overview-strategy-title">
-                                {{ $strategy->title }}
-                            </h4>
-
-                            <p class="overview-strategy-description mt-1">
-                                {{ $strategy->description }}
-                            </p>
-
-                            @if(isset($strategy->carbon_reduced))
-
-                                <p class="overview-strategy-saving mt-2">
-                                    Saves {{ number_format($strategy->carbon_reduced, 2) }} kg CO₂e
-                                </p>
-
-                            @endif
-
-                        </div>
-
-                    </div>
-
-                @endforeach
-
-            </div>
-
-        @endif
 
     </div>
 

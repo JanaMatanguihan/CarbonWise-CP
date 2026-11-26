@@ -1076,23 +1076,7 @@
                 <span>Forecasting</span>
             </a>
 
-            <a
-                href="{{ route('admin.mitigation') }}"
-                class="carbon-nav-link {{ request()->routeIs('admin.mitigation*') ? 'active' : '' }}"
-                @if(request()->routeIs('admin.mitigation*')) aria-current="page" @endif
-            >
-                <img src="{{ asset('icons/mitigation.png') }}" alt="" aria-hidden="true">
-                <span>Mitigation Strategies</span>
-            </a>
-
-            <a
-                href="{{ route('admin.alerts') }}"
-                class="carbon-nav-link {{ request()->routeIs('admin.alerts*') ? 'active' : '' }}"
-                @if(request()->routeIs('admin.alerts*')) aria-current="page" @endif
-            >
-                <img src="{{ asset('icons/alerts.png') }}" alt="" aria-hidden="true">
-                <span>Alerts &amp; Notifications</span>
-            </a>
+            
 
         </nav>
 
