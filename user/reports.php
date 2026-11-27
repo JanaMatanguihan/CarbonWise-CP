@@ -213,41 +213,181 @@ foreach ($timeframe_over_time as $tf_key => $dates) {
 }
 
 // ==========================================================================
-// 3. FETCH OR GENERATE FORECAST RECORDS
+// 3. 30-DAY FORECAST  (CarbonWise TFT V6 API - same 90-entry rule as the mobile app)
 // ==========================================================================
-$forecast_labels = [];
-$forecast_data   = [];
 
-try {
-    $stmt_fore = $pdo->prepare("
-        SELECT forecast_date, predicted_emission 
-        FROM forecast_records 
-        ORDER BY forecast_date ASC 
-        LIMIT 30
+// ---- TFT API SETTINGS (change these when you deploy the API) ----
+// Start the API locally with:  uvicorn app_v6:app --host 127.0.0.1 --port 8000
+$TFT_API_URL       = getenv('CARBONWISE_TFT_URL') ?: 'http://127.0.0.1:8000/forecast';
+$TFT_REQUIRED_DAYS = 90;       // logged days needed before a forecast is shown (same as mobile)
+$TFT_HISTORY_DAYS  = 150;      // days of history sent to the model
+$TFT_SCALE_TARGET  = 14600.0;  // typical daily total_emission in the model's training data
+$TFT_TIMEOUT       = 25;       // seconds to wait for the API
+$TFT_RETRY_AFTER   = 300;      // seconds to wait before retrying after an API failure
+
+/**
+ * Ask the TFT V6 API for a 30-day forecast of this user's emissions.
+ * Returns ['labels','data','lower','upper'] or null when the API cannot be used.
+ *
+ * The model was trained on campus-level totals (about 14,600 kg/day), while one
+ * student logs about 10-20 kg/day. The user's history is therefore scaled up to
+ * the model's range before sending, and the forecast is scaled back down.
+ */
+function carbonwise_tft_forecast(PDO $pdo, $user_id, $api_url, $history_days, $scale_target, $timeout)
+{
+    if (!$user_id || !function_exists('curl_init')) {
+        return null;
+    }
+
+    $today = date('Y-m-d');
+    $since = date('Y-m-d', strtotime('-' . ($history_days - 1) . ' days'));
+
+    // One row per day (several transport entries on one day are summed).
+    $stmt = $pdo->prepare("
+        SELECT record_date::date AS d,
+               SUM(COALESCE(transportation, 0)) AS t,
+               SUM(COALESCE(electricity, 0))    AS e,
+               SUM(COALESCE(food, 0))           AS f,
+               SUM(COALESCE(total_emission, COALESCE(transportation,0) + COALESCE(electricity,0) + COALESCE(food,0))) AS tot
+        FROM carbon_records
+        WHERE user_id = :uid AND record_date::date >= :since AND record_date::date <= :today
+        GROUP BY record_date::date
+        ORDER BY record_date::date ASC
     ");
-    $stmt_fore->execute();
-    $forecast_rows = $stmt_fore->fetchAll();
+    $stmt->execute([':uid' => $user_id, ':since' => $since, ':today' => $today]);
+    $rows = $stmt->fetchAll();
 
-    foreach ($forecast_rows as $row) {
-        $forecast_labels[] = date('n/j', strtotime($row['forecast_date']));
-        $forecast_data[]   = (float)$row['predicted_emission'];
+    if (!$rows) {
+        return null;
     }
-} catch (PDOException $e) {
-    $forecast_rows = [];
+
+    $by_date = [];
+    $sum = ['t' => 0.0, 'e' => 0.0, 'f' => 0.0, 'tot' => 0.0];
+    foreach ($rows as $r) {
+        $by_date[$r['d']] = [
+            't' => (float)$r['t'], 'e' => (float)$r['e'],
+            'f' => (float)$r['f'], 'tot' => (float)$r['tot'],
+        ];
+        foreach ($sum as $k => $_) { $sum[$k] += (float)$r[$k]; }
+    }
+
+    $n    = count($by_date);
+    $mean = array_map(function ($v) use ($n) { return $v / $n; }, $sum);
+
+    if ($mean['tot'] <= 0) {
+        return null;
+    }
+
+    $k = $scale_target / $mean['tot'];
+
+    // Continuous daily series up to today (the API needs no gaps).
+    // A day with nothing logged is filled with the user's average day.
+    $first   = array_key_first($by_date);
+    $records = [];
+    for ($ts = strtotime($first); $ts <= strtotime($today); $ts += 86400) {
+        $d   = date('Y-m-d', $ts);
+        $day = $by_date[$d] ?? $mean;
+        $records[] = [
+            'record_date'    => $d,
+            'transportation' => round($day['t']   * $k, 4),
+            'electricity'    => round($day['e']   * $k, 4),
+            'food'           => round($day['f']   * $k, 4),
+            'total_emission' => round($day['tot'] * $k, 4),
+        ];
+    }
+
+    $ch = curl_init($api_url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS     => json_encode(['records' => $records]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT        => $timeout,
+    ]);
+    $response = curl_exec($ch);
+    $status   = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($response === false || $status !== 200) {
+        error_log("CarbonWise TFT API failed (HTTP $status): " . substr((string)$response, 0, 300));
+        return null;
+    }
+
+    $json = json_decode($response, true);
+    if (empty($json['forecast']) || !is_array($json['forecast'])) {
+        return null;
+    }
+
+    $out = ['labels' => [], 'data' => [], 'lower' => [], 'upper' => []];
+    foreach ($json['forecast'] as $row) {
+        $out['labels'][] = date('n/j', strtotime($row['record_date']));
+        $out['data'][]   = round(max(0, (float)$row['forecast']    / $k), 2);
+        $out['lower'][]  = round(max(0, (float)$row['lower_bound'] / $k), 2);
+        $out['upper'][]  = round(max(0, (float)$row['upper_bound'] / $k), 2);
+    }
+
+    return count($out['data']) ? $out : null;
 }
 
-if (empty($forecast_data)) {
-    $base_emission = ($total_this_week > 0) ? ($total_this_week / 7) : 12.5;
-    
-    for ($i = 1; $i <= 30; $i++) {
-        $future_date = date('Y-m-d', strtotime("+$i days"));
-        $forecast_labels[] = date('n/j', strtotime($future_date));
-        
-        $variation = sin($i / 3) * 2.5 + (rand(-10, 10) / 10.0);
-        $predicted_val = max(1.5, round($base_emission + $variation, 2));
-        $forecast_data[] = $predicted_val;
+$forecast_labels   = [];
+$forecast_data     = [];
+$forecast_lower    = [];
+$forecast_upper    = [];
+$forecast_state    = 'building';   // building | ready | unavailable
+$forecast_have     = 0;            // days the user has logged
+$forecast_required = $TFT_REQUIRED_DAYS;
+
+if ($user_id) {
+    try {
+        // How many different days has this user logged, and did anything change?
+        $stmt_sig = $pdo->prepare("
+            SELECT COUNT(DISTINCT record_date::date) AS days,
+                   COUNT(*) AS c,
+                   COALESCE(SUM(total_emission), 0) AS s
+            FROM carbon_records WHERE user_id = :uid
+        ");
+        $stmt_sig->execute([':uid' => $user_id]);
+        $sig_row       = $stmt_sig->fetch();
+        $forecast_have = (int)$sig_row['days'];
+
+        if ($forecast_have >= $forecast_required) {
+            $signature = date('Y-m-d') . '|' . $sig_row['c'] . '|' . round((float)$sig_row['s'], 4);
+
+            $cache      = $_SESSION['tft_cache'][$user_id] ?? null;
+            $force      = isset($_GET['tft_refresh']);
+            $same       = $cache && ($cache['sig'] ?? '') === $signature && !$force;
+            $cache_ok   = $same && !empty($cache['result']);
+            $retry_wait = $same && !empty($cache['fail_until']) && $cache['fail_until'] > time();
+
+            if ($cache_ok) {
+                $tft = $cache['result'];
+            } elseif ($retry_wait) {
+                $tft = null;
+            } else {
+                $tft = carbonwise_tft_forecast($pdo, $user_id, $TFT_API_URL, $TFT_HISTORY_DAYS, $TFT_SCALE_TARGET, $TFT_TIMEOUT);
+                $_SESSION['tft_cache'][$user_id] = $tft
+                    ? ['sig' => $signature, 'result' => $tft]
+                    : ['sig' => $signature, 'fail_until' => time() + $TFT_RETRY_AFTER];
+            }
+
+            if ($tft) {
+                $forecast_labels = $tft['labels'];
+                $forecast_data   = $tft['data'];
+                $forecast_lower  = $tft['lower'];
+                $forecast_upper  = $tft['upper'];
+                $forecast_state  = 'ready';
+            } else {
+                $forecast_state = 'unavailable';
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('CarbonWise TFT integration error: ' . $e->getMessage());
+        if ($forecast_have >= $forecast_required) { $forecast_state = 'unavailable'; }
     }
 }
+
+$forecast_pct = (int)min(100, round(($forecast_have / max(1, $forecast_required)) * 100));
 
 // Compute Growth Rate Delta
 if ($total_prev_month > 0) {
@@ -645,6 +785,14 @@ function time_elapsed_string($datetime, $full = false) {
         .fc-sel-close:hover { background: rgba(0,0,0,0.05); }
         .fc-sel-close:focus-visible { outline: 2px solid var(--fc-line); }
 
+        .fc-chart[hidden], .fc-stats[hidden] { display: none; }
+        .fc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 56px 16px 48px; gap: 10px; }
+        .fc-empty-ico { width: 88px; height: 88px; border-radius: 50%; background: var(--mint-card); color: var(--fc-line); display: flex; align-items: center; justify-content: center; font-size: 1.9rem; margin-bottom: 14px; }
+        .fc-empty h4 { font-size: 1.15rem; font-weight: 700; color: var(--text-main); }
+        .fc-empty p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; }
+        .fc-empty-bar { width: 100%; max-width: 520px; height: 10px; border-radius: 999px; background: var(--fc-grid); overflow: hidden; margin-top: 12px; }
+        .fc-empty-bar span { display: block; height: 100%; border-radius: 999px; background: var(--fc-line); transition: width 0.4s ease; }
+        .fc-empty small { font-size: 0.78rem; color: var(--text-muted); }
         .fc-stats { display: grid; grid-template-columns: 1fr 1fr; margin-top: 16px; padding: 16px 6px; background: var(--mint-soft); border-radius: 16px; }
         .fc-stat { display: flex; flex-direction: column; gap: 8px; padding: 0 16px; min-width: 0; }
         .fc-stat + .fc-stat { border-left: 1px solid var(--border-color); }
@@ -881,9 +1029,25 @@ function time_elapsed_string($datetime, $full = false) {
 
                 <div class="fc-body" id="fcBody">
                     <div class="fc-body-inner">
-                        <p class="fc-desc">Projected carbon footprint for the upcoming month. Swipe horizontally to see all 30 days.</p>
+                        <p class="fc-desc">Projected carbon footprint for the upcoming month. Swipe horizontally to see all 30 days.<?php if ($forecast_state === 'ready'): ?> Powered by the CarbonWise TFT V6 model.<?php endif; ?></p>
 
-                        <div class="fc-chart">
+                        <?php if ($forecast_state === 'building'): ?>
+                        <div class="fc-empty">
+                            <div class="fc-empty-ico"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                            <h4>Building your emission history</h4>
+                            <p>You have recorded <?= (int)$forecast_have; ?> of <?= (int)$forecast_required; ?> required history entries.</p>
+                            <div class="fc-empty-bar"><span style="width: <?= $forecast_pct; ?>%"></span></div>
+                            <small><?= $forecast_pct; ?>% of required history</small>
+                        </div>
+                        <?php elseif ($forecast_state === 'unavailable'): ?>
+                        <div class="fc-empty">
+                            <div class="fc-empty-ico"><i class="fa-solid fa-cloud-bolt"></i></div>
+                            <h4>Forecast temporarily unavailable</h4>
+                            <p>The forecasting service could not be reached. Please try again in a few minutes.</p>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="fc-chart" <?= $forecast_state === 'ready' ? '' : 'hidden'; ?>>
                             <div class="fc-yaxis" id="fcY" aria-hidden="true"></div>
                             <div class="fc-scroll" id="fcScroll"><svg id="fcSvg" role="img" aria-label="30-day emissions forecast line chart"></svg></div>
                         </div>
@@ -897,7 +1061,7 @@ function time_elapsed_string($datetime, $full = false) {
                             <button type="button" class="fc-sel-close" id="fcSelClose" aria-label="Clear selection"><i class="fa-solid fa-xmark"></i></button>
                         </div>
 
-                        <div class="fc-stats">
+                        <div class="fc-stats" <?= $forecast_state === 'ready' ? '' : 'hidden'; ?>>
                             <div class="fc-stat">
                                 <span class="fc-stat-label"><i class="fa-solid fa-arrow-trend-up"></i> Daily Average</span>
                                 <span class="fc-stat-val" id="fcAvg">–</span>
@@ -1173,6 +1337,8 @@ function time_elapsed_string($datetime, $full = false) {
 
         const forecastLabels = <?= json_encode($forecast_labels); ?>;
         const forecastData   = <?= json_encode($forecast_data); ?>;
+        const forecastLower  = <?= json_encode($forecast_lower); ?>;
+        const forecastUpper  = <?= json_encode($forecast_upper); ?>;
 
         const getGridColor = (t) => t === 'dark' ? '#1B3A2B' : '#E5E7EB';
         const getLabelColor = (t) => t === 'dark' ? '#9CA3AF' : '#6B7280';
@@ -1261,7 +1427,15 @@ function time_elapsed_string($datetime, $full = false) {
             var selDate = document.getElementById('fcSelDate');
             var selVal = document.getElementById('fcSelVal');
             var selClose = document.getElementById('fcSelClose');
-            if (!card || !svg || !n) { if (card) card.style.display = 'none'; return; }
+            if (!card || !svg || !n) {
+                if (card && toggle) {
+                    toggle.addEventListener('click', function () {
+                        var c = card.classList.toggle('collapsed');
+                        toggle.setAttribute('aria-expanded', c ? 'false' : 'true');
+                    });
+                }
+                return;
+            }
 
             // summary stats
             var sum = vals.reduce(function (a, b) { return a + b; }, 0);
@@ -1354,6 +1528,9 @@ function time_elapsed_string($datetime, $full = false) {
                 if (selected === null) { selBox.hidden = true; return; }
                 selDate.textContent = labels[selected];
                 selVal.innerHTML = vals[selected].toFixed(2) + ' kg CO<sub>2</sub>e predicted';
+                if (forecastLower.length === n && forecastUpper.length === n) {
+                    selVal.innerHTML += ' <small style="font-weight:500;opacity:.7;">(likely ' + Number(forecastLower[selected]).toFixed(2) + ' – ' + Number(forecastUpper[selected]).toFixed(2) + ' kg)</small>';
+                }
                 selBox.hidden = false;
                 selBox.style.animation = 'none'; void selBox.offsetWidth; selBox.style.animation = '';
             }
